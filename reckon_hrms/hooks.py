@@ -35,9 +35,5 @@ doc_events = {
     for doctype in TENANT_OWNED_DOCTYPES
 }
 
-# Tenant access follows every assignment (roles, company permission).
-doc_events.setdefault("Tenant User Assignment", {}).update({
-    "after_insert": "reckon_hrms.access.sync_tenant_user_access",
-    "on_update": "reckon_hrms.access.sync_tenant_user_access",
-})
+# Tenant User Assignment access is reconciled by the platform (reckon_saas_platform.team).
 

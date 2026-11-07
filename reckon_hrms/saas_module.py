@@ -12,6 +12,7 @@ from reckon_hrms.constants import (
     MODULE_KEY,
     MODULE_LABEL,
     ROLES,
+    TENANT_OWNED_DOCTYPES,
     WORKSPACE,
 )
 
@@ -31,4 +32,7 @@ def get_module_definition() -> dict:
         "desk_guard": DESK_GUARD,
         "desk_doctypes": list(DESK_DOCTYPES),
         "desk_workspaces": list(DESK_WORKSPACES),
+        # The platform creates per-company roles and reconciles team access for these.
+        "tenant_role_prefix": "Reckon HRMS",
+        "tenant_doctypes": list(TENANT_OWNED_DOCTYPES),
     }
