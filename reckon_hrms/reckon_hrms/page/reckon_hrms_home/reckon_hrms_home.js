@@ -1,6 +1,6 @@
 // Reckon HRMS home: role-specific dashboard, rendered inside the Desk so the left nav is the Desk's.
 frappe.pages["reckon-hrms-home"].on_page_load = function (wrapper) {
-	const page = frappe.ui.make_app_page({ parent: wrapper, title: "My home", single_column: true });
+	const page = frappe.ui.make_app_page({ parent: wrapper, title: "Dashboard", single_column: true });
 	const root = $(`<div class="rhrms-home"></div>`).appendTo(page.main);
 	root.html(`<style>${STYLE}</style><div class="rhrms-muted">Loading your home…</div>`);
 
