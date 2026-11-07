@@ -107,8 +107,6 @@ function panel_kpi(d) {
 	const sugg = d.suggestions.map((s) => `<li>${esc(s)}</li>`).join("");
 	return `<div class="rhd-tiles">${d.kpis.map(tile).join("")}</div>
 		<div class="rhd-grid">
-			<div class="rhd-card"><h4>Pending items</h4><ul class="list">${pending}</ul></div>
-			<div class="rhd-card"><h4>Suggestions</h4><ul class="list">${sugg}</ul></div>
 		</div>`;
 }
 
