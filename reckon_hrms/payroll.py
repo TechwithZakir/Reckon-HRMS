@@ -51,15 +51,19 @@ def setup_bd_payroll(company: str) -> dict:
             frappe.db.set_value("Salary Component", row["salary_component"], "depends_on_payment_days",
                                 row["depends_on_payment_days"])
 
-    # Payroll needs a holiday list per employee. Give employees without one the company calendar.
-    holiday_list = frappe.db.get_value("Holiday List", {"company": company}, "name", order_by="from_date desc")
-    created["holiday_list_assigned"] = 0
-    if holiday_list:
-        missing = frappe.get_all("Employee", filters={"company": company, "status": "Active",
-                                 "holiday_list": ["is", "not set"]}, pluck="name", limit_page_length=0)
-        for emp in missing:
-            frappe.db.set_value("Employee", emp, "holiday_list", holiday_list)
-        created["holiday_list_assigned"] = len(missing)
+    # HRMS resolves holidays from Holiday List Assignment, so the company calendar needs a submitted
+    # company-level assignment. It covers every employee without a personal assignment.
+    created["holiday_assignment"] = False
+    calendar = frappe.db.get_value("Holiday List", {"company": company}, ["name", "from_date"],
+                                   as_dict=True, order_by="from_date desc")
+    if calendar and not frappe.db.exists("Holiday List Assignment", {"assigned_to": company,
+                                         "applicable_for": "Company", "docstatus": 1}):
+        hla = frappe.get_doc({"doctype": "Holiday List Assignment", "applicable_for": "Company",
+                              "assigned_to": company, "holiday_list": calendar.name,
+                              "from_date": calendar.from_date})
+        hla.insert(ignore_permissions=True)
+        hla.submit()
+        created["holiday_assignment"] = True
 
     name = structure_name(company)
     if not frappe.db.exists("Salary Structure", name):
