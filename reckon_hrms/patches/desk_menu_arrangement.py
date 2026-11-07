@@ -1,8 +1,9 @@
 """Arrange the whole Reckon HRMS desk menu under /desk/reckon-hrms and hide the stock Frappe HR workspaces.
 
-Groups follow the work an HR owner does: Home, People, Time & Attendance, Leave & Approvals, Payroll,
-Statutory and Setup. Pages that live outside the Desk (home, check-in) are added as URL links. Stock
-Frappe HR workspaces are hidden from the sidebar so tenants only see the Reckon HRMS menu. Idempotent.
+Groups follow the work an HR owner does. The sidebar lists DocTypes and Reports. Pages that live outside
+the Desk (my home, check-in) are URL shortcuts, because workspace links only accept DocType, Page or Report
+targets. The desk content blocks are rebuilt from the same menu. Stock Frappe HR workspaces are hidden so
+tenants only see the Reckon HRMS menu. Idempotent.
 """
 
 import json
@@ -11,6 +12,7 @@ import frappe
 
 WORKSPACE = "Reckon HRMS"
 
+# (group, items). Items: ("DocType", name) | ("Report", name) | ("URL", path, label)
 MENU = (
     ("Home", (
         ("URL", "/hrms-home", "My home"),
@@ -29,6 +31,7 @@ MENU = (
         ("DocType", "Shift Assignment"),
         ("DocType", "Holiday List"),
         ("DocType", "Holiday List Assignment"),
+        ("Report", "Monthly Attendance Sheet"),
     )),
     ("Leave & Approvals", (
         ("DocType", "Leave Application"),
@@ -36,7 +39,7 @@ MENU = (
         ("DocType", "Leave Allocation"),
         ("DocType", "Expense Claim"),
         ("DocType", "Expense Claim Type"),
-        ("URL", "/app/query-report/Employee Leave Balance", "Leave balance"),
+        ("Report", "Employee Leave Balance"),
     )),
     ("Payroll", (
         ("DocType", "Salary Structure"),
@@ -45,68 +48,95 @@ MENU = (
         ("DocType", "Additional Salary"),
         ("DocType", "Payroll Entry"),
         ("DocType", "Salary Slip"),
-        ("URL", "/app/query-report/Salary Register", "Salary register"),
-    )),
-    ("Reports", (
-        ("URL", "/app/query-report/Monthly Attendance Sheet", "Monthly attendance sheet"),
-        ("URL", "/app/query-report/Salary Register", "Salary register"),
-        ("URL", "/app/query-report/Employee Leave Balance", "Leave balance"),
+        ("Report", "Salary Register"),
     )),
 )
 
+STOCK_HR_NAMES = ("Frappe HR", "HR", "HR Setup", "Human Resources", "Frappe HRMS", "HRMS")
 
-def _menu_rows():
+
+def _item_label(item) -> str:
+    return item[2] if item[0] == "URL" else item[1]
+
+
+def _exists(item) -> bool:
+    if item[0] == "DocType":
+        return frappe.db.exists("DocType", item[1])
+    if item[0] == "Report":
+        return frappe.db.exists("Report", item[1])
+    return True
+
+
+def _link_rows() -> list[dict]:
     rows = []
     for group, items in MENU:
         rows.append({"type": "Card Break", "label": group})
         for item in items:
-            kind = item[0]
-            if kind == "URL":
-                _, url, label = item
-                rows.append({"type": "URL", "link_to": url, "label": label})
+            if item[0] == "URL" or not _exists(item):
+                continue
+            if item[0] == "DocType":
+                rows.append({"type": "Link", "link_type": "DocType", "link_to": item[1], "label": item[1]})
             else:
-                doctype = item[1]
-                if frappe.db.exists("DocType", doctype):
-                    rows.append({"type": "Link", "link_type": "DocType", "link_to": doctype, "label": doctype})
+                rows.append({"type": "Link", "link_type": "Report", "link_to": item[1], "label": item[1]})
     return rows
 
 
-def _shortcut_rows():
+def _shortcut_rows() -> list[dict]:
     rows = []
-    for row in _menu_rows():
-        if row["type"] == "Link":
-            rows.append({"type": "DocType", "link_to": row["link_to"], "label": row["label"], "color": "Blue"})
+    for _group, items in MENU:
+        for item in items:
+            if not _exists(item):
+                continue
+            if item[0] == "URL":
+                rows.append({"type": "URL", "url": item[1], "label": item[2], "color": "Blue"})
+            elif item[0] == "DocType":
+                rows.append({"type": "DocType", "link_to": item[1], "label": item[1], "color": "Blue"})
+            else:
+                rows.append({"type": "Report", "link_to": item[1], "label": item[1], "color": "Blue"})
     return rows
+
+
+def _content_blocks() -> list[dict]:
+    blocks = []
+    for index, (group, items) in enumerate(MENU):
+        blocks.append({"id": f"rhrms-h{index}", "type": "header",
+                       "data": {"text": f'<span class="h4">{group}</span>', "col": 12}})
+        for item in items:
+            if not _exists(item):
+                continue
+            label = _item_label(item)
+            blocks.append({"id": f"rhrms-s-{label.replace(' ', '-').replace('/', '-').lower()}",
+                           "type": "shortcut", "data": {"shortcut_name": label, "col": 3}})
+    return blocks
 
 
 def _rebuild_workspace():
     if not frappe.db.exists("Workspace", WORKSPACE):
         return
     ws = frappe.get_doc("Workspace", WORKSPACE)
-    links = _menu_rows()
+    links = _link_rows()
     shortcuts = _shortcut_rows()
-    current = [(r.type, r.label, r.link_to) for r in ws.links]
-    target = [(r["type"], r["label"], r.get("link_to")) for r in links]
-    if current != target:
+    blocks = _content_blocks()
+
+    current_links = [(r.type, r.label, r.link_to) for r in ws.links]
+    if current_links != [(r["type"], r["label"], r.get("link_to")) for r in links]:
         ws.set("links", [])
         for row in links:
             ws.append("links", row)
-    if len(ws.shortcuts) != len(shortcuts):
+    current_short = [(r.type, r.label, r.link_to or r.url) for r in ws.shortcuts]
+    if current_short != [(r["type"], r["label"], r.get("link_to") or r.get("url")) for r in shortcuts]:
         ws.set("shortcuts", [])
         for row in shortcuts:
             ws.append("shortcuts", row)
+    ws.content = json.dumps(blocks)
     ws.is_hidden = 0
     ws.save(ignore_permissions=True)
-
-
-STOCK_HR_NAMES = ("Frappe HR", "HR", "HR Setup", "Human Resources", "Frappe HRMS", "HRMS")
 
 
 def _hide_frappe_hr():
     names = set(frappe.get_all("Workspace", filters={"name": ["in", list(STOCK_HR_NAMES)]}, pluck="name"))
     names |= set(frappe.get_all("Workspace", filters={"module": ["in", ["HR", "HRMS", "Human Resources"]]},
                                 pluck="name"))
-    names |= set(frappe.get_all("Workspace", filters={"name": ["like", "%HR%"]}, pluck="name"))
     names.discard(WORKSPACE)
     for name in names:
         if frappe.db.get_value("Workspace", name, "is_hidden") != 1:
