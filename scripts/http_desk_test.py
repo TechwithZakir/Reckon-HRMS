@@ -56,8 +56,9 @@ for email, spec in USERS.items():
         status, _ = fetch(path, sid)
         print("HTTP", email, path, status, "OK" if status == 200 else "UNEXPECTED")
     for path in spec["blocked"]:
-        status, _ = fetch(path, sid)
-        print("HTTP", email, path, status, "OK" if status in (403, 417) else "UNEXPECTED")
+        status, body = fetch(path, sid)
+        marker = "covers" in body or "not permitted" in body.lower() or "permission" in body.lower()
+        print("HTTP", email, path, status, "BLOCKED_MSG" if marker else "NO_BLOCK_MSG", "OK" if (status in (403, 417) or marker) else "UNEXPECTED")
     q = urllib.parse.quote(spec["api_allowed"])
     status, body = fetch(f"/api/resource/{q}?limit_page_length=0&fields=%5B%22name%22%2C%22company%22%5D", sid)
     companies = sorted({row.get("company") for row in json.loads(body).get("data", [])}) if status == 200 else []
