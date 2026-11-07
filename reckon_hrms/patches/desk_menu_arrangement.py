@@ -63,7 +63,7 @@ def _menu_rows():
             kind = item[0]
             if kind == "URL":
                 _, url, label = item
-                rows.append({"type": "URL", "url": url, "label": label, "is_query_report": 0})
+                rows.append({"type": "URL", "link_to": url, "label": label})
             else:
                 doctype = item[1]
                 if frappe.db.exists("DocType", doctype):
@@ -85,8 +85,8 @@ def _rebuild_workspace():
     ws = frappe.get_doc("Workspace", WORKSPACE)
     links = _menu_rows()
     shortcuts = _shortcut_rows()
-    current = [(r.type, r.label, r.link_to or r.url) for r in ws.links]
-    target = [(r["type"], r["label"], r.get("link_to") or r.get("url")) for r in links]
+    current = [(r.type, r.label, r.link_to) for r in ws.links]
+    target = [(r["type"], r["label"], r.get("link_to")) for r in links]
     if current != target:
         ws.set("links", [])
         for row in links:
@@ -99,12 +99,15 @@ def _rebuild_workspace():
     ws.save(ignore_permissions=True)
 
 
+STOCK_HR_NAMES = ("Frappe HR", "HR", "HR Setup", "Human Resources", "Frappe HRMS", "HRMS")
+
+
 def _hide_frappe_hr():
-    names = frappe.get_all(
-        "Workspace",
-        filters=[["name", "like", "%HR%"], ["name", "!=", WORKSPACE]],
-        pluck="name",
-    )
+    names = set(frappe.get_all("Workspace", filters={"name": ["in", list(STOCK_HR_NAMES)]}, pluck="name"))
+    names |= set(frappe.get_all("Workspace", filters={"module": ["in", ["HR", "HRMS", "Human Resources"]]},
+                                pluck="name"))
+    names |= set(frappe.get_all("Workspace", filters={"name": ["like", "%HR%"]}, pluck="name"))
+    names.discard(WORKSPACE)
     for name in names:
         if frappe.db.get_value("Workspace", name, "is_hidden") != 1:
             frappe.db.set_value("Workspace", name, "is_hidden", 1)
