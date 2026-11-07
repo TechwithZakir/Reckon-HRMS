@@ -39,6 +39,8 @@ def fetch(path, sid):
 
 frappe.init(site=SITE)
 frappe.connect()
+from werkzeug.test import EnvironBuilder
+frappe.local.request = EnvironBuilder(path="/", base_url="http://" + SITE).get_request()
 sids = {}
 for email in USERS:
     frappe.local.login_manager = None
