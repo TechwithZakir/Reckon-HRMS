@@ -169,6 +169,8 @@ def _rebuild_sidebar():
                                  "header_icon": "users"})
     for row in items:
         row["added"] = 1  # Frappe treats only added rows as items; other rows are references to base items
+        if row["type"] == "Link":
+            row["indent"] = 1  # links sit under the section heading above them
         custom.append("sidebar_items", row)
     if existing:
         custom.save(ignore_permissions=True)
