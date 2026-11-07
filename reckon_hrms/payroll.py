@@ -71,10 +71,14 @@ def setup_bd_payroll(company: str) -> dict:
                          formula=row.get("formula", ""), amount=row.get("amount", 0)) for row in EARNINGS]
         deductions = [dict(row, amount_based_on_formula=1 if "formula" in row else 0,
                            formula=row.get("formula", ""), amount=row.get("amount", 0)) for row in DEDUCTIONS]
-        frappe.get_doc({
+        structure = frappe.get_doc({
             "doctype": "Salary Structure", "name": name, "company": company, "is_active": "Yes",
             "payroll_frequency": "Monthly", "earnings": earnings, "deductions": deductions,
         }).insert(ignore_permissions=True)
+        structure.submit()  # assignments and slips only accept a submitted structure
+        created["structure"] = True
+    elif frappe.db.get_value("Salary Structure", name, "docstatus") == 0:
+        frappe.get_doc("Salary Structure", name).submit()
         created["structure"] = True
 
     if not frappe.db.exists("Print Format", PRINT_FORMAT):
