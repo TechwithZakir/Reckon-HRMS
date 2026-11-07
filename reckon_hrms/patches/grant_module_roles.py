@@ -7,7 +7,7 @@ read/write/create. Employees get no default access here.
 
 import frappe
 
-from reckon_hrms.constants import ADMIN_ROLE, TENANT_OWNED_DOCTYPES
+from reckon_hrms.constants import ADMIN_ROLE, ROLES, TENANT_OWNED_DOCTYPES
 
 MANAGER_ROLE = "Reckon HRMS Manager"
 
@@ -18,6 +18,11 @@ GRANTS = {
 
 
 def execute():
+    for role in ROLES:
+        if not frappe.db.exists("Role", role):
+            frappe.get_doc({"doctype": "Role", "role_name": role, "desk_access": 1}).insert(
+                ignore_permissions=True
+            )
     for doctype in TENANT_OWNED_DOCTYPES:
         if not frappe.db.exists("DocType", doctype):
             continue
