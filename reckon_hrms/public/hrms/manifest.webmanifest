@@ -1,0 +1,10 @@
+{
+  "name": "Reckon HRMS",
+  "short_name": "HRMS",
+  "start_url": "/hrms-home",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f3fb",
+  "theme_color": "#6d4cff",
+  "description": "Attendance, leave, payroll and approvals for your team."
+}
