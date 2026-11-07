@@ -75,6 +75,10 @@ def decide(doctype: str, name: str, decision: str, amount: float | None = None, 
         if approved and (sanctioned <= 0 or sanctioned > claimed):
             frappe.throw(_("Sanctioned amount must be between 0 and the claimed amount."))
         doc.approval_status = "Approved" if approved else "Rejected"
+        # HRMS recomputes the header from the row-level sanctioned amounts, so scale the rows too.
+        ratio = (sanctioned / claimed) if (approved and claimed) else 0
+        for row in doc.expenses:
+            row.sanctioned_amount = round(flt(row.amount) * ratio, 2) if approved else 0
         doc.total_sanctioned_amount = sanctioned if approved else 0
     if remark:
         doc.add_comment("Comment", remark)
