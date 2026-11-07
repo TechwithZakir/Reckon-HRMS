@@ -38,7 +38,7 @@ def ensure_shared_defaults() -> dict:
 
 
 def ensure_company_defaults(company: str) -> dict:
-    """Company-owned starter masters: each tenant gets its own departments."""
+    """Company-owned starter masters: departments and a holiday calendar for each tenant."""
     created = 0
     for name in DEPARTMENTS:
         if not frappe.db.exists("Department", {"department_name": name, "company": company}):
@@ -46,7 +46,20 @@ def ensure_company_defaults(company: str) -> dict:
                 ignore_permissions=True
             )
             created += 1
-    return {"departments": created}
+    holiday_list = f"Standard Holidays - {company}"[:140]
+    holiday_list_created = 0
+    if not frappe.db.exists("Holiday List", {"company": company}):
+        year = frappe.utils.getdate().year
+        frappe.get_doc({
+            "doctype": "Holiday List",
+            "holiday_list_name": holiday_list,
+            "company": company,
+            "from_date": f"{year}-01-01",
+            "to_date": f"{year}-12-31",
+            "weekly_off": "Friday",
+        }).insert(ignore_permissions=True)
+        holiday_list_created = 1
+    return {"departments": created, "holiday_list": holiday_list_created}
 
 
 def run_hrms_seed(company: str, seed_version: str) -> dict:
