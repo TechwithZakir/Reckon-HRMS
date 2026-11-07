@@ -186,7 +186,8 @@ def _manager(company: str) -> dict:
 
 def _manager_onboarding(company: str, headcount: int) -> list[dict]:
     def has(doctype, filters):
-        return bool(frappe.get_list(doctype, filters=filters, pluck="name", limit_page_length=1))
+        # Explicit company filters keep this scoped; get_all avoids masters the HR role cannot list.
+        return bool(frappe.get_all(doctype, filters=filters, pluck="name", limit=1))
 
     return [
         {"label": _("Departments"), "done": has("Department", {"company": company}), "route": "/app/department/new"},
