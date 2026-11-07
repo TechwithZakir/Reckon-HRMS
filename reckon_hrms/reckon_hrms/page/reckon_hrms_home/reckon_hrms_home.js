@@ -55,6 +55,37 @@ function detail(d) {
 		: `<div class="rhrms-muted">No upcoming holidays in your calendar.</div>`;
 }
 
+// Analytics charts use Frappe's bundled frappe.Chart when it is available on the page.
+function draw_analytics(root, d) {
+	if (!d.analytics || !window.frappe || !frappe.Chart) return;
+	const trend = d.analytics.attendance_trend;
+	const trendEl = root.find("#rhrms-trend")[0];
+	if (trendEl) {
+		new frappe.Chart(trendEl, {
+			data: {
+				labels: trend.map((t) => t.date.slice(5)),
+				datasets: [
+					{ name: "Present", values: trend.map((t) => t.present) },
+					{ name: "Absent", values: trend.map((t) => t.absent) },
+					{ name: "On leave", values: trend.map((t) => t.leave) },
+				],
+			},
+			type: "line",
+			height: 220,
+			colors: ["#2e9d6b", "#d24b4b", "#6d4cff"],
+		});
+	}
+	const mix = d.analytics.leave_mix;
+	const mixEl = root.find("#rhrms-mix")[0];
+	if (mixEl && mix.length) {
+		new frappe.Chart(mixEl, {
+			data: { labels: mix.map((m) => m.leave_type), datasets: [{ name: "Days", values: mix.map((m) => m.days) }] },
+			type: "pie",
+			height: 220,
+		});
+	}
+}
+
 function detail_title(view) {
 	if (view === "manager") return "Departments and employee KPIs (last 30 days)";
 	if (view === "payroll") return "Employees without a salary structure";
@@ -79,9 +110,13 @@ function render(root, d) {
 			<div class="rhrms-card"><h4>Suggestions</h4><ul class="rhrms-list">${listRows(d.suggestions, "No suggestions right now.",
 				(s) => `<li>${esc(s)}</li>`)}</ul></div>
 			<div class="rhrms-card rhrms-wide"><h4>${detail_title(d.view)}</h4>${detail(d)}</div>
-			<div class="rhrms-card rhrms-wide"><h4>Reports</h4><ul class="rhrms-list">${listRows(d.reports, "No reports.",
+			${d.analytics ? `<div class="rhrms-card rhrms-wide"><h4>Attendance, last 14 days</h4><div id="rhrms-trend"></div></div>
+				<div class="rhrms-card"><h4>Leave taken this month, by type</h4>${d.analytics.leave_mix.length
+					? `<div id="rhrms-mix"></div>` : `<div class="rhrms-muted">No approved leave this month.</div>`}</div>` : ""}
+				<div class="rhrms-card rhrms-wide"><h4>Reports</h4><ul class="rhrms-list">${listRows(d.reports, "No reports.",
 				(r) => `<li><a href="${esc(r.route)}">${esc(r.label)}</a></li>`)}</ul></div>
 		</div>`);
+	draw_analytics(root, d);
 	root.find("[data-route]").on("click", function () {
 		window.location.href = $(this).attr("data-route");
 	});

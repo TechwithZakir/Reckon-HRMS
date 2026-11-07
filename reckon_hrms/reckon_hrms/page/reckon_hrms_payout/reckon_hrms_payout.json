@@ -1,0 +1,13 @@
+{
+ "doctype": "Page",
+ "name": "reckon-hrms-payout",
+ "page_name": "reckon-hrms-payout",
+ "title": "Monthly payroll payout",
+ "module": "Reckon HRMS",
+ "standard": "Yes",
+ "roles": [
+  {"role": "HR Manager"},
+  {"role": "Payroll Manager"},
+  {"role": "System Manager"}
+ ]
+}

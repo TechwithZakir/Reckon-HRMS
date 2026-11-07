@@ -129,6 +129,10 @@ def _manager(company: str) -> dict:
 
     onboarding = _manager_onboarding(company, headcount)
     onboarding_done = sum(1 for s in onboarding if s["done"])
+    analytics = {
+        "attendance_trend": _attendance_trend(company, today),
+        "leave_mix": _leave_mix(company, month_start),
+    }
 
     todos = []
     if pending_leaves:
@@ -180,8 +184,47 @@ def _manager(company: str) -> dict:
         "kpis": kpis,
         "detailed": {"departments": departments, "employees": employee_kpis,
                      "window_days": 30, "window_rows": len(window_rows)},
+        "analytics": analytics,
         "reports": REPORTS,
     }
+
+
+def _attendance_trend(company: str, today) -> list[dict]:
+    """Present, absent and on-leave counts per day for the last 14 days, oldest first."""
+    start = add_days(today, -13)
+    rows = frappe.get_all(
+        "Attendance", filters={"company": company, "attendance_date": ["between", [start, today]],
+                               "docstatus": ["!=", 2]},
+        fields=["attendance_date", "status"], limit_page_length=0,
+    )
+    days = {}
+    for i in range(14):
+        day = add_days(start, i)
+        days[str(day)] = {"date": str(day), "present": 0, "absent": 0, "leave": 0}
+    for r in rows:
+        bucket = days.get(str(r.attendance_date))
+        if not bucket:
+            continue
+        if r.status in PRESENT:
+            bucket["present"] += 1
+        elif r.status == "On Leave":
+            bucket["leave"] += 1
+        elif r.status == "Absent":
+            bucket["absent"] += 1
+    return list(days.values())
+
+
+def _leave_mix(company: str, month_start) -> list[dict]:
+    """Approved leave days this month, by leave type."""
+    rows = frappe.get_all(
+        "Leave Application", filters={"company": company, "status": "Approved", "docstatus": 1,
+                                      "from_date": [">=", month_start]},
+        fields=["leave_type", "total_leave_days"], limit_page_length=0,
+    )
+    totals: dict[str, float] = {}
+    for r in rows:
+        totals[r.leave_type] = totals.get(r.leave_type, 0) + flt(r.total_leave_days)
+    return [{"leave_type": k, "days": v} for k, v in sorted(totals.items(), key=lambda kv: -kv[1])]
 
 
 def _manager_onboarding(company: str, headcount: int) -> list[dict]:
