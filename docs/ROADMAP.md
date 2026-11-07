@@ -31,3 +31,9 @@ Status key: done, in progress, planned.
 ## AI
 - HR assistant: planned.
 - Payroll anomaly checks: planned.
+
+## Status update (roles and workspace)
+- Done: team roles HR Manager, Payroll Manager, Talent Admin (Frappe Interviewer) and Employee Self Service. Each is tested on the live site.
+- Done: self-service members see only their own employee record.
+- Done: workspace groups are People, Time & Attendance, Leave and Payroll.
+- Not done: the rest of the list above (dashboard, bulk payroll, Bangladesh tax and bank files, biometrics, SMS and WhatsApp, AI assistant). These are multi-phase.
