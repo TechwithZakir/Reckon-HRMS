@@ -167,44 +167,44 @@ def _hide_frappe_hr():
 
 
 def _sidebar_items() -> list[dict]:
-    """Left-nav items: a section per group, then one link per menu entry (pages, DocTypes, reports)."""
+    """Left-nav items: a section per group, then one link per menu entry (web pages, DocTypes, reports)."""
     items = []
     seen = set()
     for group, entries in MENU:
-        items.append({"type": "Section Break", "label": group, "collapsible": 1, "indent": 0})
+        items.append({"type": "Section Break", "label": group, "collapsible": 1})
         for entry in entries:
             if entry[0] == "URL":
-                page = PAGE_FOR_URL.get(entry[1])
-                if not page or not frappe.db.exists("Page", page) or entry[2] in seen:
+                if entry[2] in seen:
                     continue
                 seen.add(entry[2])
-                items.append({"type": "Link", "label": entry[2], "link_type": "Page", "link_to": page,
-                              "icon": "house", "open_in_new_tab": 0})
+                items.append({"type": "Link", "label": entry[2], "link_type": "URL", "url": entry[1],
+                              "icon": "house"})
                 continue
             if not _exists(entry) or entry[1] in seen:
                 continue
             seen.add(entry[1])
             link_type = "DocType" if entry[0] == "DocType" else "Report"
-            items.append({"type": "Link", "label": entry[1], "link_type": link_type, "link_to": entry[1],
-                          "open_in_new_tab": 0})
+            items.append({"type": "Link", "label": entry[1], "link_type": link_type, "link_to": entry[1]})
     return items
 
 
 def _rebuild_sidebar():
-    """Create or refresh the Workspace Sidebar record that drives the Reckon HRMS left nav."""
-    name = WORKSPACE
+    """Create or refresh the module Sidebar that drives the Reckon HRMS left nav (Frappe 16 model)."""
+    if not frappe.db.exists("Module Def", WORKSPACE):
+        return
     items = _sidebar_items()
-    if frappe.db.exists("Workspace Sidebar", name):
-        sidebar = frappe.get_doc("Workspace Sidebar", name)
+    existing = frappe.db.get_value("Sidebar", {"module": WORKSPACE}, "name")
+    if existing:
+        sidebar = frappe.get_doc("Sidebar", existing)
         sidebar.set("items", [])
-        for row in items:
-            sidebar.append("items", row)
+    else:
+        sidebar = frappe.get_doc({"doctype": "Sidebar", "module": WORKSPACE, "title": WORKSPACE,
+                                  "header_icon": "users", "standard": 0})
+    for row in items:
+        sidebar.append("items", row)
+    if existing:
         sidebar.save(ignore_permissions=True)
     else:
-        sidebar = frappe.get_doc({"doctype": "Workspace Sidebar", "title": name, "header_icon": "users",
-                                  "module": WORKSPACE, "standard": 0})
-        for row in items:
-            sidebar.append("items", row)
         sidebar.insert(ignore_permissions=True)
 
 
