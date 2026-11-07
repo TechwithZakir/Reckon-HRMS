@@ -38,8 +38,13 @@
   #err { color:#b4233f; font-size:14px; }
   .scroll { overflow-x:auto; }
 </style>
+<link rel="stylesheet" href="/assets/reckon_hrms/hrms/nav.css">
 </head>
 <body>
+<div class="hrms-shell">
+<aside id="hrms-nav" class="hrms-nav"></aside>
+<div class="hrms-main">
+<button id="hrms-toggle" class="hrms-toggle" type="button">Menu</button>
 <main>
   <div class="muted" id="when"></div>
   <h1 id="title">Home</h1>
@@ -57,6 +62,8 @@
     <div class="card wide"><h2>Reports</h2><ul id="reports"></ul></div>
   </section>
 </main>
+</div>
+</div>
 <script>
   const CSRF = {{ csrf_token | tojson }};
   const $ = (id) => document.getElementById(id);
@@ -164,5 +171,6 @@
   }
   load().catch((e) => { $("err").textContent = e.message; });
 </script>
+<script src="/assets/reckon_hrms/hrms/nav.js"></script>
 </body>
 </html>

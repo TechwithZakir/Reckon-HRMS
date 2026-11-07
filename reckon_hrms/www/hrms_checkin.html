@@ -19,8 +19,13 @@
   #msg { margin-top: 14px; min-height: 22px; font-size: 14px; }
   .ok { color: #0f7a55; } .bad { color: #b4233f; }
 </style>
+<link rel="stylesheet" href="/assets/reckon_hrms/hrms/nav.css">
 </head>
 <body>
+<div class="hrms-shell">
+<aside id="hrms-nav" class="hrms-nav"></aside>
+<div class="hrms-main">
+<button id="hrms-toggle" class="hrms-toggle" type="button">Menu</button>
 <main>
   <div class="card">
     <h1>Attendance</h1>
@@ -31,6 +36,8 @@
     <div id="msg" role="status" aria-live="polite"></div>
   </div>
 </main>
+</div>
+</div>
 <script>
   {% if frappe.session.user == "Guest" %}
   location.replace("/login?redirect-to=/hrms-checkin");
@@ -87,5 +94,6 @@
   $("out").addEventListener("click", () => punch("OUT"));
   refresh().catch((e) => say(e.message, false));
 </script>
+<script src="/assets/reckon_hrms/hrms/nav.js"></script>
 </body>
 </html>
