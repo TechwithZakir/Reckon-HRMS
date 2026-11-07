@@ -13,6 +13,7 @@ import frappe
 WORKSPACE = "Reckon HRMS"
 
 # (group, items). Items: ("DocType", name) | ("Report", name) | ("URL", path, label)
+# Each item appears once, so the left nav and the cards stay in step.
 MENU = (
     ("Featured", (
         ("URL", "/hrms-home", "My home"),
@@ -22,12 +23,13 @@ MENU = (
         ("DocType", "Payroll Entry"),
         ("DocType", "Employee"),
     )),
-    ("Home", (
-        ("URL", "/hrms-home", "My home"),
-        ("URL", "/hrms-checkin", "Check in / out"),
+    ("Dashboards & Reports", (
+        ("URL", "/hrms-home", "Dashboard"),
+        ("Report", "Monthly Attendance Sheet"),
+        ("Report", "Employee Leave Balance"),
+        ("Report", "Salary Register"),
     )),
     ("People", (
-        ("DocType", "Employee"),
         ("DocType", "Department"),
         ("DocType", "Designation"),
         ("DocType", "HRMS Office Location"),
@@ -39,26 +41,51 @@ MENU = (
         ("DocType", "Shift Assignment"),
         ("DocType", "Holiday List"),
         ("DocType", "Holiday List Assignment"),
-        ("Report", "Monthly Attendance Sheet"),
     )),
-    ("Leave & Approvals", (
-        ("DocType", "Leave Application"),
+    ("Leave & Expenses", (
         ("DocType", "Leave Type"),
         ("DocType", "Leave Allocation"),
-        ("DocType", "Expense Claim"),
         ("DocType", "Expense Claim Type"),
-        ("Report", "Employee Leave Balance"),
     )),
     ("Payroll", (
+        ("DocType", "Salary Slip"),
         ("DocType", "Salary Structure"),
         ("DocType", "Salary Structure Assignment"),
         ("DocType", "Salary Component"),
         ("DocType", "Additional Salary"),
-        ("DocType", "Payroll Entry"),
-        ("DocType", "Salary Slip"),
-        ("Report", "Salary Register"),
     )),
 )
+
+# Lucide icon names for each left-nav item, keyed by its label.
+ICONS = {
+    "My home": "layout-dashboard",
+    "Check in / out": "log-in",
+    "Leave Application": "calendar-days",
+    "Expense Claim": "receipt",
+    "Payroll Entry": "wallet",
+    "Employee": "users",
+    "Dashboard": "gauge",
+    "Monthly Attendance Sheet": "file-spreadsheet",
+    "Employee Leave Balance": "calendar-check",
+    "Salary Register": "banknote",
+    "Department": "building-2",
+    "Designation": "id-card",
+    "HRMS Office Location": "map-pin",
+    "Attendance": "user-check",
+    "Employee Checkin": "fingerprint",
+    "Shift Type": "clock",
+    "Shift Assignment": "timer",
+    "Holiday List": "calendar-off",
+    "Holiday List Assignment": "calendar-range",
+    "Leave Type": "tag",
+    "Leave Allocation": "plus-circle",
+    "Expense Claim Type": "list",
+    "Salary Slip": "file-text",
+    "Salary Structure": "layers",
+    "Salary Structure Assignment": "link",
+    "Salary Component": "puzzle",
+    "Additional Salary": "plus",
+}
 
 STOCK_HR_NAMES = ("Frappe HR", "HR", "HR Setup", "Human Resources", "Frappe HRMS", "HRMS", "Payroll", "Tax & Benefits")
 
@@ -178,13 +205,14 @@ def _sidebar_items() -> list[dict]:
                     continue
                 seen.add(entry[2])
                 items.append({"type": "Link", "label": entry[2], "link_type": "URL", "url": entry[1],
-                              "icon": "house"})
+                              "icon": ICONS.get(entry[2], "circle")})
                 continue
             if not _exists(entry) or entry[1] in seen:
                 continue
             seen.add(entry[1])
             link_type = "DocType" if entry[0] == "DocType" else "Report"
-            items.append({"type": "Link", "label": entry[1], "link_type": link_type, "link_to": entry[1]})
+            items.append({"type": "Link", "label": entry[1], "link_type": link_type, "link_to": entry[1],
+                          "icon": ICONS.get(entry[1], "circle")})
     return items
 
 
