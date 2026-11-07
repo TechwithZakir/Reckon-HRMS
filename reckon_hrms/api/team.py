@@ -61,6 +61,8 @@ def add_member(email: str, full_name: str | None = None, role_profile: str = "Co
         doc = frappe.get_doc("Tenant User Assignment", existing)
         doc.db_set({"active": 1, "role_profile": role_profile})
         doc.reload()
+        # db_set skips hooks, so reconcile the roles explicitly.
+        doc.run_method("on_update")
     else:
         doc = frappe.get_doc({
             "doctype": "Tenant User Assignment", "user": email, "company": company,
