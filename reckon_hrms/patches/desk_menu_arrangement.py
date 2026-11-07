@@ -197,12 +197,15 @@ def _rebuild_sidebar():
     if frappe.db.exists("Workspace Sidebar", name):
         sidebar = frappe.get_doc("Workspace Sidebar", name)
         sidebar.set("items", [])
+        for row in items:
+            sidebar.append("items", row)
+        sidebar.save(ignore_permissions=True)
     else:
-        sidebar = frappe.get_doc({"doctype": "Workspace Sidebar", "name": name, "title": WORKSPACE,
-                                  "header_icon": "users", "module": WORKSPACE, "standard": 0})
-    for row in items:
-        sidebar.append("items", row)
-    sidebar.save(ignore_permissions=True)
+        sidebar = frappe.get_doc({"doctype": "Workspace Sidebar", "title": name, "header_icon": "users",
+                                  "module": WORKSPACE, "standard": 0})
+        for row in items:
+            sidebar.append("items", row)
+        sidebar.insert(ignore_permissions=True)
 
 
 def execute():
