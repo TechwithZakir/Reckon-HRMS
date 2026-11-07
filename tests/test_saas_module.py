@@ -11,6 +11,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from reckon_hrms.constants import tenant_role  # noqa: E402
 from reckon_hrms.constants import MODULE_FEATURES, ROLES, TENANT_OWNED_DOCTYPES  # noqa: E402
 from reckon_hrms.saas_module import get_module_definition  # noqa: E402
 
@@ -65,6 +66,16 @@ class TenantOwnedDoctypeTests(unittest.TestCase):
     def test_every_entry_is_a_plain_doctype_name(self):
         for doctype in TENANT_OWNED_DOCTYPES:
             self.assertRegex(doctype, r"^[A-Za-z][A-Za-z &]+$")
+
+
+class TenantRoleTests(unittest.TestCase):
+    def test_role_names_are_per_company(self):
+        self.assertEqual(tenant_role("Admin", "Acme Ltd"), "Reckon HRMS Admin - Acme Ltd")
+        self.assertNotEqual(tenant_role("User", "A"), tenant_role("User", "B"))
+
+    def test_unknown_kind_rejected(self):
+        with self.assertRaises(ValueError):
+            tenant_role("Manager", "Acme")
 
 
 if __name__ == "__main__":
