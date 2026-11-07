@@ -1,1 +1,2 @@
 reckon_hrms.patches.create_workspace
+reckon_hrms.patches.grant_module_roles
