@@ -5,6 +5,8 @@ Kept so existing callers (the seed) keep working; the logic lives in reckon_saas
 
 from __future__ import annotations
 
+import frappe
+
 from reckon_saas_platform.team import ensure_tenant_roles as _ensure_tenant_roles
 from reckon_saas_platform.team import reconcile_user as _reconcile_user
 from reckon_saas_platform.team import sync_tenant_user_access as _sync_tenant_user_access
