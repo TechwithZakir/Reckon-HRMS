@@ -18,6 +18,16 @@ MEMBERS = {
     "demo.ess.member@example.com": "Employee Self Service",
 }
 
+ess_email = "demo.ess.member@example.com"
+if not frappe.db.exists("User", ess_email):
+    frappe.get_doc({"doctype": "User", "email": ess_email, "first_name": "ESS Demo", "enabled": 1,
+                    "send_welcome_email": 0}).insert(ignore_permissions=True)
+if not frappe.db.exists("Employee", {"user_id": ess_email}):
+    frappe.get_doc({"doctype": "Employee", "first_name": "ESS", "last_name": "Demo", "gender": "Male",
+                    "date_of_birth": "1996-03-01", "date_of_joining": "2025-02-01", "status": "Active",
+                    "company": "RD Demo HRMS Alpha Ltd", "user_id": ess_email}).insert(ignore_permissions=True)
+frappe.db.commit()
+
 frappe.set_user(ADMIN)
 try:
     for email, role in MEMBERS.items():
@@ -55,5 +65,7 @@ for email in MEMBERS:
     for name in frappe.get_all("Tenant User Assignment", {"user": email}, pluck="name"):
         frappe.delete_doc("Tenant User Assignment", name, ignore_permissions=True, force=True)
     frappe.delete_doc("User", email, ignore_permissions=True, force=True)
+for name in frappe.get_all("Employee", {"user_id": email}, pluck="name"):
+        frappe.delete_doc("Employee", name, ignore_permissions=True, force=True)
 frappe.db.commit()
 print("CLEANED", len(MEMBERS))
