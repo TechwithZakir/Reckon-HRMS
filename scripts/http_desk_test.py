@@ -41,6 +41,8 @@ frappe.init(site=SITE)
 frappe.connect()
 from werkzeug.test import EnvironBuilder
 frappe.local.request = EnvironBuilder(path="/", base_url="http://" + SITE).get_request()
+from frappe.auth import CookieManager
+frappe.local.cookie_manager = CookieManager()
 sids = {}
 for email in USERS:
     frappe.local.login_manager = None
