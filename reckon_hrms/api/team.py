@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 from frappe.utils import validate_email_address
 
-ALLOWED_PROFILES = ("Company User", "Company Admin")
+ALLOWED_PROFILES = ("Company Manager", "Company Admin")
 
 
 def _admin_company() -> str:
@@ -36,7 +36,7 @@ def list_members() -> list[dict]:
 
 
 @frappe.whitelist(methods=["POST"])
-def add_member(email: str, full_name: str | None = None, role_profile: str = "Company User") -> dict:
+def add_member(email: str, full_name: str | None = None, role_profile: str = "Company Manager") -> dict:
     company = _admin_company()
     email = (email or "").strip().lower()
     if not validate_email_address(email):

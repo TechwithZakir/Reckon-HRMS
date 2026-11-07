@@ -13,7 +13,7 @@ COMPANY = "RD Demo HRMS Alpha Ltd"
 
 frappe.set_user(ADMIN)
 try:
-    add_member(MEMBER, "HRMS Demo Member", "Company User")
+    add_member(MEMBER, "HRMS Demo Member", "Company Manager")
     print("ADDED", MEMBER, [m.user for m in list_members()])
 finally:
     frappe.set_user("Administrator")
