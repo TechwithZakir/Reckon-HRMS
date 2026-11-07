@@ -26,10 +26,10 @@ has_permission = {
 }
 doc_events = {
     doctype: {
-        "before_validate": "reckon_saas_platform.tenant_security.bind_doc_to_tenant",
+        "before_validate": "reckon_hrms.tenancy_hooks.bind_company",
         "validate": [
-            "reckon_saas_platform.tenant_security.validate_tenant_company_immutable",
-            "reckon_saas_platform.tenant_security.validate_tenant_owned_doc",
+            "reckon_hrms.tenancy_hooks.validate_company_immutable",
+            "reckon_hrms.tenancy_hooks.validate_owned",
         ],
     }
     for doctype in TENANT_OWNED_DOCTYPES
