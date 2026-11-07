@@ -32,7 +32,6 @@
   </div>
 </main>
 <script>
-  {% set csrf_token = csrf_token or frappe.sessions.get_csrf_token() %}
   {% if frappe.session.user == "Guest" %}
   location.replace("/login?redirect-to=/hrms-checkin");
   {% endif %}
