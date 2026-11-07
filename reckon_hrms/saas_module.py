@@ -35,4 +35,18 @@ def get_module_definition() -> dict:
         # The platform creates per-company roles and reconciles team access for these.
         "tenant_role_prefix": "Reckon HRMS",
         "tenant_doctypes": list(TENANT_OWNED_DOCTYPES),
+        # Company admins get full rights on the company's records through the per-company admin role.
+        "tenant_grants": {
+            "Admin": {"read": 1, "write": 1, "create": 1, "delete": 1, "submit": 1, "cancel": 1},
+            "User": {},
+        },
+        # Module roles a team member can be given. They map onto Frappe HRMS roles (shared).
+        "tenant_role_map": {
+            "HR Manager": "HR Manager",
+            "Payroll Manager": "Payroll Manager",
+            "Talent Admin": "Interviewer",
+            "Employee Self Service": "Employee Self Service",
+        },
+        "tenant_admin_map": "HR Manager",
+        "tenant_default_role": "Employee Self Service",
     }

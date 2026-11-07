@@ -2,3 +2,4 @@ reckon_hrms.patches.create_workspace
 reckon_hrms.patches.grant_module_roles
 reckon_hrms.patches.holiday_list_and_workspace
 reckon_hrms.patches.workspace_content
+reckon_hrms.patches.payroll_manager_role
