@@ -32,6 +32,10 @@
   </div>
 </main>
 <script>
+  {% set csrf_token = csrf_token or frappe.sessions.get_csrf_token() %}
+  {% if frappe.session.user == "Guest" %}
+  location.replace("/login?redirect-to=/hrms-checkin");
+  {% endif %}
   const CSRF = {{ csrf_token | tojson }};
   const $ = (id) => document.getElementById(id);
   const say = (text, ok) => { $("msg").textContent = text; $("msg").className = ok ? "ok" : "bad"; };
