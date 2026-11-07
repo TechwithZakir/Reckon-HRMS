@@ -19,8 +19,8 @@ const STYLE = `
 .rhd-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 16px;border-bottom:1px solid var(--border-color)}
 .rhd-tab{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;color:var(--text-muted);font-weight:600;cursor:pointer}
 .rhd-tab.active{color:var(--text-color);border-bottom-color:var(--primary)}
-.rhd-panel{display:none}
-.rhd-panel.active{display:block}
+.rhd-section{margin-bottom:22px}
+.rhd-section-title{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border-color)}
 .rhd-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
 .rhd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
 .rhd-wide{grid-column:1/-1}
@@ -72,29 +72,22 @@ function tabs_for(d) {
 	return ["kpi"];
 }
 
+// One page: every section available to the role, stacked under its heading.
 function build(root, d) {
 	const available = tabs_for(d);
 	const title = d.view === "self" ? `Hi, ${esc(d.employee_name || "there")}` : `${esc(d.company)} · ${d.view === "payroll" ? "Payroll dashboard" : "HR dashboard"}`;
+	const section = (key, body) => `<section class="rhd-section"><h3 class="rhd-section-title">${TABS[key]}</h3>${body}</section>`;
 	root.html(`<style>${STYLE}</style>
 		<div class="rhd-head"><div><h2 class="rhd-title">${title}</h2><div class="rhd-muted">${esc(d.greeting_date)}</div></div></div>
-		<div class="rhd-tabs">${available.map((t, i) => `<button class="rhd-tab ${i === 0 ? "active" : ""}" data-tab="${t}">${TABS[t]}</button>`).join("")}</div>
-		<div class="rhd-panel active" data-panel="kpi">${panel_kpi(d)}</div>
-		${available.includes("hr") ? `<div class="rhd-panel" data-panel="hr">${panel_hr(d)}</div>` : ""}
-		${available.includes("payroll") ? `<div class="rhd-panel" data-panel="payroll">${panel_payroll(d)}</div>` : ""}
-		${available.includes("analytics") ? `<div class="rhd-panel" data-panel="analytics">${panel_analytics(d)}</div>` : ""}`);
+		${section("kpi", panel_kpi(d))}
+		${available.includes("hr") ? section("hr", panel_hr(d)) : ""}
+		${available.includes("payroll") ? section("payroll", panel_payroll(d)) : ""}
+		${available.includes("analytics") ? section("analytics", panel_analytics(d)) : ""}`);
 
-	root.find(".rhd-tab").on("click", function () {
-		const key = $(this).data("tab");
-		root.find(".rhd-tab").removeClass("active");
-		$(this).addClass("active");
-		root.find(".rhd-panel").removeClass("active");
-		root.find(`.rhd-panel[data-panel="${key}"]`).addClass("active");
-		draw_charts(root, d, key);
-	});
 	root.find("[data-route]").on("click", function () {
 		window.location.href = $(this).attr("data-route");
 	});
-	draw_charts(root, d, "kpi");
+	available.forEach((key) => draw_charts(root, d, key));
 }
 
 function panel_kpi(d) {
