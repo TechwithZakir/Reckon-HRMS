@@ -67,3 +67,6 @@ website_route_rules = [
 
 # Bangladesh SME payroll: monthly TDS on every slip of a BD structure.
 doc_events.setdefault("Salary Slip", {}).update({"validate": "reckon_hrms.payroll.apply_bd_tax"})
+
+# Desk-wide dashboard script: draws the KPI dashboard on the Reckon HRMS workspace.
+app_include_js = ["/assets/reckon_hrms/hrms/dashboard.js"]
