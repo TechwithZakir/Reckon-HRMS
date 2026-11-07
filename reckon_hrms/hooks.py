@@ -48,3 +48,13 @@ doc_events = {
 
 # Tenant User Assignment access is reconciled by the platform (reckon_saas_platform.team).
 
+# Self-service scope: a self-service login sees only its own employee record.
+doc_events.setdefault("Tenant User Assignment", {}).update({
+    "after_insert": ["reckon_hrms.access.sync_self_service"],
+    "on_update": ["reckon_hrms.access.sync_self_service"],
+})
+doc_events.setdefault("Employee", {}).update({
+    "after_insert": ["reckon_hrms.access.sync_employee_self_service"],
+    "on_update": ["reckon_hrms.access.sync_employee_self_service"],
+})
+
