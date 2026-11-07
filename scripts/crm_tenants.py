@@ -69,7 +69,7 @@ def test():
                 first, _, last = full.partition(" ")
                 if not frappe.db.exists("CRM Lead", {"first_name": first, "last_name": last, "company": company}):
                     frappe.get_doc({"doctype": "CRM Lead", "first_name": first, "last_name": last,
-                                    "email": f"{first.lower()}.{last.lower()}@example.com"}).insert()
+                                    "email": f"{first}.{last}".replace(" ", "").lower() + "@example.com"}).insert()
         finally:
             frappe.set_user("Administrator")
     frappe.db.commit()
