@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, flt, get_first_day, getdate, nowdate
+from frappe.utils import add_days, add_months, flt, get_first_day, getdate, nowdate
 
 from reckon_hrms.api.attendance import _my_employee
 
@@ -132,6 +132,9 @@ def _manager(company: str) -> dict:
     analytics = {
         "attendance_trend": _attendance_trend(company, today),
         "leave_mix": _leave_mix(company, month_start),
+        "attendance_mix": _attendance_mix(company, today),
+        "joiners_trend": _joiners_trend(company, today),
+        **_payroll_analytics(company, today),
     }
 
     todos = []
@@ -214,6 +217,75 @@ def _attendance_trend(company: str, today) -> list[dict]:
     return list(days.values())
 
 
+def _month_key(day) -> str:
+    return f"{day.year}-{day.month:02d}"
+
+
+def _last_six_months(today) -> list[str]:
+    first = get_first_day(today)
+    return [_month_key(add_months(first, -i)) for i in range(5, -1, -1)]
+
+
+def _attendance_mix(company: str, today) -> list[dict]:
+    """Attendance status counts over the last 30 days."""
+    rows = frappe.get_all(
+        "Attendance", filters={"company": company, "attendance_date": ["between", [add_days(today, -29), today]],
+                               "docstatus": ["!=", 2]},
+        fields=["status"], limit_page_length=0,
+    )
+    counts: dict[str, int] = {}
+    for r in rows:
+        counts[r.status] = counts.get(r.status, 0) + 1
+    return [{"status": k, "count": v} for k, v in sorted(counts.items(), key=lambda kv: -kv[1])]
+
+
+def _joiners_trend(company: str, today) -> list[dict]:
+    """New joiners per month for the last six months."""
+    months = _last_six_months(today)
+    joined = frappe.get_all(
+        "Employee", filters={"company": company, "date_of_joining": [">=", f"{months[0]}-01"]},
+        fields=["date_of_joining"], limit_page_length=0,
+    )
+    counts = {m: 0 for m in months}
+    for e in joined:
+        key = _month_key(getdate(e.date_of_joining))
+        if key in counts:
+            counts[key] += 1
+    return [{"month": m, "joiners": counts[m]} for m in months]
+
+
+def _payroll_analytics(company: str, today) -> dict:
+    """Six-month payroll trend, and this month's deduction split by component."""
+    months = _last_six_months(today)
+    slips = frappe.get_all(
+        "Salary Slip", filters={"company": company, "docstatus": 1,
+                                "posting_date": [">=", f"{months[0]}-01"]},
+        fields=["name", "posting_date", "gross_pay", "total_deduction", "net_pay"], limit_page_length=0,
+    )
+    trend = {m: {"month": m, "gross": 0.0, "deductions": 0.0, "net": 0.0} for m in months}
+    this_month = _month_key(today)
+    current_names = []
+    for s in slips:
+        key = _month_key(getdate(s.posting_date))
+        if key in trend:
+            trend[key]["gross"] += flt(s.gross_pay)
+            trend[key]["deductions"] += flt(s.total_deduction)
+            trend[key]["net"] += flt(s.net_pay)
+        if key == this_month:
+            current_names.append(s.name)
+    mix: dict[str, float] = {}
+    if current_names:
+        for row in frappe.get_all(
+            "Salary Detail", filters={"parent": ["in", current_names], "parentfield": "deductions"},
+            fields=["salary_component", "amount"], limit_page_length=0,
+        ):
+            mix[row.salary_component] = mix.get(row.salary_component, 0) + flt(row.amount)
+    return {
+        "payroll_trend": list(trend.values()),
+        "deduction_mix": [{"component": k, "amount": round(v, 2)} for k, v in sorted(mix.items(), key=lambda kv: -kv[1])],
+    }
+
+
 def _leave_mix(company: str, month_start) -> list[dict]:
     """Approved leave days this month, by leave type."""
     rows = frappe.get_all(
@@ -293,6 +365,7 @@ def _payroll(company: str) -> dict:
             _item(_("Net pay this month"), f"{net_month:,.0f}"),
         ],
         "detailed": {"unassigned_employees": unassigned[:25]},
+        "analytics": _payroll_analytics(company, today),
         "reports": [r for r in REPORTS if "payroll" in r["route"] or "salary" in r["route"] or "attendance" in r["route"].lower()],
     }
 
