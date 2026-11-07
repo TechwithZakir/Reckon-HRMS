@@ -1,0 +1,28 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:company",
+ "creation": "2026-11-07 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["company", "latitude", "longitude", "radius_m"],
+ "fields": [
+  {"fieldname": "company", "fieldtype": "Link", "in_list_view": 1, "label": "Company", "options": "Company", "reqd": 1, "unique": 1},
+  {"fieldname": "latitude", "fieldtype": "Float", "label": "Office Latitude", "precision": "6", "reqd": 1},
+  {"fieldname": "longitude", "fieldtype": "Float", "label": "Office Longitude", "precision": "6", "reqd": 1},
+  {"default": "150", "fieldname": "radius_m", "fieldtype": "Int", "label": "Allowed Distance (metres)", "description": "Check-in and check-out are accepted within this distance of the office."}
+ ],
+ "links": [],
+ "modified": "2026-11-07 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Reckon HRMS",
+ "name": "HRMS Office Location",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1},
+  {"create": 1, "read": 1, "report": 1, "role": "HR Manager", "write": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
