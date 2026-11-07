@@ -71,7 +71,7 @@ def setup_status() -> dict:
         ("Holiday calendar", frappe.db.exists("Holiday List", {"company": company})),
         ("Holiday assignment", frappe.db.exists("Holiday List Assignment", {"assigned_to": company, "docstatus": 1})),
         ("Office location", frappe.db.exists("HRMS Office Location", company)),
-        ("Leave types", frappe.db.exists("Leave Type")),
+        ("Leave types", frappe.db.count("Leave Type") > 0),
         ("Salary components", frappe.db.exists("Salary Component", "Basic Salary")),
         ("Bangladesh payroll structure", frappe.db.exists("Salary Structure", f"Reckon BD SME - {company}")),
         ("Payslip format", frappe.db.exists("Print Format", "Reckon Payslip (Bilingual)")),
