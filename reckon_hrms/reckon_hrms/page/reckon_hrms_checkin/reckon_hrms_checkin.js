@@ -63,5 +63,5 @@ frappe.pages["reckon-hrms-checkin"].on_page_load = function (wrapper) {
 
 	el("in").on("click", () => punch("IN"));
 	el("out").on("click", () => punch("OUT"));
-	refresh().catch((e) => say((e && e.message) || "Could not load your status.", false));
+	refresh().catch(() => say("Your login is not linked to an employee record yet. Ask HR to link it.", false));
 };
