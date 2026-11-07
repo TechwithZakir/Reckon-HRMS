@@ -113,10 +113,7 @@ def _link_rows() -> list[dict]:
         rows.append({"type": "Card Break", "label": group})
         for item in items:
             if item[0] == "URL":
-                page = PAGE_FOR_URL.get(item[1])
-                if page and frappe.db.exists("Page", page) and item[2] not in seen:
-                    seen.add(item[2])
-                    rows.append({"type": "Link", "link_type": "Page", "link_to": page, "label": item[2]})
+                # Web pages live in the cards and the left nav as URLs, not as workspace links.
                 continue
             if not _exists(item):
                 continue
