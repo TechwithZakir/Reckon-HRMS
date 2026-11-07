@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Home</title>
+<link rel="manifest" href="/assets/reckon_hrms/hrms/manifest.webmanifest">
+<meta name="theme-color" content="#6d4cff">
 <style>
   :root { color-scheme: light dark; --accent:#6d4cff; --bg:#f4f3fb; --card:#fff; --ink:#15132b; --muted:#5a5780; --line:#e6e4f2; --good:#0f7a55; --warn:#b76e00; --info:#2a6fdb; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#07070f; --card:#15132b; --ink:#eceaff; --muted:#a9a5d6; --line:#2a2650; --good:#4fd1a5; --warn:#f0b35a; --info:#7fb0ff; } }
@@ -157,6 +159,9 @@
     fillList("reports", d.reports, (r) => { const li = el("li"); li.appendChild(link(r.route, r.label)); return li; }, "No reports.");
   }
 
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/assets/reckon_hrms/hrms/sw.js").catch(() => {});
+  }
   load().catch((e) => { $("err").textContent = e.message; });
 </script>
 </body>
