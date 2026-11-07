@@ -16,6 +16,8 @@ COMPANY = "RD Demo HRMS Alpha Ltd"
 MEMBERS = {
     "demo.payroll.member@example.com": "Payroll Manager",
     "demo.ess.member@example.com": "Employee Self Service",
+    "demo.hr.member@example.com": "HR Manager",
+    "demo.talent.member@example.com": "Talent Admin",
 }
 
 ess_email = "demo.ess.member@example.com"
@@ -44,8 +46,8 @@ for email, role in MEMBERS.items():
     print("DB_ROLES", email, sorted(frappe.get_all("Has Role", {"parent": email, "parenttype": "User"}, pluck="role")))
     frappe.set_user(email)
     try:
-        companies = sorted({r.company for r in frappe.get_list("Employee", fields=["company"], limit_page_length=0)})
-        print("EMPLOYEE_SEES", email, companies)
+        rows = frappe.get_list("Employee", fields=["name", "company"], limit_page_length=0)
+        print("EMPLOYEE_SEES", email, sorted({r.company for r in rows}), len(rows))
         try:
             frappe.get_doc("Employee", beta_employee).check_permission("read")
             print("CROSS_READ", email, "ALLOWED (BAD)")
