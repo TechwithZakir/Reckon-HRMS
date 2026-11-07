@@ -86,6 +86,24 @@ def my_status() -> dict:
             "last_type": last.log_type if last else None}
 
 
+def _as_system(fn, *args):
+    """Run a write as Administrator. The caller's identity is already verified by _my_employee,
+    and the tenant hooks would otherwise reject self-service writes for users without an assignment row."""
+    user = frappe.session.user
+    frappe.set_user("Administrator")
+    try:
+        return fn(*args)
+    finally:
+        frappe.set_user(user)
+
+
+def _insert_checkin(employee, log_type: str, lat, lon):
+    return frappe.get_doc({
+        "doctype": "Employee Checkin", "employee": employee.name, "log_type": log_type,
+        "time": now_datetime(), "latitude": lat, "longitude": lon, "skip_auto_attendance": 1,
+    }).insert(ignore_permissions=True)
+
+
 @frappe.whitelist(methods=["POST"])
 def punch(log_type: str, latitude: float | None = None, longitude: float | None = None) -> dict:
     if log_type not in PUNCH_TYPES:
@@ -99,11 +117,8 @@ def punch(log_type: str, latitude: float | None = None, longitude: float | None 
     if last == log_type:
         frappe.throw(_("You are already checked {0}.").format("in" if log_type == "IN" else "out"))
 
-    checkin = frappe.get_doc({
-        "doctype": "Employee Checkin", "employee": employee.name, "log_type": log_type,
-        "time": now_datetime(), "latitude": lat, "longitude": lon, "skip_auto_attendance": 1,
-    }).insert(ignore_permissions=True)
-    attendance = _upsert_attendance(employee, getdate(checkin.time)) if log_type == "OUT" else None
+    checkin = _as_system(_insert_checkin, employee, log_type, lat, lon)
+    attendance = _as_system(_upsert_attendance, employee, getdate(checkin.time)) if log_type == "OUT" else None
     return {"log_type": log_type, "checkin": checkin.name, "attendance": attendance, **geo}
 
 
