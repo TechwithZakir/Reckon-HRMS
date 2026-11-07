@@ -1,0 +1,9 @@
+{
+ "doctype": "Page",
+ "name": "reckon-hrms-checkin",
+ "page_name": "reckon-hrms-checkin",
+ "title": "Check in / out",
+ "module": "Reckon HRMS",
+ "standard": "Yes",
+ "roles": []
+}

@@ -1,0 +1,9 @@
+{
+ "doctype": "Page",
+ "name": "reckon-hrms-home",
+ "page_name": "reckon-hrms-home",
+ "title": "My home",
+ "module": "Reckon HRMS",
+ "standard": "Yes",
+ "roles": []
+}

@@ -75,12 +75,23 @@ def _exists(item) -> bool:
     return True
 
 
+# Web pages reached from the sidebar through a desk Page that redirects to them (see page/ folders).
+PAGE_FOR_URL = {"/hrms-home": "reckon-hrms-home", "/hrms-checkin": "reckon-hrms-checkin"}
+
+
 def _link_rows() -> list[dict]:
     rows = []
+    seen = set()
     for group, items in MENU:
         rows.append({"type": "Card Break", "label": group})
         for item in items:
-            if item[0] == "URL" or not _exists(item):
+            if item[0] == "URL":
+                page = PAGE_FOR_URL.get(item[1])
+                if page and frappe.db.exists("Page", page) and item[2] not in seen:
+                    seen.add(item[2])
+                    rows.append({"type": "Link", "link_type": "Page", "link_to": page, "label": item[2]})
+                continue
+            if not _exists(item):
                 continue
             if item[0] == "DocType":
                 rows.append({"type": "Link", "link_type": "DocType", "link_to": item[1], "label": item[1]})
