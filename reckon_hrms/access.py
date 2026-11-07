@@ -1,7 +1,7 @@
-"""Tenant access sync for Reckon HRMS: per-tenant role, Company permission, shared-role cleanup.
+"""Tenant access for Reckon HRMS: per-company roles, Company permissions, reconciled per user.
 
-Runs from the Tenant User Assignment hooks, so every assignment (onboarding, team
-changes, edits) gets the same access. Idempotent.
+A user's Reckon HRMS roles always match their active assignments in HRMS-subscribed
+companies. Adding, changing or deactivating an assignment reconciles the whole set.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import frappe
 from reckon_hrms.constants import ADMIN_ROLE, ROLES, TENANT_OWNED_DOCTYPES, tenant_role
 
 SHARED_ROLES = tuple(ROLES)
+MODULE_ROLE_PREFIX = "Reckon HRMS "
 GRANTS = {
     "Admin": {"read": 1, "write": 1, "create": 1, "delete": 1, "submit": 1, "cancel": 1},
     "User": {"read": 1, "write": 1, "create": 1},
@@ -48,39 +49,48 @@ def sync_company_permission(user: str, companies: list[str]) -> None:
             frappe.delete_doc("User Permission", row.name, ignore_permissions=True, force=True)
     have = {row.for_value for row in existing if row.for_value in companies}
     for company in companies:
-        if company in have:
-            continue
-        frappe.get_doc({
-            "doctype": "User Permission", "user": user, "allow": "Company", "for_value": company,
-            "apply_to_all_doctypes": 1, "is_default": 1,
-        }).insert(ignore_permissions=True)
+        if company not in have:
+            frappe.get_doc({
+                "doctype": "User Permission", "user": user, "allow": "Company", "for_value": company,
+                "apply_to_all_doctypes": 1, "is_default": 1,
+            }).insert(ignore_permissions=True)
 
 
-def apply_assignment(user: str, company: str, role_profile: str | None) -> None:
-    """Give the user this company's HRMS role and permission, and drop the shared roles."""
-    if not frappe.db.exists("User", user) or user in {"Guest", "Administrator"}:
+def reconcile_user(user: str) -> None:
+    """Make the user's Reckon HRMS roles and Company permissions match their active assignments."""
+    from reckon_saas_platform.saas import is_subscription_active
+
+    if not user or user in {"Guest", "Administrator"} or not frappe.db.exists("User", user):
         return
-    roles = ensure_tenant_roles(company)
-    kind = "Admin" if role_profile == "Company Admin" else "User"
-    target = roles[kind]
+    rows = frappe.get_all(
+        "Tenant User Assignment", filters={"user": user, "active": 1}, fields=["company", "role_profile"]
+    )
+    desired, companies = set(), []
+    for row in rows:
+        if not is_subscription_active(row.company, "hrms"):
+            continue
+        roles = ensure_tenant_roles(row.company)
+        desired.add(roles["Admin"] if row.role_profile == "Company Admin" else roles["User"])
+        companies.append(row.company)
+
+    module_roles = set(frappe.get_all("Role", filters={"name": ["like", MODULE_ROLE_PREFIX + "%"]}, pluck="name"))
+    module_roles = {r for r in module_roles if " - " in r}
     doc = frappe.get_doc("User", user)
-    current = frappe.get_roles(user)
-    if target not in current:
-        doc.add_roles(target)
-    for shared in SHARED_ROLES:
-        if shared in current:
-            doc.remove_roles(shared)
-    companies = frappe.get_all("Tenant User Assignment", filters={"user": user, "active": 1}, pluck="company")
+    current = set(frappe.get_roles(user))
+    for role in sorted(desired - current):
+        doc.add_roles(role)
+    for role in sorted(((module_roles | set(SHARED_ROLES)) & current) - desired):
+        doc.remove_roles(role)
     sync_company_permission(user, sorted(set(companies)))
     frappe.clear_cache(user=user)
 
 
-def sync_tenant_user_access(doc, method=None) -> None:
-    """Tenant User Assignment hook. Only assignments for HRMS-subscribed companies."""
-    from reckon_saas_platform.saas import is_subscription_active
+def apply_assignment(user: str, company: str, role_profile: str | None) -> None:
+    """Kept for the seed; the reconcile covers every assignment the user has."""
+    reconcile_user(user)
 
-    if not doc.get("active") or not doc.get("user") or not doc.get("company"):
-        return
-    if not is_subscription_active(doc.company, "hrms"):
-        return
-    apply_assignment(doc.user, doc.company, doc.get("role_profile"))
+
+def sync_tenant_user_access(doc, method=None) -> None:
+    """Tenant User Assignment hook: reconcile the user, including when an assignment is deactivated."""
+    if doc.get("user"):
+        reconcile_user(doc.user)
