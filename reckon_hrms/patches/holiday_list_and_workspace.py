@@ -10,8 +10,8 @@ import frappe
 from reckon_hrms.constants import MODULE_FEATURES  # noqa: F401  (documents the four modules)
 
 WORKSPACE_GROUPS = (
-    ("Employees", ("Employee", "Department", "Designation")),
-    ("Attendance & Shifts", ("Attendance", "Shift Type", "Shift Assignment", "Holiday List")),
+    ("People", ("Employee", "Department", "Designation")),
+    ("Time & Attendance", ("Attendance", "Shift Type", "Shift Assignment", "Holiday List")),
     ("Leave", ("Leave Application", "Leave Type")),
     ("Payroll", ("Salary Structure", "Salary Structure Assignment", "Payroll Entry", "Salary Slip",
                  "Salary Component")),
