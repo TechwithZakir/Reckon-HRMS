@@ -18,13 +18,13 @@ PRINT_FORMAT = "Reckon Payslip (Bilingual)"
 
 # Earnings and deductions of the starter structure. Formulas use the structure base and earlier rows.
 EARNINGS = (
-    {"salary_component": "Basic Salary", "abbr": "BASIC", "formula": "base * 0.6"},
-    {"salary_component": "House Rent Allowance", "abbr": "HRA", "formula": "BASIC * 0.5"},
+    {"salary_component": "Basic Salary", "abbr": "BASIC", "formula": "base * 0.6", "depends_on_payment_days": 1},
+    {"salary_component": "House Rent Allowance", "abbr": "HRA", "formula": "BASIC * 0.5", "depends_on_payment_days": 0},
     {"salary_component": "Medical Allowance", "abbr": "MED", "amount": 1500},
     {"salary_component": "Conveyance Allowance", "abbr": "CONV", "amount": 1000},
 )
 DEDUCTIONS = (
-    {"salary_component": "Provident Fund (Employee)", "abbr": "PFEMP", "formula": "BASIC * 0.05"},
+    {"salary_component": "Provident Fund (Employee)", "abbr": "PFEMP", "formula": "BASIC * 0.05", "depends_on_payment_days": 0},
     # Filled in by apply_bd_tax on every slip, so the formula is a placeholder.
     {"salary_component": "Income Tax (TDS)", "abbr": "TDS", "amount": 0},
 )
