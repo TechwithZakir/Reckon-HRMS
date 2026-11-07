@@ -91,10 +91,12 @@ def _link_rows() -> list[dict]:
 
 def _shortcut_rows() -> list[dict]:
     rows = []
+    seen = set()
     for _group, items in MENU:
         for item in items:
-            if not _exists(item):
+            if not _exists(item) or _item_label(item) in seen:
                 continue
+            seen.add(_item_label(item))
             if item[0] == "URL":
                 rows.append({"type": "URL", "url": item[1], "label": item[2], "color": "Blue"})
             elif item[0] == "DocType":
@@ -106,12 +108,14 @@ def _shortcut_rows() -> list[dict]:
 
 def _content_blocks() -> list[dict]:
     blocks = []
+    seen = set()
     for index, (group, items) in enumerate(MENU):
         blocks.append({"id": f"rhrms-h{index}", "type": "header",
                        "data": {"text": f'<span class="h4">{group}</span>', "col": 12}})
         for item in items:
-            if not _exists(item):
+            if not _exists(item) or _item_label(item) in seen:
                 continue
+            seen.add(_item_label(item))
             label = _item_label(item)
             blocks.append({"id": f"rhrms-s-{label.replace(' ', '-').replace('/', '-').lower()}",
                            "type": "shortcut", "data": {"shortcut_name": label, "col": 3}})
