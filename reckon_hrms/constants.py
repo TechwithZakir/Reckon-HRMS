@@ -2,7 +2,7 @@
 
 MODULE_KEY = "hrms"
 MODULE_LABEL = "Reckon HRMS"
-WORKSPACE = "reckon-hrms"
+WORKSPACE = "app/reckon-hrms"
 HOME_ROUTE = "/desk/reckon-hrms"
 
 ADMIN_ROLE = "Reckon HRMS Admin"
