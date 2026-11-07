@@ -192,20 +192,21 @@ def _rebuild_sidebar():
     """Create or refresh the module Sidebar that drives the Reckon HRMS left nav (Frappe 16 model)."""
     if not frappe.db.exists("Module Def", WORKSPACE):
         return
+    # The app owns the Reckon HRMS Sidebar, so the site customizes it through Custom Sidebar (site-wide).
     items = _sidebar_items()
-    existing = frappe.db.get_value("Sidebar", {"module": WORKSPACE}, "name")
+    existing = frappe.db.get_value("Custom Sidebar", {"module": WORKSPACE, "user": ["is", "not set"]}, "name")
     if existing:
-        sidebar = frappe.get_doc("Sidebar", existing)
-        sidebar.set("items", [])
+        custom = frappe.get_doc("Custom Sidebar", existing)
+        custom.set("sidebar_items", [])
     else:
-        sidebar = frappe.get_doc({"doctype": "Sidebar", "module": WORKSPACE, "title": WORKSPACE,
-                                  "header_icon": "users", "standard": 0})
+        custom = frappe.get_doc({"doctype": "Custom Sidebar", "module": WORKSPACE, "label": WORKSPACE,
+                                 "header_icon": "users"})
     for row in items:
-        sidebar.append("items", row)
+        custom.append("sidebar_items", row)
     if existing:
-        sidebar.save(ignore_permissions=True)
+        custom.save(ignore_permissions=True)
     else:
-        sidebar.insert(ignore_permissions=True)
+        custom.insert(ignore_permissions=True)
 
 
 def execute():
