@@ -130,9 +130,14 @@ def apply_bd_tax(doc, method=None):
         return
     pf = sum(flt(row.amount) for row in doc.deductions if row.abbr == "PFEMP")
     tds = float(bd.monthly_tds(flt(doc.gross_pay), pf))
-    for row in doc.deductions:
-        if row.abbr == "TDS":
+    tds_rows = [row for row in doc.deductions if row.abbr == "TDS"]
+    if tds_rows:
+        for row in tds_rows:
             row.amount = tds
+    else:
+        # HRMS drops zero-amount structure rows from a slip, so add the TDS row when it is missing.
+        doc.append("deductions", {"salary_component": "Income Tax (TDS)", "abbr": "TDS", "amount": tds,
+                                  "default_amount": 0})
     if hasattr(doc, "calculate_net_pay"):
         doc.calculate_net_pay()
 
