@@ -4,7 +4,7 @@ frappe.pages["reckon-hrms-home"].on_page_load = function (wrapper) {
 	const root = $(`<div class="rhrms-home"></div>`).appendTo(page.main);
 	root.html(`<style>${STYLE}</style><div class="rhrms-muted">Loading your home…</div>`);
 
-	frappe.call({ method: "reckon_hrms.api.home.get_home" })
+	frappe.call({ method: "reckon_hrms.api.home.get_home", type: "GET" })
 		.then((r) => render(root, r.message))
 		.catch(() => root.append(`<div class="rhrms-err">Could not load your home page.</div>`));
 };

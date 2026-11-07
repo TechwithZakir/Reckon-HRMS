@@ -38,7 +38,7 @@ frappe.pages["reckon-hrms-checkin"].on_page_load = function (wrapper) {
 	}
 
 	function refresh() {
-		return frappe.call({ method: "reckon_hrms.api.attendance.my_status" }).then((r) => {
+		return frappe.call({ method: "reckon_hrms.api.attendance.my_status", type: "GET" }).then((r) => {
 			const s = r.message;
 			el("who").text(`${s.employee_name} (${s.employee})`);
 			el("state").text(s.checked_in ? "You are checked in." : "You are checked out.");
