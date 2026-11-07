@@ -32,6 +32,8 @@ TENANT_OWNED_DOCTYPES = (
     "Payroll Entry",
     # Holiday lists get a Company field (patch), so each tenant has its own calendar.
     "Holiday List",
+    # Office coordinates for the attendance geofence, one per company.
+    "HRMS Office Location",
 )
 
 
