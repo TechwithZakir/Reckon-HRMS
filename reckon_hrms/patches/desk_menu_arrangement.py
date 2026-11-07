@@ -169,8 +169,11 @@ def _rebuild_sidebar():
                                  "header_icon": "users"})
     for row in items:
         row["added"] = 1  # Frappe treats only added rows as items; other rows are references to base items
+        # Same shape as Reckon Accounts: a heading (Section Break, indent 1) and links marked as its children.
         if row["type"] == "Link":
-            row["indent"] = 1  # links sit under the section heading above them
+            row["child"] = 1
+        else:
+            row["indent"] = 1
         custom.append("sidebar_items", row)
     if existing:
         custom.save(ignore_permissions=True)
