@@ -202,6 +202,7 @@ def _rebuild_sidebar():
         custom = frappe.get_doc({"doctype": "Custom Sidebar", "module": WORKSPACE, "label": WORKSPACE,
                                  "header_icon": "users"})
     for row in items:
+        row["added"] = 1  # Frappe treats only added rows as items; other rows are references to base items
         custom.append("sidebar_items", row)
     if existing:
         custom.save(ignore_permissions=True)
