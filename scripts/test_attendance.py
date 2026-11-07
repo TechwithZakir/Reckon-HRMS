@@ -62,6 +62,7 @@ print("BULK_AGAIN", as_user(ADMIN, att.bulk_mark, None, "Present", [emp]))
 
 rows = frappe.get_all("Attendance", filters={"employee": emp}, fields=["attendance_date", "status", "working_hours"])
 print("ATTENDANCE_ROWS", len(rows))
+print("CHECKINS", frappe.get_all("Employee Checkin", filters={"employee": emp}, fields=["log_type", "time"], order_by="time desc"))
 
 frappe.db.delete("Attendance", {"employee": emp})
 frappe.db.delete("Employee Checkin", {"employee": emp})
