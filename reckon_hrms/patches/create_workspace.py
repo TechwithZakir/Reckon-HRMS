@@ -14,7 +14,8 @@ SHORTCUTS = [
 
 
 def execute():
-    if frappe.db.exists("Workspace", WORKSPACE):
+    # Frappe stores the workspace under its title, so check both names.
+    if frappe.db.exists("Workspace", WORKSPACE) or frappe.db.exists("Workspace", "Reckon HRMS"):
         return
     doc = frappe.get_doc(
         {
