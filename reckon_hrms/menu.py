@@ -6,15 +6,15 @@ Items: ("DocType", name) | ("Report", name) | ("URL", path, label). Icons are Lu
 # Each item appears once, so the left nav and the cards stay in step.
 MENU = (
     ("Featured", (
-        ("URL", "/hrms-home", "My home"),
-        ("URL", "/hrms-checkin", "Check in / out"),
+        ("Page", "reckon-hrms-home", "My home"),
+        ("Page", "reckon-hrms-checkin", "Check in / out"),
         ("DocType", "Leave Application"),
         ("DocType", "Expense Claim"),
         ("DocType", "Payroll Entry"),
         ("DocType", "Employee"),
     )),
     ("Dashboards & Reports", (
-        ("URL", "/hrms-home", "Dashboard"),
+        ("Page", "reckon-hrms-home", "Dashboard"),
         ("Report", "Monthly Attendance Sheet"),
         ("Report", "Employee Leave Balance"),
         ("Report", "Salary Register"),

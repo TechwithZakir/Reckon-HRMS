@@ -2,9 +2,6 @@ import frappe
 
 
 def get_context(context):
-    if frappe.session.user == "Guest":
-        frappe.local.flags.redirect_location = "/login?redirect-to=/hrms-home"
-        raise frappe.Redirect
-    context.no_cache = 1
-    context.csrf_token = frappe.sessions.get_csrf_token()
-    context.title = "Home"
+	# The home page lives in the Desk now, so the left nav is the Desk's.
+	frappe.local.flags.redirect_location = "/app/reckon-hrms-home"
+	raise frappe.Redirect

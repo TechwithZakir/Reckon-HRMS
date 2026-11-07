@@ -19,7 +19,7 @@ STOCK_HR_NAMES = ("Frappe HR", "HR", "HR Setup", "Human Resources", "Frappe HRMS
 
 
 def _item_label(item) -> str:
-    return item[2] if item[0] == "URL" else item[1]
+    return item[2] if item[0] in ("URL", "Page") else item[1]
 
 
 def _exists(item) -> bool:
@@ -27,6 +27,8 @@ def _exists(item) -> bool:
         return frappe.db.exists("DocType", item[1])
     if item[0] == "Report":
         return frappe.db.exists("Report", item[1])
+    if item[0] == "Page":
+        return frappe.db.exists("Page", item[1])
     return True
 
 
@@ -47,6 +49,8 @@ def _link_rows() -> list[dict]:
                 continue
             if item[0] == "DocType":
                 rows.append({"type": "Link", "link_type": "DocType", "link_to": item[1], "label": item[1]})
+            elif item[0] == "Page":
+                rows.append({"type": "Link", "link_type": "Page", "link_to": item[1], "label": item[2]})
             else:
                 rows.append({"type": "Link", "link_type": "Report", "link_to": item[1], "label": item[1]})
     return rows
@@ -64,6 +68,8 @@ def _shortcut_rows() -> list[dict]:
                 rows.append({"type": "URL", "url": item[1], "label": item[2], "color": "Blue"})
             elif item[0] == "DocType":
                 rows.append({"type": "DocType", "link_to": item[1], "label": item[1], "color": "Blue"})
+            elif item[0] == "Page":
+                rows.append({"type": "Page", "link_to": item[1], "label": item[2], "color": "Blue"})
             else:
                 rows.append({"type": "Report", "link_to": item[1], "label": item[1], "color": "Blue"})
     return rows
@@ -130,6 +136,13 @@ def _sidebar_items() -> list[dict]:
                     continue
                 seen.add(entry[2])
                 items.append({"type": "Link", "label": entry[2], "link_type": "URL", "url": entry[1],
+                              "icon": ICONS.get(entry[2], "circle")})
+                continue
+            if entry[0] == "Page":
+                if not _exists(entry) or entry[2] in seen:
+                    continue
+                seen.add(entry[2])
+                items.append({"type": "Link", "label": entry[2], "link_type": "Page", "link_to": entry[1],
                               "icon": ICONS.get(entry[2], "circle")})
                 continue
             if not _exists(entry) or entry[1] in seen:
