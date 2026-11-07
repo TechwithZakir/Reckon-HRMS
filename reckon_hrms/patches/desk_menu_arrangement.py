@@ -52,7 +52,7 @@ MENU = (
     )),
 )
 
-STOCK_HR_NAMES = ("Frappe HR", "HR", "HR Setup", "Human Resources", "Frappe HRMS", "HRMS")
+STOCK_HR_NAMES = ("Frappe HR", "HR", "HR Setup", "Human Resources", "Frappe HRMS", "HRMS", "Payroll", "Tax & Benefits")
 
 
 def _item_label(item) -> str:
