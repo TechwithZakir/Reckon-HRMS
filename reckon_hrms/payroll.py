@@ -45,6 +45,12 @@ def setup_bd_payroll(company: str) -> dict:
                         "salary_component_abbr": FESTIVAL_ABBR, "type": "Earning"}).insert(ignore_permissions=True)
         created["components"] += 1
 
+    # HRMS copies the payment-day flag from the component master, so align the masters with the rows.
+    for row in EARNINGS + DEDUCTIONS:
+        if "depends_on_payment_days" in row and frappe.db.exists("Salary Component", row["salary_component"]):
+            frappe.db.set_value("Salary Component", row["salary_component"], "depends_on_payment_days",
+                                row["depends_on_payment_days"])
+
     name = structure_name(company)
     if not frappe.db.exists("Salary Structure", name):
         earnings = [dict(row, amount_based_on_formula=1 if "formula" in row else 0,
