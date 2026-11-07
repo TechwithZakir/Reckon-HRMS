@@ -87,8 +87,14 @@ def main():
     created = {}
     for company_name, email, owner_name in DEMO:
         password = ensure_tenant(company_name, email, owner_name)
-        ensure_employees(company_name)
-        ensure_attendance(company_name)
+        # Tenant rules bind records to the logged-in user's company, so the
+        # tenant's own admin creates that tenant's records.
+        frappe.set_user(email)
+        try:
+            ensure_employees(company_name)
+            ensure_attendance(company_name)
+        finally:
+            frappe.set_user("Administrator")
         created[email] = password
     frappe.db.commit()
     for email, password in created.items():
