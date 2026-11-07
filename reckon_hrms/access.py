@@ -57,7 +57,20 @@ def sync_company_permission(user: str, companies: list[str]) -> None:
 
 
 def reconcile_user(user: str) -> None:
-    """Make the user's Reckon HRMS roles and Company permissions match their active assignments."""
+    """Make the user's Reckon HRMS roles and Company permissions match their active assignments.
+
+    Role changes are server-side work, so they run as Administrator even when a company
+    admin triggered them; the caller's session is restored afterwards.
+    """
+    caller = frappe.session.user
+    frappe.set_user("Administrator")
+    try:
+        _reconcile(user)
+    finally:
+        frappe.set_user(caller)
+
+
+def _reconcile(user: str) -> None:
     from reckon_saas_platform.saas import is_subscription_active
 
     if not user or user in {"Guest", "Administrator"} or not frappe.db.exists("User", user):
