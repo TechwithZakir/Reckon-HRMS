@@ -78,7 +78,7 @@ def _upsert_attendance(employee: dict, day) -> str:
 def my_status() -> dict:
     employee = _my_employee()
     last = frappe.db.get_value(
-        "Employee Checkin", {"employee": employee.name}, ["log_type", "time"], order_by="time desc", as_dict=True
+        "Employee Checkin", {"employee": employee.name}, ["log_type", "time"], order_by="time desc, creation desc", as_dict=True
     )
     today_open = bool(last and last.log_type == "IN" and getdate(last.time) == getdate(nowdate()))
     return {"employee": employee.name, "employee_name": employee.employee_name,
@@ -113,7 +113,9 @@ def punch(log_type: str, latitude: float | None = None, longitude: float | None 
     lon = flt(longitude) if longitude not in (None, "") else None
     geo = _check_geofence(employee.company, lat, lon)
 
-    last = frappe.db.get_value("Employee Checkin", {"employee": employee.name}, "log_type", order_by="time desc")
+    last = frappe.db.get_value(
+        "Employee Checkin", {"employee": employee.name}, "log_type", order_by="time desc, creation desc"
+    )
     if last == log_type:
         frappe.throw(_("You are already checked {0}.").format("in" if log_type == "IN" else "out"))
 
