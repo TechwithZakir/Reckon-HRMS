@@ -14,6 +14,14 @@ WORKSPACE = "Reckon HRMS"
 
 # (group, items). Items: ("DocType", name) | ("Report", name) | ("URL", path, label)
 MENU = (
+    ("Featured", (
+        ("URL", "/hrms-home", "My home"),
+        ("URL", "/hrms-checkin", "Check in / out"),
+        ("DocType", "Leave Application"),
+        ("DocType", "Expense Claim"),
+        ("DocType", "Payroll Entry"),
+        ("DocType", "Employee"),
+    )),
     ("Home", (
         ("URL", "/hrms-home", "My home"),
         ("URL", "/hrms-checkin", "Check in / out"),
