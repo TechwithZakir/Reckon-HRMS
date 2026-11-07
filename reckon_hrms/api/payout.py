@@ -59,7 +59,7 @@ def payout_sheet(month: str, company: str | None = None) -> dict:
     for a in frappe.get_all(
         "Additional Salary", filters={"company": company, "docstatus": 1,
                                       "payroll_date": ["between", [start, next_start]]},
-        fields=["employee", "salary_component", "amount"], limit_page_length=0,
+        fields=["name", "employee", "salary_component", "amount"], limit_page_length=0,
     ):
         additions.setdefault(a.employee, []).append(a)
 
@@ -85,6 +85,13 @@ def payout_sheet(month: str, company: str | None = None) -> dict:
                 row["deductions"][r.salary_component] = flt(r.amount)
                 if r.salary_component not in deduction_names:
                     deduction_names.append(r.salary_component)
+            # Additions entered after the slip was made are not in it yet. Show them as pending.
+            in_slip = {r.additional_salary for r in doc.earnings if r.get("additional_salary")}
+            pending = [a for a in additions.get(emp.name, []) if a.name not in in_slip]
+            if pending:
+                row["pending"] = sum(flt(a.amount) for a in pending)
+                row["pending_items"] = [{"component": a.salary_component, "amount": flt(a.amount)} for a in pending]
+                row["status"] = "Generated, regenerate to add pending"
         else:
             base_row = assignments.get(emp.name)
             row["base"] = flt(base_row.base) if base_row else 0
@@ -134,9 +141,10 @@ def bulk_custom_entry(employees: list | str, month: str, component: str, amount:
         doc = frappe.get_doc({
             "doctype": "Additional Salary", "employee": emp, "company": company,
             "salary_component": component, "amount": flt(amount), "payroll_date": start,
-            "notes": remarks or "",
         }).insert(ignore_permissions=True)
         doc.submit()
+        if remarks:
+            doc.add_comment("Comment", remarks)
         created.append(doc.name)
     frappe.db.commit()
     return {"created": len(created), "names": created}
