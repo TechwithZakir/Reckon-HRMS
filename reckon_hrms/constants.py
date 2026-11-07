@@ -30,6 +30,8 @@ TENANT_OWNED_DOCTYPES = (
     "Salary Structure Assignment",
     "Salary Slip",
     "Payroll Entry",
+    # Holiday lists get a Company field (patch), so each tenant has its own calendar.
+    "Holiday List",
 )
 
 
