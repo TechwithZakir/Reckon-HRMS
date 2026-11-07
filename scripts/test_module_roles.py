@@ -21,7 +21,7 @@ MEMBERS = {
 frappe.set_user(ADMIN)
 try:
     for email, role in MEMBERS.items():
-        add_team_member(email, role, "Company Manager", role)
+        add_team_member(email, email.split("@")[0], "Company Manager", role)
 finally:
     frappe.set_user("Administrator")
 frappe.db.commit()
@@ -31,6 +31,7 @@ for email, role in MEMBERS.items():
     roles = sorted(r for r in frappe.get_roles(email) if r in (
         "HR Manager", "Payroll Manager", "Interviewer", "Employee Self Service") or r.startswith("Reckon HRMS"))
     print("ROLES", email, roles)
+    print("DB_ROLES", email, sorted(frappe.get_all("Has Role", {"parent": email, "parenttype": "User"}, pluck="role")))
     frappe.set_user(email)
     try:
         companies = sorted({r.company for r in frappe.get_list("Employee", fields=["company"], limit_page_length=0)})
