@@ -38,3 +38,17 @@ def tenant_role(kind: str, company: str) -> str:
     if kind not in {"Admin", "User"}:
         raise ValueError(f"unknown HRMS role kind: {kind}")
     return f"Reckon HRMS {kind} - {company}"[:140]
+
+# Desk reach for a tenant on the compact HRMS module: its four modules and their masters.
+DESK_GUARD = True
+DESK_DOCTYPES = TENANT_OWNED_DOCTYPES + (
+    "Leave Type",
+    "Leave Policy",
+    "Holiday List",
+    "Shift Type",
+    "Shift Assignment",
+    "Salary Component",
+    "Additional Salary",
+    "Employee Checkin",
+)
+DESK_WORKSPACES = ("Reckon HRMS",)
