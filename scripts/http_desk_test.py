@@ -68,6 +68,12 @@ for email, spec in USERS.items():
     print("API", email, spec["api_blocked"], status, "OK" if status in (403, 417) else "UNEXPECTED")
 
 for email, sid in sids.items():
+    status, home = fetch("/app", sid)
+    other = ["Distribution", "Accounting", "Sales Invoice", "Purchase Invoice"] if "hrms" in email else ["Employee", "Payroll", "Accounting", "Distribution"]
+    leaked = [word for word in other if word in home]
+    print("HOME", email, status, "leaked:", leaked, "OK" if not leaked else "CHECK")
+
+for email, sid in sids.items():
     frappe.db.delete("Sessions", {"sid": sid})
 frappe.db.commit()
 print("SESSIONS_REMOVED", len(sids))
