@@ -51,6 +51,16 @@ def setup_bd_payroll(company: str) -> dict:
             frappe.db.set_value("Salary Component", row["salary_component"], "depends_on_payment_days",
                                 row["depends_on_payment_days"])
 
+    # Payroll needs a holiday list per employee. Give employees without one the company calendar.
+    holiday_list = frappe.db.get_value("Holiday List", {"company": company}, "name", order_by="from_date desc")
+    created["holiday_list_assigned"] = 0
+    if holiday_list:
+        missing = frappe.get_all("Employee", filters={"company": company, "status": "Active",
+                                 "holiday_list": ["is", "not set"]}, pluck="name", limit_page_length=0)
+        for emp in missing:
+            frappe.db.set_value("Employee", emp, "holiday_list", holiday_list)
+        created["holiday_list_assigned"] = len(missing)
+
     name = structure_name(company)
     if not frappe.db.exists("Salary Structure", name):
         earnings = [dict(row, amount_based_on_formula=1 if "formula" in row else 0,
