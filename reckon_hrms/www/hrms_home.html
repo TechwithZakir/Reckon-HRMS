@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home</title>
+<style>
+  :root { color-scheme: light dark; --accent:#6d4cff; --bg:#f4f3fb; --card:#fff; --ink:#15132b; --muted:#5a5780; --line:#e6e4f2; --good:#0f7a55; --warn:#b76e00; --info:#2a6fdb; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#07070f; --card:#15132b; --ink:#eceaff; --muted:#a9a5d6; --line:#2a2650; --good:#4fd1a5; --warn:#f0b35a; --info:#7fb0ff; } }
+  :root[data-theme="dark"] { --bg:#07070f; --card:#15132b; --ink:#eceaff; --muted:#a9a5d6; --line:#2a2650; --good:#4fd1a5; --warn:#f0b35a; --info:#7fb0ff; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font-family:"Geist", system-ui, sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:16px; }
+  h1 { font-size:22px; margin:4px 0; }
+  h2 { font-size:15px; margin:0 0 10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .muted { color:var(--muted); font-size:13px; }
+  .grid { display:grid; gap:14px; grid-template-columns:1fr; }
+  @media (min-width:800px) { .grid.two { grid-template-columns:1fr 1fr; } .grid.kpis { grid-template-columns:repeat(4,1fr); } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; box-shadow:0 6px 22px rgba(40,30,110,.06); }
+  .kpi .v { font-size:24px; font-weight:700; }
+  .kpi .l { font-size:12px; color:var(--muted); margin-top:2px; }
+  .kpi.warn .v { color:var(--warn); } .kpi.good .v { color:var(--good); }
+  a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+  ul { list-style:none; margin:0; padding:0; }
+  li { padding:9px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:10px; align-items:center; font-size:14px; }
+  li:last-child { border-bottom:0; }
+  .tag { font-size:12px; padding:2px 8px; border-radius:999px; background:var(--line); color:var(--ink); white-space:nowrap; }
+  .tag.warn { color:var(--warn); } .tag.good { color:var(--good); } .tag.info { color:var(--info); }
+  .bar { height:8px; background:var(--line); border-radius:999px; overflow:hidden; margin:8px 0 12px; }
+  .bar > span { display:block; height:100%; background:var(--accent); }
+  .check { width:18px; height:18px; border-radius:50%; border:2px solid var(--line); display:inline-block; margin-right:8px; vertical-align:middle; }
+  .check.done { background:var(--good); border-color:var(--good); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; }
+  .wide { grid-column:1 / -1; }
+  #err { color:#b4233f; font-size:14px; }
+  .scroll { overflow-x:auto; }
+</style>
+</head>
+<body>
+<main>
+  <div class="muted" id="when"></div>
+  <h1 id="title">Home</h1>
+  <div class="muted" id="sub"></div>
+  <div id="err" role="status"></div>
+
+  <section class="grid kpis" id="kpis" style="margin-top:14px"></section>
+
+  <section class="grid two" style="margin-top:14px">
+    <div class="card" id="onboard-card"><h2>Setup and onboarding</h2><div id="onboard"></div></div>
+    <div class="card"><h2>To do</h2><ul id="todos"></ul></div>
+    <div class="card"><h2>Pending items</h2><ul id="pending"></ul></div>
+    <div class="card"><h2>Suggestions</h2><ul id="sugg"></ul></div>
+    <div class="card wide" id="detail-card"><h2 id="detail-title">Details</h2><div id="detail"></div></div>
+    <div class="card wide"><h2>Reports</h2><ul id="reports"></ul></div>
+  </section>
+</main>
+<script>
+  const CSRF = {{ csrf_token | tojson }};
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, attrs, text) => { const n = document.createElement(tag); Object.assign(n, attrs || {}); if (text !== undefined) n.textContent = text; return n; };
+  const link = (route, text) => { const a = el("a", { href: route }, text); return a; };
+  const VIEW_TITLES = { manager: "HR dashboard", payroll: "Payroll dashboard", self: "My workspace" };
+
+  function kpi(k) {
+    const d = el("div", { className: "card kpi " + (k.tone || "") });
+    d.appendChild(el("div", { className: "v" }, String(k.value)));
+    d.appendChild(el("div", { className: "l" }, k.label));
+    if (k.route) d.style.cursor = "pointer", d.onclick = () => location.href = k.route;
+    return d;
+  }
+
+  function renderOnboarding(o) {
+    const box = $("onboard");
+    box.replaceChildren();
+    if (!o.total) { $("onboard-card").style.display = "none"; return; }
+    $("onboard-card").style.display = "";
+    const pct = Math.round(100 * o.done / o.total);
+    box.appendChild(el("div", { className: "muted" }, o.done + " of " + o.total + " steps done"));
+    const bar = el("div", { className: "bar" }); bar.appendChild(el("span", { style: "width:" + pct + "%" })); box.appendChild(bar);
+    const ul = el("ul");
+    o.steps.forEach((s) => {
+      const li = el("li");
+      const left = el("span"); left.appendChild(el("span", { className: "check" + (s.done ? " done" : "") })); left.appendChild(document.createTextNode(s.label));
+      li.appendChild(left);
+      li.appendChild(s.done ? el("span", { className: "tag good" }, "Done") : link(s.route, "Set up"));
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+  }
+
+  function fillList(id, items, render, empty) {
+    const ul = $(id); ul.replaceChildren();
+    if (!items.length) { ul.appendChild(el("li", { className: "muted" }, empty)); return; }
+    items.forEach((i) => ul.appendChild(render(i)));
+  }
+
+  function todoRow(t) {
+    const li = el("li");
+    const left = el("span", null, t.label);
+    li.appendChild(left);
+    const right = el("span", { className: "tag " + (t.tone || "") }, String(t.value));
+    if (t.route) { const a = link(t.route, ""); a.appendChild(right); li.appendChild(a); } else li.appendChild(right);
+    return li;
+  }
+
+  function pendingRow(p) {
+    const li = el("li");
+    const body = el("span");
+    body.appendChild(el("div", null, p.title));
+    body.appendChild(el("div", { className: "muted" }, p.detail));
+    li.appendChild(body);
+    li.appendChild(link(p.route, p.type));
+    return li;
+  }
+
+  function renderDetail(view, d) {
+    const box = $("detail"); box.replaceChildren();
+    if (view === "manager") {
+      $("detail-title").textContent = "Department and employee KPIs (last " + d.window_days + " days)";
+      const dep = el("table");
+      dep.appendChild(el("tr", null)); const h = el("tr");
+      ["Department", "Headcount", "Present today"].forEach((t) => h.appendChild(el("th", null, t)));
+      dep.appendChild(h);
+      d.departments.forEach((r) => { const tr = el("tr"); tr.appendChild(el("td", null, r.department)); tr.appendChild(el("td", null, String(r.headcount))); tr.appendChild(el("td", null, String(r.present_today))); dep.appendChild(tr); });
+      const wrap = el("div", { className: "scroll" }); wrap.appendChild(dep); box.appendChild(wrap);
+      const emp = el("table", { style: "margin-top:14px" });
+      const eh = el("tr"); ["Employee", "Department", "Present", "Leave", "Absent"].forEach((t) => eh.appendChild(el("th", null, t)));
+      emp.appendChild(eh);
+      d.employees.forEach((r) => { const tr = el("tr"); [r.employee_name, r.department || "", r.present, r.leave, r.absent].forEach((v) => tr.appendChild(el("td", null, String(v)))); emp.appendChild(tr); });
+      const w2 = el("div", { className: "scroll" }); w2.appendChild(emp); box.appendChild(w2);
+    } else if (view === "payroll") {
+      $("detail-title").textContent = "Employees without a salary structure";
+      if (!d.unassigned_employees.length) box.appendChild(el("div", { className: "muted" }, "Everyone has a salary structure."));
+      else { const ul = el("ul"); d.unassigned_employees.forEach((e) => ul.appendChild(el("li", null, e))); box.appendChild(ul); }
+    } else {
+      $("detail-title").textContent = "Upcoming holidays";
+      if (!d.upcoming_holidays.length) box.appendChild(el("div", { className: "muted" }, "No upcoming holidays in your calendar."));
+      else { const ul = el("ul"); d.upcoming_holidays.forEach((h) => ul.appendChild(el("li", null, h.date + " · " + (h.name || "Holiday")))); box.appendChild(ul); }
+    }
+  }
+
+  async function load() {
+    const res = await fetch("/api/method/reckon_hrms.api.home.get_home", { credentials: "same-origin", headers: { "X-Frappe-CSRF-Token": CSRF, "X-Requested-With": "XMLHttpRequest" } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || "Could not load your home page.");
+    const d = body.message;
+    $("when").textContent = d.greeting_date;
+    $("title").textContent = d.view === "self" ? ("Hi, " + (d.employee_name || "there")) : (d.company + " · " + VIEW_TITLES[d.view]);
+    $("sub").textContent = VIEW_TITLES[d.view];
+    $("kpis").replaceChildren(...d.kpis.map(kpi));
+    renderOnboarding(d.onboarding);
+    fillList("todos", d.todos, todoRow, "Nothing waiting for you.");
+    fillList("pending", d.pending, pendingRow, "No pending items.");
+    fillList("sugg", d.suggestions.map((s) => ({ s })), (x) => el("li", null, x.s), "No suggestions right now.");
+    renderDetail(d.view, d.detailed);
+    fillList("reports", d.reports, (r) => { const li = el("li"); li.appendChild(link(r.route, r.label)); return li; }, "No reports.");
+  }
+
+  load().catch((e) => { $("err").textContent = e.message; });
+</script>
+</body>
+</html>

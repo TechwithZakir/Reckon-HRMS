@@ -60,4 +60,7 @@ doc_events.setdefault("Employee", {}).update({
 
 
 # The check-in page lives at /hrms-checkin. Frappe cannot load a hyphenated www module, so the file is named hrms_checkin.
-website_route_rules = [{"from_route": "/hrms-checkin", "to_route": "hrms_checkin"}]
+website_route_rules = [
+    {"from_route": "/hrms-checkin", "to_route": "hrms_checkin"},
+    {"from_route": "/hrms-home", "to_route": "hrms_home"},
+]
