@@ -1,0 +1,168 @@
+"""Bangladesh SME payroll on Frappe HRMS: setup, tax on salary slips, festival bonus, bilingual slips, bank sheet."""
+
+from __future__ import annotations
+
+import csv
+import io
+
+import frappe
+from frappe import _
+from frappe.utils import flt, getdate, nowdate
+
+from reckon_hrms import bd_payroll as bd
+
+STRUCTURE_PREFIX = "Reckon BD SME"
+FESTIVAL_COMPONENT = "Festival Bonus"
+FESTIVAL_ABBR = "FESTIVAL"
+PRINT_FORMAT = "Reckon Payslip (Bilingual)"
+
+# Earnings and deductions of the starter structure. Formulas use the structure base and earlier rows.
+EARNINGS = (
+    {"salary_component": "Basic Salary", "abbr": "BASIC", "formula": "base * 0.6"},
+    {"salary_component": "House Rent Allowance", "abbr": "HRA", "formula": "BASIC * 0.5"},
+    {"salary_component": "Medical Allowance", "abbr": "MED", "amount": 1500},
+    {"salary_component": "Conveyance Allowance", "abbr": "CONV", "amount": 1000},
+)
+DEDUCTIONS = (
+    {"salary_component": "Provident Fund (Employee)", "abbr": "PFEMP", "formula": "BASIC * 0.05"},
+    # Filled in by apply_bd_tax on every slip, so the formula is a placeholder.
+    {"salary_component": "Income Tax (TDS)", "abbr": "TDS", "amount": 0},
+)
+
+
+def structure_name(company: str) -> str:
+    return f"{STRUCTURE_PREFIX} - {company}"[:140]
+
+
+@frappe.whitelist(methods=["POST"])
+def setup_bd_payroll(company: str) -> dict:
+    """Create the Bangladesh starter components, salary structure and bilingual slip format. Idempotent."""
+    frappe.only_for(["HR Manager", "Payroll Manager", "System Manager"])
+    created = {"components": 0, "structure": False, "print_format": False}
+
+    if not frappe.db.exists("Salary Component", FESTIVAL_COMPONENT):
+        frappe.get_doc({"doctype": "Salary Component", "salary_component": FESTIVAL_COMPONENT,
+                        "salary_component_abbr": FESTIVAL_ABBR, "type": "Earning"}).insert(ignore_permissions=True)
+        created["components"] += 1
+
+    name = structure_name(company)
+    if not frappe.db.exists("Salary Structure", name):
+        earnings = [dict(row, amount_based_on_formula=1 if "formula" in row else 0,
+                         formula=row.get("formula", ""), amount=row.get("amount", 0)) for row in EARNINGS]
+        deductions = [dict(row, amount_based_on_formula=1 if "formula" in row else 0,
+                           formula=row.get("formula", ""), amount=row.get("amount", 0)) for row in DEDUCTIONS]
+        frappe.get_doc({
+            "doctype": "Salary Structure", "name": name, "company": company, "is_active": "Yes",
+            "payroll_frequency": "Monthly", "earnings": earnings, "deductions": deductions,
+        }).insert(ignore_permissions=True)
+        created["structure"] = True
+
+    if not frappe.db.exists("Print Format", PRINT_FORMAT):
+        frappe.get_doc({"doctype": "Print Format", "name": PRINT_FORMAT, "doc_type": "Salary Slip",
+                        "print_format_type": "Jinja", "custom_format": 1, "standard": "No",
+                        "html": bilingual_slip_html()}).insert(ignore_permissions=True)
+        created["print_format"] = True
+
+    frappe.db.commit()
+    return created
+
+
+def bilingual_slip_html() -> str:
+    """Jinja template for a two-language slip. Labels come from bd_payroll.LABELS."""
+    labels = "{" + ", ".join(f'"{k}": ("{en}", "{bn}")' for k, (en, bn) in bd.LABELS.items()) + "}"
+    return f"""
+{{% set L = {labels} %}}
+<div style="font-family: 'Noto Sans Bengali', 'Nirmala UI', sans-serif; max-width: 720px; margin: auto">
+  <h2 style="margin-bottom:0">{{{{ doc.company }}}}</h2>
+  <div>{{{{ _("Salary Slip") }}}} / বেতন স্লিপ · {{{{ doc.start_date }}}} → {{{{ doc.end_date }}}}</div>
+  <table style="width:100%; margin-top:12px; border-collapse:collapse">
+    <tr><td>{{{{ _("Employee") }}}} / কর্মী</td><td>{{{{ doc.employee_name }}}} ({{{{ doc.employee }}}})</td></tr>
+    <tr><td>{{{{ _("Designation") }}}} / পদবি</td><td>{{{{ doc.designation or "" }}}}</td></tr>
+    <tr><td>{{{{ _("Department") }}}} / বিভাগ</td><td>{{{{ doc.department or "" }}}}</td></tr>
+  </table>
+  <table style="width:100%; margin-top:14px; border-collapse:collapse" border="1" cellpadding="6">
+    <tr><th align="left">{{{{ _("Earnings") }}}} / আয়</th><th align="right">{{{{ _("Amount") }}}} / টাকা</th>
+        <th align="left">{{{{ _("Deductions") }}}} / কর্তন</th><th align="right">{{{{ _("Amount") }}}} / টাকা</th></tr>
+    {{% for e in doc.earnings %}}{{% set d = doc.deductions[loop.index0] if loop.index0 < doc.deductions|length else None %}}
+    <tr>
+      <td>{{{{ L.get(e.salary_component, (e.salary_component, e.salary_component))[0] }}}} / {{{{ L.get(e.salary_component, (e.salary_component, e.salary_component))[1] }}}}</td>
+      <td align="right">{{{{ "{{:,.2f}}".format(e.amount) }}}}</td>
+      <td>{{% if d %}}{{{{ L.get(d.salary_component, (d.salary_component, d.salary_component))[0] }}}} / {{{{ L.get(d.salary_component, (d.salary_component, d.salary_component))[1] }}}}{{% endif %}}</td>
+      <td align="right">{{% if d %}}{{{{ "{{:,.2f}}".format(d.amount) }}}}{{% endif %}}</td>
+    </tr>
+    {{% endfor %}}
+    <tr><td><b>{{{{ _("Gross Pay") }}}} / মোট আয়</b></td><td align="right"><b>{{{{ "{{:,.2f}}".format(doc.gross_pay) }}}}</b></td>
+        <td><b>{{{{ _("Total Deduction") }}}} / মোট কর্তন</b></td><td align="right"><b>{{{{ "{{:,.2f}}".format(doc.total_deduction) }}}}</b></td></tr>
+  </table>
+  <h3 style="margin-top:14px">{{{{ _("Net Pay") }}}} / নিট বেতন: {{{{ "{{:,.2f}}".format(doc.net_pay) }}}}</h3>
+  <div style="font-size:12px; color:#555">{{{{ _("Computer generated slip; no signature required.") }}}}</div>
+</div>
+"""
+
+
+def apply_bd_tax(doc, method=None):
+    """Salary Slip validate hook. Sets monthly TDS for Bangladesh SME structures and refreshes net pay."""
+    if not (doc.get("salary_structure") or "").startswith(STRUCTURE_PREFIX):
+        return
+    pf = sum(flt(row.amount) for row in doc.deductions if row.abbr == "PFEMP")
+    tds = float(bd.monthly_tds(flt(doc.gross_pay), pf))
+    for row in doc.deductions:
+        if row.abbr == "TDS":
+            row.amount = tds
+    if hasattr(doc, "calculate_net_pay"):
+        doc.calculate_net_pay()
+
+
+@frappe.whitelist(methods=["POST"])
+def create_festival_bonus(company: str, festival: str, payroll_date: str | None = None) -> dict:
+    """Create one Festival Bonus additional salary per eligible employee for a festival."""
+    frappe.only_for(["HR Manager", "Payroll Manager", "System Manager"])
+    if not frappe.db.exists("Salary Component", FESTIVAL_COMPONENT):
+        frappe.throw(_("Run the Bangladesh payroll setup first."))
+    day = getdate(payroll_date or nowdate())
+    assignments = frappe.get_all(
+        "Salary Structure Assignment", filters={"company": company, "docstatus": 1},
+        fields=["employee", "base"], limit_page_length=0,
+    )
+    created, skipped = [], []
+    for a in assignments:
+        emp = frappe.db.get_value("Employee", a.employee, ["status", "date_of_joining", "employee_name"], as_dict=True)
+        if not emp or emp.status != "Active" or not emp.date_of_joining:
+            skipped.append(a.employee)
+            continue
+        months = max(0, (day.year - getdate(emp.date_of_joining).year) * 12
+                     + day.month - getdate(emp.date_of_joining).month)
+        basic = flt(a.base) * 0.6
+        amount = float(bd.festival_bonus(basic, months))
+        if amount <= 0:
+            skipped.append(a.employee)
+            continue
+        if frappe.db.exists("Additional Salary", {"employee": a.employee, "salary_component": FESTIVAL_COMPONENT,
+                                                  "payroll_date": day, "docstatus": ["!=", 2]}):
+            skipped.append(a.employee)
+            continue
+        doc = frappe.get_doc({
+            "doctype": "Additional Salary", "employee": a.employee, "company": company,
+            "salary_component": FESTIVAL_COMPONENT, "amount": amount, "payroll_date": day,
+            "notes": f"{festival} bonus",
+        }).insert(ignore_permissions=True)
+        doc.submit()
+        created.append(doc.name)
+    frappe.db.commit()
+    return {"created": len(created), "skipped": len(skipped), "names": created}
+
+
+@frappe.whitelist()
+def bank_sheet(payroll_entry: str) -> str:
+    """CSV bank transfer sheet for the submitted slips of a payroll run."""
+    if not frappe.has_permission("Payroll Entry", "read", payroll_entry):
+        frappe.throw(_("Not permitted to export this payroll run."), frappe.PermissionError)
+    slips = frappe.get_all(
+        "Salary Slip", filters={"payroll_entry": payroll_entry, "docstatus": 1},
+        fields=["employee", "employee_name", "bank_name", "bank_ac_no", "net_pay"],
+        order_by="employee asc", limit_page_length=0,
+    )
+    rows = bd.bank_sheet_rows([dict(s) for s in slips])
+    buf = io.StringIO()
+    csv.writer(buf).writerows(rows)
+    return buf.getvalue()
