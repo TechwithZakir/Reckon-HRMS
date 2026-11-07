@@ -39,13 +39,10 @@ def home_view(roles) -> str:
 
 
 def _company() -> str:
-    default = frappe.defaults.get_user_default("Company")
-    if default:
-        return default
-    companies = frappe.get_list("Company", pluck="name", limit_page_length=1)
-    if not companies:
-        frappe.throw(_("No company is assigned to your login."), frappe.PermissionError)
-    return companies[0]
+    """The caller's tenant company, resolved by the platform (fails closed without an assignment)."""
+    from reckon_saas_platform.tenant_security import require_tenant
+
+    return require_tenant().company
 
 
 def _item(label, value, route=None, tone="neutral"):
