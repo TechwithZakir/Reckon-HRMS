@@ -323,7 +323,7 @@ def missing_pay_item_accounts(name):
 
 
 def _is_paid(name) -> bool:
-    count = frappe.db.sql("SELECT COUNT(name) FROM `tabSalary Slip` WHERE payroll_entry = %(p)s AND docstatus = 1 AND IFNULL(journal_entry, '') != ''", {"p": name})[0][0]
+    count = frappe.db.sql("SELECT COUNT(name) FROM `tabSalary Slip` WHERE payroll_entry = %(p)s AND docstatus = 1 AND IFNULL(reckon_payment_entry, '') != ''", {"p": name})[0][0]
     return bool(count)
 
 
@@ -419,7 +419,7 @@ def record_payment(name: str, bank_account: str, reference: str, reference_date:
     }).insert()
     je.submit()
     for s in slips:
-        frappe.db.set_value("Salary Slip", s.name, "journal_entry", je.name)
+        frappe.db.set_value("Salary Slip", s.name, "reckon_payment_entry", je.name)
     doc.add_comment("Comment", "{0} recorded payment of {1} through {2} at {3}.".format(
         frappe.session.user, total, je.name, frappe.utils.now()))
     frappe.db.commit()

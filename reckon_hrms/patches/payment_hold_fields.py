@@ -6,6 +6,9 @@ FIELDS = [
     {"fieldname": "reckon_payment_hold", "fieldtype": "Check", "label": "Hold payment"},
     {"fieldname": "reckon_hold_reason", "fieldtype": "Small Text", "label": "Hold reason",
      "depends_on": "eval:doc.reckon_payment_hold"},
+    # Bank payment journal. Separate from HRMS's own journal_entry, which holds the accrual entry.
+    {"fieldname": "reckon_payment_entry", "fieldtype": "Link", "options": "Journal Entry",
+     "label": "Payment journal entry", "read_only": 1},
 ]
 
 
