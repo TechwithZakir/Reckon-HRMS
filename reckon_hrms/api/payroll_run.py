@@ -283,6 +283,13 @@ def run_approve(name, job):
             submit_salary_slips_for_employees(frappe.get_doc("Payroll Entry", name), [(s.name,) for s in batch], publish_progress=False)
         except Exception as exc:
             state["failed"].append({"batch_start": i, "reason": str(exc)[:160]})
+        # HRMS logs per-slip failures instead of raising, so count what actually submitted.
+        names = [s.name for s in batch]
+        submitted = set(frappe.get_all("Salary Slip", filters={"name": ["in", names], "docstatus": 1}, pluck="name"))
+        for s in batch:
+            if s.name not in submitted:
+                state["failed"].append({"slip": s.name, "employee": s.employee,
+                                        "reason": "Not submitted. See the Error Log for the reason."})
         state["done"] = min(len(slips), i + SLIP_BATCH)
         frappe.cache().set_value(key, state)
         frappe.publish_realtime("reckon_progress", dict(state, job=job, kind="submit"), user=frappe.session.user)
