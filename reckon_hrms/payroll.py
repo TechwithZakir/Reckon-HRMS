@@ -44,7 +44,7 @@ def ensure_payroll_payable(company: str) -> str | None:
     current = frappe.db.get_value("Company", company, "default_payroll_payable_account")
     if current:
         return current
-    account = frappe.db.get_value("Account", {"company": company, "is_group": 0, "account_type": "Payable",
+    account = frappe.db.get_value("Account", {"company": company, "is_group": 0,
                                               "account_name": ["like", "Payroll Payable%"]}, "name")
     if not account:
         parent = None
