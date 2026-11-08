@@ -51,12 +51,14 @@ def usage_counts(doctype: str, names: list[str]) -> dict[str, int]:
 
 
 @frappe.whitelist(methods=["GET"])
-def list_items(doctype: str, start=0, page_length=DEFAULT_PAGE) -> dict:
+def list_items(doctype: str, start=0, page_length=DEFAULT_PAGE, company: str | None = None) -> dict:
     _chip_type(doctype)
     _check(doctype, "read")
     start_i, length_i = page_bounds(start, page_length)
-    total = frappe.db.count(doctype)
-    rows = frappe.get_list(doctype, fields=["name"], order_by="name asc",
+    # Departments belong to one company, so list only the caller's company when one is given.
+    filters = {"company": company} if doctype == "Department" and company else {}
+    total = frappe.db.count(doctype, filters)
+    rows = frappe.get_list(doctype, filters=filters, fields=["name"], order_by="name asc",
                            start=start_i, page_length=length_i)
     names = [r.name for r in rows]
     used = usage_counts(doctype, names)

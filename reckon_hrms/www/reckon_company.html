@@ -140,7 +140,7 @@
   }
 
   function loadChips(list, box) {
-    return api("GET", "reckon_hrms.api.setup.list_items", { doctype: list.doctype, start: 0, page_length: 100 })
+    return api("GET", "reckon_hrms.api.setup.list_items", { doctype: list.doctype, start: 0, page_length: 100, company: COMPANY })
       .then(function (res) {
         var wrap = box.querySelector(".chips");
         wrap.innerHTML = res.rows.map(function (r) {
