@@ -63,10 +63,5 @@ doc_events.setdefault("Employee", {}).update({
 website_route_rules = [
     {"from_route": "/hrms-checkin", "to_route": "hrms_checkin"},
     {"from_route": "/hrms-home", "to_route": "hrms_home"},
+    {"from_route": "/reckon/company", "to_route": "reckon_company"},
 ]
-
-# Bangladesh SME payroll: monthly TDS on every slip of a BD structure.
-doc_events.setdefault("Salary Slip", {}).update({"validate": "reckon_hrms.payroll.apply_bd_tax"})
-
-# Desk-wide dashboard script: draws the KPI dashboard on the Reckon HRMS workspace.
-app_include_js = ["/assets/reckon_hrms/hrms/dashboard.js"]

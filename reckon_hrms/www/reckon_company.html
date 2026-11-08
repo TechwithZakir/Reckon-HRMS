@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your company</title>
+<style>
+  :root { color-scheme: light dark; --bg:#F5F7F7; --card:#fff; --ink:#142321; --muted:#5A6B68; --line:#DDE4E2; --soft:#EDF2F1; --accent:#0E6F66; --accent-soft:#DDF0ED; --good:#1A7A47; --bad:#B3261E; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0D1514; --card:#152120; --ink:#E4EEEC; --muted:#96A8A4; --line:#263634; --soft:#1B2A28; --accent:#5FD0C3; --accent-soft:#123A36; --good:#5FCB93; --bad:#FF8F86; } }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui, "IBM Plex Sans", sans-serif; }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  h1 { font-size:22px; margin:6px 0 2px; } h2 { font-size:16px; margin:0 0 6px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-top:14px; }
+  .bar { height:8px; background:var(--soft); border-radius:99px; overflow:hidden; margin:8px 0; }
+  .bar b { display:block; height:100%; background:var(--accent); }
+  .checks { list-style:none; padding:0; margin:8px 0 0; display:grid; gap:6px; }
+  .checks li { display:flex; gap:8px; align-items:center; }
+  .dot { width:14px; height:14px; border-radius:50%; border:2px solid var(--line); display:inline-block; }
+  .dot.done { background:var(--good); border-color:var(--good); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .chip { display:inline-flex; gap:6px; align-items:center; background:var(--soft); border-radius:99px; padding:4px 10px; font-size:13px; }
+  .chip button { border:0; background:none; color:var(--muted); cursor:pointer; font-size:15px; padding:0; }
+  .chip .n { color:var(--muted); font-size:11px; }
+  .suggest { border:1px dashed var(--muted); background:none; color:var(--muted); border-radius:99px; padding:4px 10px; cursor:pointer; font-size:13px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
+  input[type=text] { flex:1 1 180px; min-width:0; height:36px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); padding:0 10px; font:inherit; }
+  .btn { border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:8px; padding:7px 12px; cursor:pointer; font:inherit; text-decoration:none; }
+  .btn.pri { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .err { color:var(--bad); font-size:13px; margin-top:6px; }
+  .ok { color:var(--good); font-size:13px; margin-top:6px; }
+  .map { display:none; font:500 11px ui-monospace, Menlo, monospace; background:var(--soft); color:var(--muted); padding:1px 6px; border-radius:4px; margin-left:6px; }
+  body.showmap .map { display:inline-block; }
+  .sw { display:flex; gap:6px; align-items:center; font-size:13px; color:var(--muted); cursor:pointer; }
+  .top { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; align-items:center; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div><div class="muted">Step 1 of 3</div><h1>Your company</h1></div>
+    <label class="sw"><input type="checkbox" id="mapSw"> Show Frappe HR mapping</label>
+  </div>
+
+  <section class="card">
+    <h2>Progress</h2>
+    <div class="muted"><span id="pct">0</span>% done · <span id="doneCount">0</span> of <span id="totalCount">0</span> steps</div>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Setup progress"><b id="bar" style="width:0%"></b></div>
+    <ul class="checks" id="checks"></ul>
+  </section>
+
+  <section class="card" id="chipSections"></section>
+
+  <section class="card">
+    <h2>Next</h2>
+    <p class="muted">Adding your people, holidays and leave, and attendance settings come next on this page.
+      Until then, use <a href="/app/employee" id="empLink">Employees</a> in the standard desk.</p>
+    <div class="row"><a class="btn pri" href="/reckon/salary">Continue to salary rules</a></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var CSRF = {{ csrf_token | tojson }};
+  var COMPANY = {{ company | tojson }};
+  var LISTS = [
+    { doctype: "Branch", title: "Offices and factories", map: "Branch",
+      suggest: ["Gazipur Factory", "Dhaka Head Office", "Narayanganj Unit", "Chattogram Unit", "Khulna Depot"] },
+    { doctype: "Department", title: "Departments", map: "Department",
+      suggest: ["Production", "Accounts", "HR & Admin", "Merchandising", "Quality", "Sales", "Store", "IT", "Maintenance", "Security"] },
+    { doctype: "Designation", title: "Job titles", map: "Designation",
+      suggest: ["Operator", "Supervisor", "Officer", "Senior Officer", "Manager", "Executive", "Cleaner"] },
+    { doctype: "Employee Grade", title: "Levels", map: "Employee Grade",
+      suggest: ["Worker", "Staff", "Management", "Trainee"] },
+    { doctype: "Employment Type", title: "Types of employee", map: "Employment Type",
+      suggest: ["Permanent", "Probation", "Contract", "Daily wage", "Intern"] }
+  ];
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (t) { var d = document.createElement("div"); d.textContent = t == null ? "" : String(t); return d.innerHTML; };
+
+  function api(method, path, data) {
+    var opts = { method: method, credentials: "same-origin",
+      headers: { "X-Frappe-CSRF-Token": CSRF, "X-Requested-With": "XMLHttpRequest" } };
+    var url = "/api/method/" + path;
+    if (method === "GET" && data) url += "?" + new URLSearchParams(data).toString();
+    if (method === "POST") {
+      opts.headers["Content-Type"] = "application/x-www-form-urlencoded";
+      opts.body = new URLSearchParams(data || {}).toString();
+    }
+    return fetch(url, opts).then(function (r) {
+      return r.json().then(function (b) {
+        if (!r.ok) throw new Error(friendly(b));
+        return b.message;
+      });
+    });
+  }
+
+  function friendly(b) {
+    try {
+      var m = JSON.parse(JSON.parse(b._server_messages)[0]).message;
+      return m.replace(/<[^>]+>/g, "");
+    } catch (e) { return b.exception ? "Something went wrong. Try again." : "Request failed."; }
+  }
+
+  function renderState(s) {
+    $("pct").textContent = s.percent;
+    $("bar").style.width = s.percent + "%";
+    $("doneCount").textContent = s.done;
+    $("totalCount").textContent = s.total;
+    $("checks").innerHTML = s.steps.map(function (st) {
+      return '<li><span class="dot ' + (st.done ? "done" : "") + '"></span>' + esc(st.label) + "</li>";
+    }).join("");
+  }
+
+  function loadState() {
+    return api("GET", "reckon_hrms.api.setup.get_state").then(renderState);
+  }
+
+  function chipSection(list, idx) {
+    var box = document.createElement("div");
+    box.style.marginTop = idx ? "18px" : "0";
+    box.innerHTML = '<h2>' + esc(list.title) + '<span class="map">' + esc(list.map) + '</span></h2>' +
+      '<div class="chips" data-doctype="' + esc(list.doctype) + '"></div>' +
+      '<div class="row"><input type="text" maxlength="140" placeholder="Type a name and press Enter" aria-label="Add ' + esc(list.title) + '">' +
+      '<a class="btn" href="' + "/app/" + esc(list.doctype.toLowerCase().replace(/ /g, "-")) + '" target="_blank" rel="noopener">List</a></div>' +
+      '<div class="row" data-suggest></div><div class="err" data-err></div>';
+    var input = box.querySelector("input");
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && input.value.trim()) { e.preventDefault(); addItem(list, input.value.trim(), box); input.value = ""; }
+    });
+    var sug = box.querySelector("[data-suggest]");
+    list.suggest.forEach(function (name) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "suggest"; b.textContent = "+ " + name;
+      b.addEventListener("click", function () { addItem(list, name, box); });
+      sug.appendChild(b);
+    });
+    return box;
+  }
+
+  function loadChips(list, box) {
+    return api("GET", "reckon_hrms.api.setup.list_items", { doctype: list.doctype, start: 0, page_length: 100 })
+      .then(function (res) {
+        var wrap = box.querySelector(".chips");
+        wrap.innerHTML = res.rows.map(function (r) {
+          return '<span class="chip">' + esc(r.name) + ' <span class="n">' + r.employees + ' people</span>' +
+            '<button type="button" aria-label="Remove ' + esc(r.name) + '" data-name="' + esc(r.name) + '">×</button></span>';
+        }).join("") || '<span class="muted">Nothing added yet.</span>';
+        wrap.querySelectorAll("button[data-name]").forEach(function (b) {
+          b.addEventListener("click", function () { removeItem(list, b.dataset.name, box); });
+        });
+        box.querySelector("[data-err]").textContent = "";
+      });
+  }
+
+  function addItem(list, name, box) {
+    var data = { doctype: list.doctype, name: name };
+    if (list.doctype === "Department") data.company = COMPANY;
+    api("POST", "reckon_hrms.api.setup.create_item", data)
+      .then(function () { return loadChips(list, box); })
+      .then(loadState)
+      .catch(function (e) { box.querySelector("[data-err]").textContent = e.message; });
+  }
+
+  function removeItem(list, name, box) {
+    if (!confirm("Remove " + name + "?")) return;
+    api("POST", "reckon_hrms.api.setup.delete_item", { doctype: list.doctype, name: name })
+      .then(function () { return loadChips(list, box); })
+      .then(loadState)
+      .catch(function (e) { box.querySelector("[data-err]").textContent = e.message; });
+  }
+
+  var host = $("chipSections");
+  var boxes = LISTS.map(function (list, i) {
+    var box = chipSection(list, i);
+    host.appendChild(box);
+    return { list: list, box: box };
+  });
+  $("mapSw").addEventListener("change", function () { document.body.classList.toggle("showmap", this.checked); });
+  $("empLink").href = "/app/employee";
+
+  loadState().catch(function (e) { $("checks").innerHTML = '<li class="err">' + esc(e.message) + "</li>"; });
+  boxes.forEach(function (b) { loadChips(b.list, b.box).catch(function (e) { b.box.querySelector("[data-err]").textContent = e.message; }); });
+})();
+</script>
+</body>
+</html>
