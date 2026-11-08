@@ -29,7 +29,7 @@ frappe.pages["reckon-hrms-company"].on_page_load = function (wrapper) {
 		root.find("#checks").html(s.steps.map((st) =>
 			`<li><span class="rhc-dot ${st.done ? "done" : ""}"></span>${esc(st.label)}</li>`).join(""));
 	}
-	const loadState = () => frappe.call({ method: "reckon_hrms.api.setup.get_state" }).then((r) => renderState(r.message));
+	const loadState = () => frappe.call({ method: "reckon_hrms.api.setup.get_state", type: "GET" }).then((r) => renderState(r.message));
 
 	function chipSection(list) {
 		const box = $(`<section class="rhc-card">
@@ -56,7 +56,7 @@ frappe.pages["reckon-hrms-company"].on_page_load = function (wrapper) {
 	function loadChips(list, box) {
 		const args = { doctype: list.doctype, start: 0, page_length: 100 };
 		if (list.doctype === "Department" && company) args.company = company;
-		return frappe.call({ method: "reckon_hrms.api.setup.list_items", args }).then((r) => {
+		return frappe.call({ method: "reckon_hrms.api.setup.list_items", args, type: "GET" }).then((r) => {
 			const wrap = box.find(".rhc-chips").empty();
 			if (!r.message.rows.length) wrap.append(`<span class="rhc-muted">Nothing added yet.</span>`);
 			r.message.rows.forEach((row) => {
