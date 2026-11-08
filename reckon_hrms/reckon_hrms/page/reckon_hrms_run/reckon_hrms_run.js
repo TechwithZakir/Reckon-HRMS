@@ -1,5 +1,5 @@
-// Page 3 (Run salary), steps 1 and 2: choose month and people, then check the list.
-// Steps 3 to 5 (slips, approval, payment) come later. Served at /desk/reckon-hrms/reckon-hrms-run.
+// Page 3 (Run salary), five steps: choose month and people, check the list, make draft slips,
+// review and approve, then pay. Served at /desk/reckon-hrms/reckon-hrms-run.
 frappe.pages["reckon-hrms-run"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({ parent: wrapper, title: "Run salary", single_column: true });
 	const root = $(`<div class="rhr"></div>`).appendTo(page.main);
@@ -44,6 +44,46 @@ frappe.pages["reckon-hrms-run"].on_page_load = function (wrapper) {
 				<span><button class="rhr-btn" id="prev" type="button">Previous</button> <button class="rhr-btn" id="next" type="button">Next</button></span></div>
 			<div class="rhr-row"><span class="rhr-muted">Uncheck a person to leave them out of this run. Nothing is paid to anyone left out.</span></div>
 			<div class="rhr-err" id="err2"></div>
+			</div>
+			<div class="rhr-card" id="step3" style="display:none">
+				<h2>3 · Make draft slips <span class="rhr-map">Salary Slip (draft)</span></h2>
+				<div class="rhr-muted">One draft pay slip for each person on the list. Nothing is paid yet.</div>
+				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="mkSlips" type="button">Create draft slips</button></div>
+				<div class="rhr-bar"><div id="slipBar"></div></div>
+				<div class="rhr-muted" id="slipText"></div>
+				<div class="rhr-err" id="err3"></div>
+			</div>
+			<div class="rhr-card" id="step4" style="display:none">
+				<h2>4 · Review and approve <span class="rhr-map">Submit Salary Slip</span></h2>
+				<div class="rhr-sum" id="tot"></div>
+				<div class="rhr-alert" id="totNote" style="display:none"></div>
+				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="approve" type="button">Approve all slips</button></div>
+				<div class="rhr-bar"><div id="subBar"></div></div>
+				<div class="rhr-muted" id="subText"></div>
+				<div class="rhr-err" id="err4"></div>
+			</div>
+			<div class="rhr-card" id="step5" style="display:none">
+				<h2>5 · Pay <span class="rhr-map">Journal Entry</span></h2>
+				<div class="rhr-muted">Only approved slips are paid. People on hold are left out, and nothing is cancelled.</div>
+				<div class="rhr-row">
+					<label>Pay from account <select id="bank"><option value="">Choose an account</option></select></label>
+					<label>Reference <input type="text" id="ref" placeholder="e.g. Salary November 2026"></label>
+					<label>Reference date <input type="date" id="refDate" value="${frappe.datetime.get_today()}"></label>
+					<button class="rhr-btn rhr-pri" id="pay" type="button" disabled>Record payment</button>
+				</div>
+				<div class="rhr-row">
+					<button class="rhr-btn" id="dlBank" type="button">Bank sheet (CSV)</button>
+					<button class="rhr-btn" id="dlWallet" type="button">bKash or Nagad sheet (CSV)</button>
+					<span class="rhr-muted" id="fileInfo"></span>
+				</div>
+				<h3 style="font-size:14px;margin:14px 0 0">On hold</h3>
+				<div class="rhr-row">
+					<input type="text" id="holdEmp" placeholder="Employee ID" aria-label="Employee ID to hold">
+					<input type="text" id="holdReason" placeholder="Reason" aria-label="Reason for hold">
+					<button class="rhr-btn" id="holdBtn" type="button">Hold payment</button>
+				</div>
+				<table class="rhr-table"><tbody id="holds"></tbody></table>
+				<div class="rhr-err" id="err5"></div>
 		</div>`);
 
 	const call = (method, args) => frappe.call({ method: "reckon_hrms.api.payroll_run." + method, args: args || {}, type: "GET" });
@@ -76,6 +116,7 @@ frappe.pages["reckon-hrms-run"].on_page_load = function (wrapper) {
 			<div><span>Run</span><b>${esc(run.name)}</b></div>`);
 		root.find("#warn").toggle(run.unmarked_attendance > 0).text(
 			`${run.unmarked_attendance} people have no attendance marked yet for this month.`);
+			showSteps(run);
 		loadPeople();
 	}
 
@@ -122,7 +163,149 @@ frappe.pages["reckon-hrms-run"].on_page_load = function (wrapper) {
 		if (!state.run) return;
 		post("fetch_employees", { name: state.run }).then((r) => showStep2(r.message)).catch((e) => root.find("#err2").text(e.message));
 	});
-	root.find("#all").on("change", function () {
+	const money = (x) => Number(x || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+		const setBar = (sel, pct) => root.find(sel).css("width", Math.max(0, Math.min(100, pct)) + "%");
+		const save = (text, file) => {
+			const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+			const a = document.createElement("a");
+			a.href = url; a.download = file; document.body.appendChild(a); a.click(); a.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 1000);
+		};
+		// Background jobs report progress through a cache key; poll it until the job says done.
+		function poll(method, job, onTick, onDone) {
+			const timer = setInterval(() => {
+				call(method, { job }).then((r) => {
+					const s = r.message;
+					onTick(s);
+					if (s.state === "done" || s.state === "unknown") { clearInterval(timer); onDone(s); }
+				}).catch(() => clearInterval(timer));
+			}, 1500);
+		}
+		// Show each step once the run has reached it (step comes from get_run: 1 no people, 2 no slips, 3 slips).
+		function showSteps(run) {
+			root.find("#step3").show();
+			root.find("#step4").toggle(run.step >= 3);
+			root.find("#step5").toggle(run.step >= 3);
+			if (run.step >= 3) { loadTotals(); loadPayment(run); }
+		}
+		function loadTotals() {
+			call("review_totals", { name: state.run }).then((r) => {
+				const t = r.message;
+				root.find("#tot").html(`
+					<div><span>Draft slips</span><b>${t.slips}</b></div>
+					<div><span>Gross pay</span><b>${money(t.gross)}</b></div>
+					<div><span>Deductions</span><b>${money(t.deductions)}</b></div>
+					<div><span>Net pay</span><b>${money(t.net)}</b></div>`);
+				const note = t.slips === 0 ? "Every slip in this run is approved."
+					: t.change_percent === null ? "No approved salary last month to compare with."
+					: `Net pay is ${Math.abs(t.change_percent)}% ${t.change_percent >= 0 ? "higher" : "lower"} than last month (${money(t.last_month_net)}).`;
+				root.find("#totNote").show().text(note);
+				root.find("#approve").prop("disabled", t.slips === 0);
+			});
+		}
+		function loadPayment(run) {
+			frappe.call({ method: "frappe.client.get_list", args: {
+				doctype: "Account", fields: ["name"], limit_page_length: 200, order_by: "name asc",
+				filters: { company: run.company, is_group: 0, account_type: ["in", ["Bank", "Cash"]] } } }).then((r) => {
+				root.find("#bank").html(`<option value="">Choose an account</option>` +
+					r.message.map((x) => `<option value="${esc(x.name)}">${esc(x.name)}</option>`).join(""));
+			});
+			refreshFiles();
+		}
+		function refreshFiles() {
+			call("payment_files", { name: state.run }).then((r) => {
+				const f = r.message;
+				state.totalToPay = f.total_to_pay;
+				root.find("#fileInfo").text(`${f.bank_count} bank, ${f.wallet_count} bKash or Nagad, ${f.hold_count} on hold. Total to pay ${money(f.total_to_pay)}.`);
+				root.find("#holds").html(f.holds.map((h) => `<tr><td>${esc(h.employee)}</td><td>${esc(h.employee_name)}</td><td>${esc(h.reason)}</td>
+					<td><button class="rhr-btn release" data-e="${esc(h.employee)}" type="button">Release</button></td></tr>`).join("")
+					|| `<tr><td class="rhr-muted">Nobody is on hold.</td></tr>`);
+			});
+		}
+
+		root.find("#mkSlips").on("click", () => {
+			const $btn = root.find("#mkSlips");
+			root.find("#err3").text("");
+			$btn.prop("disabled", true);
+			post("create_slips", { name: state.run }).then((r) => poll("get_slip_progress", r.message.job,
+				(s) => {
+					const done = Object.values(s.branches || {}).reduce((a, b) => a + b.done, 0);
+					setBar("#slipBar", s.total ? (100 * done) / s.total : 0);
+					root.find("#slipText").text(`${done} of ${s.total || 0} slips made`);
+				},
+				(s) => {
+					$btn.prop("disabled", false);
+					if (s.state !== "done") { root.find("#err3").text("Could not finish making the slips. Try again."); return; }
+					root.find("#slipText").text(`${s.created} draft slips made.` + (s.missing ? ` ${s.missing} people did not get a slip.` : ""));
+					call("get_run", { name: state.run }).then((x) => showSteps(x.message));
+				}))
+				.catch((e) => { $btn.prop("disabled", false); root.find("#err3").text((e && e.message) || "Could not make the slips."); });
+		});
+
+		root.find("#approve").on("click", () => {
+			root.find("#err4").text("");
+			frappe.confirm("Approve every draft slip in this run? Approved slips cannot be edited.", () => {
+				const $btn = root.find("#approve");
+				$btn.prop("disabled", true);
+				post("approve_slips", { name: state.run }).then((r) => poll("get_submit_progress", r.message.job,
+					(s) => {
+						setBar("#subBar", s.total ? (100 * s.done) / s.total : 0);
+						root.find("#subText").text(`${s.done} of ${s.total} approved`);
+					},
+					(s) => {
+						if (s.failed && s.failed.length) {
+							root.find("#err4").text(`${s.failed.length} slips were not approved. ${s.failed[0].reason}`);
+							$btn.prop("disabled", false);
+						} else {
+							root.find("#subText").text("All slips approved.");
+						}
+						loadTotals();
+						refreshFiles();
+					}))
+					.catch((e) => { $btn.prop("disabled", false); root.find("#err4").text((e && e.message) || "Could not approve."); });
+			});
+		});
+
+		root.find("#bank").on("change", function () { root.find("#pay").prop("disabled", !this.value); });
+		root.find("#pay").on("click", () => {
+			const bank = root.find("#bank").val();
+			const ref = root.find("#ref").val().trim();
+			root.find("#err5").text("");
+			if (!bank) return root.find("#err5").text("Choose the account to pay from.");
+			if (!ref) return root.find("#err5").text("Type a reference, such as the month.");
+			frappe.confirm(`Record payment of ${money(state.totalToPay)} from ${bank}? This posts one journal entry.`, () => {
+				post("record_payment", { name: state.run, bank_account: bank, reference: ref, reference_date: root.find("#refDate").val() })
+					.then((r) => {
+						root.find("#pay").prop("disabled", true);
+						frappe.show_alert({ message: `Paid ${money(r.message.total)} in ${r.message.journal_entry}.`, indicator: "green" });
+						refreshFiles();
+					})
+					.catch((e) => root.find("#err5").text((e && e.message) || "Could not record the payment."));
+			});
+		});
+		root.find("#dlBank").on("click", () => call("payment_files", { name: state.run, download: 1 })
+			.then((r) => save(r.message.bank_csv, `${state.run}-bank.csv`)));
+		root.find("#dlWallet").on("click", () => call("payment_files", { name: state.run, download: 1 })
+			.then((r) => save(r.message.wallet_csv, `${state.run}-bkash-nagad.csv`)));
+		root.find("#holdBtn").on("click", () => {
+			const emp = root.find("#holdEmp").val().trim();
+			root.find("#err5").text("");
+			if (!emp) return root.find("#err5").text("Type the employee ID to hold.");
+			post("set_payment_hold", { name: state.run, employees: [emp], hold: 1, reason: root.find("#holdReason").val() })
+				.then((r) => {
+					if (!r.message.changed) return root.find("#err5").text("No approved slip for that employee in this run.");
+					root.find("#holdEmp, #holdReason").val("");
+					refreshFiles();
+				})
+				.catch((e) => root.find("#err5").text((e && e.message) || "Could not hold that payment."));
+		});
+		root.find("#holds").on("click", ".release", function () {
+			post("set_payment_hold", { name: state.run, employees: [$(this).data("e")], hold: 0 })
+				.then(() => refreshFiles())
+				.catch((e) => root.find("#err5").text((e && e.message) || "Could not release that payment."));
+		});
+
+		root.find("#all").on("change", function () {
 		root.find("input.pick").prop("checked", this.checked).trigger("change");
 	});
 };
@@ -151,4 +334,6 @@ body.map .rhr-map{display:inline-block}
 .rhr-chip.good{background:var(--control-bg)}
 .rhr-chip.warn{color:var(--orange-500)}
 .rhr-err{color:var(--red-500);font-size:13px;margin-top:6px}
+.rhr-bar{height:8px;background:var(--control-bg);border-radius:4px;margin-top:10px;overflow:hidden}
+.rhr-bar div{height:100%;width:0;background:var(--primary);transition:width .3s}
 `;

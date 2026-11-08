@@ -349,8 +349,9 @@ def set_payment_hold(name: str, employees: list | str, hold: int = 1, reason: st
 
 
 @frappe.whitelist(methods=["GET"])
-def payment_files(name: str) -> dict:
-    """Bank transfer sheet and bKash/Nagad sheet for submitted, non-held slips, plus the hold list."""
+def payment_files(name: str, download: int = 0) -> dict:
+    """Bank transfer sheet and bKash/Nagad sheet for submitted, non-held slips, plus the hold list.
+    Only a real download (download=1) is written to the audit comments."""
     _gate("Payroll Entry", "read")
     if not frappe.has_permission("Salary Slip", "read"):
         frappe.throw(_("You do not have permission to export payment files."), frappe.PermissionError)
@@ -375,8 +376,9 @@ def payment_files(name: str) -> dict:
             bank.append([s.employee, s.employee_name, s.bank_name or "", s.bank_ac_no, f"{flt(s.net_pay):.2f}"])
         elif cell.get(s.employee):
             wallet.append([s.employee, s.employee_name, cell.get(s.employee), f"{flt(s.net_pay):.2f}"])
-    frappe.get_doc("Payroll Entry", name).add_comment("Comment", "{0} downloaded the payment files at {1}.".format(
-        frappe.session.user, frappe.utils.now()))
+    if int(download or 0):
+        frappe.get_doc("Payroll Entry", name).add_comment("Comment", "{0} downloaded the payment files at {1}.".format(
+            frappe.session.user, frappe.utils.now()))
     return {
         "bank_csv": _csv_text(["Employee", "Name", "Bank", "Account", "Net Pay"], bank),
         "wallet_csv": _csv_text(["Employee", "Name", "bKash or Nagad number", "Net Pay"], wallet),
