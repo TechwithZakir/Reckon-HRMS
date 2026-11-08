@@ -1,166 +1,188 @@
 ---
 name: bangladesh-hr-payroll
-description: Domain knowledge for HR and payroll of Bangladeshi private-sector companies (Bangladesh Labour Act 2006 as amended by Act 43 of 2026, SRO 53-Law/2026, NBR income tax and withholding, sector minimum-wage gazettes). Use when designing, configuring, explaining or auditing HR, attendance, leave, salary structure, payroll run, deductions, tax or payslip behaviour for a Bangladesh employer, or when an agent must answer a Bangladesh payroll question.
+description: Company payroll benchmark for Bangladeshi private employers, from the ReckonERP Bangladesh Company Payroll Benchmark 2026 (role salary bands, salary components, deductions, attendance events, leave practices, synthetic payroll examples and AI skill guardrails). Use when suggesting salary bands, designing salary templates, explaining a payslip, reconciling attendance to payroll, flagging payroll anomalies, answering leave-balance questions or forecasting payroll cost for a Bangladesh company.
 metadata:
-  research_cut_off: 2026-11-08
-  basis: Bangladesh_Private_Sector_Payroll_Research_Report_2026.pdf and Bangladesh_Private_Sector_Payroll_Research_Datasheet_2026.xlsx
-  status: research baseline, not legal advice
+  baseline: 2026-11-08
+  basis: ReckonERP_Bangladesh_Company_Payroll_Guide_2026.pdf and ReckonERP_Bangladesh_Company_Payroll_Benchmark_2026.xlsx
+  currency: BDT per month, gross
+  status: indicative market data for product configuration, not a national average and not a legal reference
 ---
 
-# Bangladesh private-sector HR and payroll
+# Bangladesh company payroll benchmark (ReckonERP)
 
-This skill is the research baseline for an agentic HR and payroll implementation for Bangladeshi companies. It separates four kinds of evidence. Keep them separate in every answer, every configuration and every log.
+Use this skill for HR and payroll on Bangladeshi private companies. The figures are indicative market ranges that seed demos, templates and AI explanations. Each customer must calibrate them with its own payroll data.
 
-| Evidence type | What it is | How to use it |
-|---|---|---|
-| Statutory | Labour Act 2006 as amended, Act 43 of 2026, SRO 53-Law/2026, sector wage-board gazettes, Income Tax Act and NBR rules | Configure only after checking the current authentic text. Effective-dated. |
-| Market estimate | Manpower.com.bd (S09), Paylab (S10) | Indicative only. Never a legal minimum. Never a salary offer without employer validation. |
-| Company policy | Employer's own grades, allowances, incentives, leave above statute | Owned by the employer. Store with approval and effective date. |
-| Research gap | Anything the sources did not resolve | Say so. Do not fill it with an estimate. |
+## 1. Rules for the agent
 
-## 1. Rules the agent must follow
+1. **Ranges, not averages.** Always give range, midpoint and confidence together. Never present a figure as a guaranteed salary or as a national average.
+2. **Keep confidence visible.** Medium means several current market sources agree. Low means a sparse sample or broad estimate. Say which one applies.
+3. **Synthetic data is fiction.** Sample payroll records in this dataset are test data. Never present them as a real employee or employer record.
+4. **Explain, don't change pay.** Anomaly flags and reconciliation results recommend an action. They never deduct, alter or pay anything. Payroll changes need human approval.
+5. **Use current records only.** A payslip explanation uses only the current payroll period's salary, attendance, leave, approved variable pay and deductions.
+6. **Respect data access.** Share salary and bank details only with users whose role allows it.
+7. **Not a legal reference.** This dataset does not give statutory minimums, overtime formulas, leave entitlements or tax rates. Do not derive compliance settings from it. Route those questions to the company's own legal or tax adviser.
 
-1. **Never invent a number.** Quote a salary range or a legal rate only when a named source gives it, and label it with its source ID and confidence.
-2. **Never hard-code legal rates that are unverified.** Annual, casual and sick leave, maternity leave, provident fund and gratuity formulas, and exact sector wage grades are not transcribed in the baseline. Make them effective-dated configuration, and flag them as "pending legal verification".
-3. **Do not compute a statutory amount from this document alone.** Overtime base, divisor, eligibility and holiday pay need the current Act or gazette text before go-live.
-4. **Propose, do not submit.** For any payroll action (creating a run, approving slips, recording payment, changing a salary or tax setting), prepare the change and wait for a named HR or payroll approver. Payment needs a second confirmation.
-5. **Always state the legal caveat** when answering a compliance question: "Verify against authentic Bangla legislation, current gazettes and qualified Bangladesh labour or tax counsel before deployment."
-6. **Never treat lateness or absence as an automatic wage fine.** Deductions need a legal or written policy basis, a reason, an approver, a cap and an audit trail.
+## 2. Role salary bands (monthly gross, BDT)
 
-## 2. Current legal position (as of 8 Nov 2026)
+Source basis is in the workbook's Role Benchmarks sheet. Midpoint = (min + max) ÷ 2.
 
-- **Bangladesh Labour (Amendment) Act 2026, Act No. 43 of 2026, dated 10 April 2026 (S02).** Changes leave, maternity, equal remuneration and festival holidays. Old templates may be stale.
-- **Labour Rules amendment SRO 53-Law/2026, dated 16 February 2026 (S04).**
-- **Income tax:** FY 2026/27 rates under the current Income Tax Act and rules, plus NBR Withholding Tax Rules 2026 with the 6 July 2026 amendment (S11, S12). Do not hard-code rates. Use an annual tax projection per employee and reconcile monthly TDS.
-- **Minimum wages:** sector wage-board gazettes, not one national private-sector minimum (S05). Examples listed in the register: pharmaceuticals (26 Jan 2026), bakery and confectionery (26 Jan 2026), iron foundry and engineering workshop (7 Apr 2026), paint and chemical factories (9 Jul 2026), garments (20 Dec 2023), cotton textile (4 Apr 2024), construction and wood (17 Aug 2021), security services (1 Feb 2022). Amounts for most of these are not transcribed.
-- **EPZ companies** fall under a separate regime with BEPZA notifications. Treat them as a separate employer class.
+| Industry | Role | Level | Min | Max | Mid | Confidence |
+|---|---|---|---|---|---|---|
+| IT / Software | Help Desk / IT Support | Entry | 18,000 | 30,000 | 24,000 | Low |
+| IT / Software | Junior Software Developer | Entry | 35,000 | 60,000 | 47,500 | Medium |
+| IT / Software | Software Engineer | Mid | 50,000 | 130,000 | 90,000 | Medium |
+| IT / Software | Senior Software Engineer | Senior | 100,000 | 180,000 | 140,000 | Medium |
+| IT / Software | AI / Data Engineer | Mid | 50,000 | 120,000 | 85,000 | Low |
+| IT / Software | DevOps / Cloud Engineer | Mid | 80,000 | 160,000 | 120,000 | Low |
+| IT / Software | IT Project Manager | Senior | 120,000 | 200,000 | 160,000 | Medium |
+| IT / Software | QA / Test Engineer | Mid | 30,000 | 80,000 | 55,000 | Low |
+| Manufacturing / RMG / Textile | Machine Operator (skilled) | Operational | 15,000 | 25,000 | 20,000 | Low |
+| Manufacturing / RMG / Textile | Production Supervisor | Mid | 30,000 | 50,000 | 40,000 | Medium |
+| Manufacturing / RMG / Textile | Factory Manager | Senior | 80,000 | 150,000 | 115,000 | Medium |
+| Manufacturing / RMG / Textile | Quality / QA Executive | Entry-Mid | 25,000 | 50,000 | 37,500 | Low |
+| Construction / Engineering | Civil Engineer | Mid | 50,000 | 80,000 | 65,000 | Medium |
+| Construction / Engineering | Site Supervisor | Mid | 35,000 | 55,000 | 45,000 | Medium |
+| Construction / Engineering | Skilled Technician | Operational | 20,000 | 35,000 | 27,500 | Medium |
+| Corporate / Finance | Accountant / Finance Executive | Mid | 25,000 | 70,000 | 47,500 | Medium |
+| Corporate / Finance | HR Executive | Entry-Mid | 25,000 | 50,000 | 37,500 | Low |
+| Corporate / Finance | HR Manager | Senior | 70,000 | 120,000 | 95,000 | Medium |
+| Sales / Marketing | Sales Executive | Entry-Mid | 19,000 | 40,000 | 29,500 | Medium |
+| Sales / Marketing | Marketing Manager | Senior | 60,000 | 110,000 | 85,000 | Medium |
+| Pharmaceuticals | Medical / Product Sales Representative | Entry-Mid | 25,000 | 50,000 | 37,500 | Low |
+| Pharmaceuticals | Production / QA Executive | Mid | 30,000 | 65,000 | 47,500 | Low |
+| Trading / Distribution | Sales / Territory Officer | Entry-Mid | 22,000 | 45,000 | 33,500 | Low |
+| Trading / Distribution | Warehouse / Inventory Executive | Entry-Mid | 20,000 | 40,000 | 30,000 | Low |
+| Healthcare | Hospital Admin Executive | Mid | 25,000 | 55,000 | 40,000 | Low |
+| Healthcare | Accounts / Billing Executive | Entry-Mid | 22,000 | 45,000 | 33,500 | Low |
+| Education / NGO / Services | Program / Admin Officer | Mid | 30,000 | 70,000 | 50,000 | Low |
+| Retail / Logistics | Store / Operations Supervisor | Mid | 25,000 | 50,000 | 37,500 | Low |
 
-## 3. Payroll model
+Role notes that change the range (keep them when quoting):
+- Software roles: experience and delivery scope; higher-paying firms can exceed the band.
+- DevOps and AI/Data: small samples, employer-sensitive.
+- Sales and sales-executive roles: commission is usually additional to the band.
+- Pharmaceutical and healthcare roles: transport allowance, TA/DA, shift pattern and hospital size change pay.
+- Donor-funded roles (NGO and programme): may differ from market.
 
-- **Gross cash earnings** = basic + fixed cash allowances + variable earnings + eligible overtime + arrears and adjustments.
-- **Net pay** = gross cash earnings − authorized employee deductions.
-- **Employer payroll cost** = gross cash earnings + employer-side contributions, benefits and taxes where applicable. Track it separately from net pay.
-- **Employer PF or benefits** are not deducted from net pay.
-- Worked arithmetic example in the source (illustrative, not a salary scale): basic 30,000 + house rent 15,000 + medical 1,500 + conveyance 2,000 + incentive 3,000 = gross 51,500 before overtime, arrears and deductions.
+## 3. Salary components
 
-### Earnings
+| Component | Type | Frequency | Company method | ReckonERP configuration |
+|---|---|---|---|---|
+| Basic salary | Fixed | Monthly | Core contract amount, company-defined proportion | Effective-dated; the calculation base |
+| House rent | Fixed | Monthly | Flat or percentage of basic | Company formula. Do not assume a universal percentage. |
+| Medical | Fixed | Monthly | Flat allowance | Company amount or eligibility |
+| Transport / conveyance | Fixed or conditional | Monthly | Flat, actual reimbursement or attendance-linked | Support fixed, per-day and claim methods |
+| Meal / lunch | Fixed or attendance-linked | Monthly or per day | Flat, meal card or payable days × rate | Prorate by payable days |
+| Mobile / internet | Fixed or reimbursement | Monthly | Role allowance or submitted claim | Cap and receipt workflow |
+| Attendance incentive | Variable | Monthly | Paid when attendance criteria are met | Configurable eligibility and threshold |
+| Shift / night allowance | Variable | Per shift or monthly | Rate × eligible shifts | Use roster and approved shift records |
+| Project / site allowance | Variable | Per day or monthly | Rate × eligible project or site days | Link to project, site and cost centre |
+| Sales commission | Variable | Monthly or quarterly | Target achievement × plan | Slab, target, collection or margin basis; approval |
+| Performance bonus | Variable | Quarterly or annual | KPI score or approved amount | Store period, rating and approval |
+| Festival or occasion bonus | Variable | Event-based | Amount or salary multiple | Event schedule and eligibility configurable |
+| Overtime | Variable | Hourly | Approved hours × configured rate | Configured formula, time event and approval |
+| Reimbursement | Expense claim | As approved | Approved eligible expense | Kept outside fixed gross where appropriate |
 
-| Component | Type | Control |
-|---|---|---|
-| Basic salary | Fixed | Contract, grade or wage gazette. Base for overtime and some benefits only where law defines it. |
-| House rent | Fixed or percentage | No universal percentage. Employer or sector structure decides. |
-| Medical, conveyance, food, mobile | Fixed or reimbursement | Separate reimbursable expenses from taxable pay. Define taxable vs accountable treatment. |
-| Attendance or production incentive | Variable | Must not reduce the statutory wage floor. Define thresholds and eligibility in writing. |
-| Sales commission | Variable | Define booking, collection, return, cancellation and clawback rules. |
-| Overtime | Hourly | Only for eligible workers. See section 4. |
-| Night or shift allowance | Per shift or fixed | Sector order or company policy. Separate from statutory overtime unless the law includes it. |
-| Festival bonus | Fixed or formula | Set by law, wage order, contract or policy. There is no universal private-sector formula. |
-| Performance bonus | Annual or quarterly | KPI, proration and eligibility in policy. |
-| Arrears and adjustments | Adjustment | Keep period, reason and approval. |
-| Leave encashment | Daily rate × eligible days | Only eligible leave, correct wage base. |
+## 4. Deductions and adjustments
 
-### Deductions
+Model every deduction as a named, auditable transaction. Store the source event, calculation base, amount, reason, approver and payroll period.
 
-| Deduction | Rule |
-|---|---|
-| Income tax (TDS) | Annual projection and monthly reconciliation. Never a fixed rate in code. |
-| Employee PF | Only where the scheme applies. Keep separate from the employer contribution. |
-| Salary advance and loan recovery | Signed agreement, schedule, outstanding balance, cap and consent review. Keep them separate. |
-| Unpaid leave (LWP) and absence | Defined daily or hourly divisor. Exclude paid leave. Never deduct twice for the same absence. |
-| Late or early | Track the occurrence. A wage deduction needs legal review. Separate time not worked from a disciplinary fine. |
-| Notice-pay recovery | Only where the termination terms and law make it enforceable. |
-| Other authorized | Written authorization, court order or law, with a reason and approval. |
+| Deduction | Category | Example calculation | Audit handling |
+|---|---|---|---|
+| Unpaid absence | Attendance-linked | Absent days × configured daily rate, only where policy marks the day unpaid | Keep the source attendance event and calculation trace |
+| Late or early departure | Attendance-linked | Threshold, grace and penalty set by the company | Never hard-code a universal deduction |
+| Employee loan | Recovery | Approved instalment per payroll | Opening balance, instalment, closing balance |
+| Salary advance | Recovery | Approved amount or instalment | Request, approval, outstanding balance |
+| Benefit contribution | Voluntary or company plan | Fixed or percentage | Employee and employer portions kept separate |
+| Meal or transport recovery | Recovery | Actual usage or agreed amount | Cap and exception handling |
+| Damage or asset recovery | Recovery | Approved amount | Reason, approval and evidence |
+| Other adjustment | Manual | Positive or negative | Mandatory reason, approver and audit trail |
 
-## 4. Overtime, hours and holidays
+## 5. Attendance events
 
-- **Ordinary weekly working time:** normally 48 hours a week for an adult worker (Labour Act s.102). Set the threshold by establishment type and worker category.
-- **Overtime:** the report states eligible overtime is generally paid at **twice the ordinary rate of basic wage plus applicable dearness, ad-hoc or interim allowances** (s.108). Confirm the exact wording and coverage in the current text before go-live. Do not calculate overtime on gross salary by default.
-- **Weekly holiday (s.103):** factories and industrial establishments one day; shops and establishments one and a half days; road transport 24 continuous hours. Exemptions and compensatory rules need review. One weekly-off template does not fit every employer.
-- **Festival holidays:** 13 paid festival holidays per calendar year after the 2026 amendment (s.118 as updated by Act 43). Holiday work triggers substitute or compensatory handling.
-- **Wage payment deadline (s.123):** wages for a wage period are generally payable within 7 working days after the period ends. Termination wages have a different deadline. The payroll calendar must enforce the cut-off.
+Keep raw punches separate from corrected and approved attendance.
 
-## 5. Attendance design
-
-- Shift roster: general, rotating, night or split, with effective dates and swap approval.
-- Net payable hours = elapsed time − unpaid breaks.
-- Weekly hours: alert at the threshold. Do not silently convert every excess hour to overtime.
-- Overtime requires an authorization record (pre-approved, emergency or post-approved), actual hours and the overtime wage base.
-- Field, biometric and remote attendance: store the evidence (location accuracy, device, timestamp, offline sync). Biometric data needs privacy and data-governance controls with a manual correction path.
-- Rounding (minute, 5 or 15 minutes) must not underpay a legal entitlement. Document the direction and the payroll impact.
+| Event | Granularity | Configurable treatment | Data to keep |
+|---|---|---|---|
+| Present | Daily | Payable day | Timesheet, device or mobile check-in |
+| Late in | Daily | Compared with shift start plus grace; may affect incentive | Minutes late, approved exception |
+| Early out | Daily | Compared with scheduled end; may affect incentive | Approved early departure, kept separate |
+| Absent | Daily | Full or half day by company code; paid, unpaid or leave-adjusted | Reason and linked leave request |
+| Half day | Daily | Configured fraction | Half-day attendance and leave link |
+| Overtime | Time | Approved hours × configured rate | Requested, approved and payable hours, separately |
+| Shift / roster | Schedule | Planned work window and rest day | Rotating, split and night shifts |
+| Remote or field work | Location | Approved day or geotagged visit | Offline capture and manager validation |
+| Holiday / weekly off | Calendar | Company calendar classification | Company calendar, not hard-coded national rules |
+| Payroll cut-off | Period | Attendance locked at cut-off | Late corrections go through the adjustment workflow |
 
 ## 6. Leave
 
-| Leave | Status | Action |
-|---|---|---|
-| Annual or earned | Statutory. Accrual varies by worker category and amended law. Legacy 1:18 and 1:11 rules must not be used without checking the 2026 text. | Accrual ledger, carry-forward and encashment, effective-dated |
-| Casual | Statutory. Current days and eligibility to be confirmed. | Annual entitlement and approval |
-| Sick | Statutory. Days, certification and paid or unpaid status to be confirmed. | Medical certificate workflow |
-| Festival | 13 paid days (2026 amendment) | Holiday calendar and substitute benefit |
-| Maternity | Changed by 2026 amendment. Duration and eligibility not confirmed. Do not reuse the old 112-day assumption. | Eligibility, benefit base, documents, return to work |
-| Company special leave | Employer policy above the statutory floor. Cannot undercut the floor. | Separate leave type and cost centre |
+Keep leave as a ledger: opening balance + accrual + adjustment − used = closing balance.
 
-## 7. Market benchmarks (indicative, not statutory)
+| Leave type | Unit | Configuration | Workflow |
+|---|---|---|---|
+| Annual / earned | Days or hours | Company plan | Balance and planned-usage answers |
+| Casual / personal | Days or hours | Fixed or accrued | Full day, half day and hourly requests |
+| Sick | Days or hours | Balance or tracking | Attachment or approval where the employer requires |
+| Unpaid | Days or hours | Reduces payable amount if configured | Explain the salary impact before approval |
+| Maternity, parental or special | Days or hours | Separate type and pay treatment | Type and pay treatment configurable |
+| Compensatory off | Hours or days | Earned from approved extra work | Link to approved overtime or work event |
+| Encashment | Days × rate | Configured rate and eligibility | Kept separate from monthly salary |
 
-Quote only with the source ID and the note "indicative, not statutory, validate before use".
+Note: the benchmark does not set statutory leave entitlements. Use the company's approved policy.
 
-| Industry | Role | Low (BDT/month) | High (BDT/month) | Source |
+## 7. Synthetic payroll examples (fictional)
+
+| ID | Designation | Gross | Deductions | Net | Check |
+|---|---|---|---|---|---|
+| SYN-001 | Software Engineer (Mid) | 105,000 | Loan 1,500 | 103,500 | Reconciles |
+| SYN-002 | Accountant (Mid) | 67,000 | Loan 2,000 | 65,000 | Reconciles |
+| SYN-003 | Production Supervisor (Mid) | 58,000 | None | 58,000 | Reconciles |
+| SYN-004 | Sales Executive (Entry-Mid) | 52,000 | None | 52,000 | Reconciles (includes 8,000 commission) |
+| SYN-005 | Site Supervisor (Mid) | 68,000 | None | 68,000 | Reconciles (includes 6,000 site allowance) |
+| SYN-006 | Territory Officer (Entry-Mid) | Blank | Other 1,000 | Blank | Incomplete. Inputs give 52,000 gross and 51,000 net; do not fill without confirmation. |
+
+The guide's worked example is also fictional: basic 28,000 + house rent 12,000 + medical 2,000 + transport 3,000 + meal 1,500 + attendance incentive 1,000 + commission 4,500 = 52,000 gross; less loan recovery 1,000 = 51,000 net.
+
+## 8. AI skills and guardrails
+
+| Skill | Purpose | Required data | Guardrail |
+|---|---|---|---|
+| Salary Benchmark Assistant | Suggest a band by role, experience and location | Role, industry, location, experience, skills, employer size | Range, midpoint, confidence and source notes. Never a guaranteed salary. |
+| Payroll Explanation Copilot | Explain each payslip line in plain Bangla or English | Salary structure, attendance, leave, approved variable pay, deductions | Current period records only; line-by-line gross to net |
+| Attendance Reconciliation Agent | Find missing punches, late patterns, roster and payroll mismatches | Roster, raw punches, approved corrections, leave | Exception list with evidence; human approval before any payroll change |
+| Payroll Anomaly Detection | Flag salary changes, duplicate payments, outlier allowances, negative net | Current and historical payroll, grade, department, peers | Explain only; never auto-deduct or alter pay |
+| Leave Balance Assistant | Balance, pending request and projected balance | Leave ledger, requests, accrual settings | Respect role-based access |
+| Compensation Structure Designer | Company templates by role and grade | Policy, budget, benchmark bands | Customer administrator approves the template |
+| Payroll Forecasting | Cost, headcount and variable pay scenarios | Employee master, salary changes, hiring plan, roster | Keep actual, committed and forecast values separate |
+| HR Data Quality Agent | Missing bank details, duplicate IDs, missing components, invalid dates | Employee master, salary assignments, payroll history | Never expose sensitive data to unauthorised users |
+
+## 9. Data model
+
+Keep these entities separate: Employee Master; Salary Assignment (effective-dated); Salary Component Catalogue; Attendance Events; Shift or Roster; Leave Ledger; Payroll Run; Payroll Line; Commission or Bonus Plan; Loan or Advance Ledger; Expense Reimbursement; Approval Workflow; Audit Event; Benchmark Record.
+
+Each payroll line keeps its calculation base, rate, quantity, source transaction and explanation.
+
+Benchmark Record fields: industry, role, level, min, max, midpoint, source, date, confidence.
+
+## 10. Rollout guidance
+
+- Store the source date, geography, sample size where available, gross or net basis, confidence and limitations for every figure.
+- At onboarding, import the customer's actual salary register and anonymised payroll history. Build company-specific bands from that data.
+- Do not use one nationwide average for every role.
+- Refresh market ranges periodically and validate them against customer payroll before any compensation decision.
+
+## 11. Sources
+
+| ID | Source | Date or access | Useful data | Caveat |
 |---|---|---|---|---|
-| IT / Software | Junior software developer | 40,000 | 60,000 | S09 |
-| IT / Software | Senior software engineer | 100,000 | 180,000+ | S09 |
-| IT / Software | IT project manager | 120,000 | 200,000+ | S09 |
-| Manufacturing / RMG | Skilled machine operator | 15,000 | 25,000 | S09 |
-| Manufacturing / RMG | Production supervisor | 30,000 | 50,000 | S09 |
-| Manufacturing / RMG | Factory manager | 80,000 | 150,000+ | S09 |
-| Construction / Engineering | Civil engineer (mid-level) | 50,000 | 80,000 | S09 |
-| Construction / Engineering | Site supervisor | 35,000 | 55,000 | S09 |
-| Construction / Engineering | Skilled mason or electrician | 20,000 | 35,000 | S09 |
-| Corporate / Finance | Accountant or finance executive | 40,000 | 70,000 | S09 |
-| Corporate / Finance | HR manager | 70,000 | 120,000 | S09 |
-| Corporate / Finance | Marketing manager | 60,000 | 110,000 | S09 |
+| S1 | Bangladesh Bureau of Statistics, Labour Force Survey 2024, reported by The Business Standard | 2025-09-17 | National employee average BDT 15,554/month | Broad context, not a professional benchmark |
+| S2 | Paylab Bangladesh salary survey | Accessed 2026-11-08 | Survey gross averages by working area | Check sample and methodology |
+| S3 | Manpower.com.bd Bangladesh Salary Benchmarks 2026 | Accessed 2026-11-08 | Role-level gross ranges, IT, manufacturing, construction, corporate | Recruitment vendor content; indicative |
+| S4 | Mimu Jobs Bangladesh Salary Guide 2026 | Accessed 2026-11-08 | Dhaka role ranges, software, finance, data, DevOps, design, product | Methodology and coverage vary |
+| S5 | Jobiglo Bangladesh Salary Guide | Accessed 2026-11-08 | Active-offer averages and medians | Small sample; directional only |
+| S6 | Chakri AI Bangladesh Salary Guide 2026 | Accessed 2026-11-08 | Indicative ranges, software engineer and accountant | Aggregated; not a formal survey |
+| S7 | SME Foundation, Study on Software Industry in Bangladesh | Accessed 2026-11-08 | Software salary bands, historical | Older survey; not current offers |
+| S8 | JobFair.bd Software Engineer Salary Guide | Accessed 2026-11-08 | 2025–2026 software ranges | Estimates from postings and recruiter conversations |
 
-Category averages from Paylab (S10) are survey averages, not grade scales. Use them only as low-confidence directional indicators: banking 29,604; telecom 29,076; pharmaceuticals 27,098; textile, leather and apparel 14,744; transport and logistics 21,148; IT 37,234; construction and real estate 32,436.
-
-Minimum wage figures in public reporting: RMG entry level BDT 12,500 under the 2023 four-grade notification (S06, S07); textile lowest grade BDT 10,000 with location differences (S08). Both must be checked against the gazette before use.
-
-## 8. Research gaps (do not fill these)
-
-- Role-specific salary ranges for most industries: no validated source. Trading, FMCG, healthcare, education, NGO, retail, and most telecom and logistics roles have no robust range.
-- Exact pharmaceutical, RMG and textile wage-grade tables: the gazettes exist but the amounts were not transcribed.
-- Leave, maternity, provident fund and gratuity after the 2026 amendment.
-- Employee annual tax calculation and withholding under the 2026 rules: needs the full NBR schedule, rebates and exemptions.
-- Lateness and absence deduction legality.
-- EPZ wage structure.
-- Private compensation for NGO, education and hospital employers.
-
-When a question hits a gap, answer: "Not established in the baseline. Next research action: <the action from the gaps list>." Do not offer a figure.
-
-## 9. Using this in the Reckon HRMS product
-
-- Model every legal value as an effective-dated setting with a source ID and a verified-by field. Show "pending verification" until a reviewer marks it verified.
-- Salary structures per employer, with components typed as fixed, variable or reimbursable, and each deduction carrying its legal or policy basis, approval and cap.
-- Overtime: an overtime rule per worker category that holds the wage base, multiplier and eligibility. Keep it switched off until verified.
-- Holiday calendar: the 13 festival days and the weekly-off template per establishment class, with substitute-leave handling.
-- Tax: annual projection and monthly TDS reconciliation, with rates loaded from the current NBR schedule rather than code.
-- Payroll run: the agent prepares drafts and reconciliations. A human approves each stage, and payment requires a second confirmation.
-
-## 10. Sources
-
-| ID | Source | Status |
-|---|---|---|
-| S01 | Bangladesh Labour Act 2006, consolidated online text (bdlaws.minlaw.gov.bd/act-details-952.html) | Primary; check against 2026 amendment |
-| S02 | Bangladesh Labour (Amendment) Act 2026, Act 43 (10 Apr 2026) | Primary |
-| S03 | Ministry of Labour legislative information (mole.gov.bd) | Lists the 2026 Act and 2025 Ordinance |
-| S04 | Labour Rules amendment SRO 53-Law/2026 (16 Feb 2026) | Primary |
-| S05 | Minimum Wages Board final gazette listing (updated 18 Aug 2026) | Primary, register |
-| S06 | RMG minimum wage gazette announcement (21 Dec 2023) | Primary |
-| S07 | Dhaka Tribune, RMG minimum wage Tk 12,500 (26 Nov 2023) | Secondary |
-| S08 | The Business Standard, textile minimum wage reporting (3 Mar 2024) | Secondary |
-| S09 | Manpower.com.bd, Bangladesh Salary Benchmarks 2026 (Mar 2026) | Market estimate |
-| S10 | Paylab, Bangladesh salary by category (live page) | Survey average, low confidence |
-| S11 | PwC Tax Summaries, Bangladesh individual income tax (reviewed 31 Jul 2026) | Secondary |
-| S12 | NBR Income Tax Rules, incl. Withholding Tax Rules 2026 and 6 Jul 2026 amendment | Primary |
-| S13 | ILO note on the 2022 Rules amendment (SRO 284-Law/2022) | Background |
-| S14 | ILO NATLEX English translation of the Labour Act | Older translation, navigation only |
-| S15 | Labour Act s.103 weekly holiday, bdlaws | Primary |
-
-Links are in the source files: `Bangladesh_Private_Sector_Payroll_Research_Report_2026.pdf` and `Bangladesh_Private_Sector_Payroll_Research_Datasheet_2026.xlsx`.
+Links are in the source workbook's Sources sheet and the guide's source register.
