@@ -65,16 +65,16 @@ def fetch_employees(name: str) -> dict:
     doc = frappe.get_doc("Payroll Entry", name)
     if doc.docstatus != 0:
         frappe.throw(_("This run is no longer a draft."))
-    doc.employees = []
-    doc.set_employee_details = None  # noqa: keep attribute clean
-    found = doc.fill_employee_details() or []
-    for row in found:
-        doc.append("employees", {"employee": row.get("employee"), "employee_name": row.get("employee_name"),
-                                 "branch": row.get("branch"), "designation": row.get("designation"),
-                                 "department": row.get("department"), "grade": row.get("grade")})
+    try:
+        # HRMS fills doc.employees itself and returns the people with unmarked attendance (warnings).
+        unmarked = doc.fill_employee_details() or []
+    except frappe.ValidationError as exc:
+        frappe.throw(_("No people match these choices. Change the office, department, job title or level."))
     doc.save()
     frappe.db.commit()
-    return get_run(name)
+    result = get_run(name)
+    result["unmarked_attendance"] = len(unmarked)
+    return result
 
 
 @frappe.whitelist(methods=["GET"])
