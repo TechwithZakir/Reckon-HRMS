@@ -308,7 +308,7 @@ def missing_pay_item_accounts(name):
         {"p": name})
     missing = []
     for (component,) in rows:
-        has = frappe.db.exists("Salary Component Account", {"parent": component, "company": company, "account": ["is", "set"]}) if component else False
+        has = bool(frappe.db.get_value("Salary Component Account", {"parent": component, "company": company}, "account"))
         if not has:
             missing.append(component)
     return sorted(missing)
