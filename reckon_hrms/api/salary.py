@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
+from frappe.utils import flt
 
 from reckon_hrms.api.shortcuts import route
 from reckon_hrms.paging import DEFAULT_PAGE, page_bounds
@@ -107,4 +108,51 @@ def assignment_summary(company: str | None = None) -> dict:
         "with_structure": int(assigned),
         "without_structure": missing,
         "filter_route": route("Salary Structure Assignment", "list"),
+    }
+
+
+@frappe.whitelist(methods=["GET"])
+def preview_payslip(structure: str, base) -> dict:
+    """Earnings and deductions for a base salary, worked out with HRMS's own formula engine.
+
+    Uses the same evaluator as Salary Slip (hrms.payroll.utils._safe_eval with its globals). Nothing is
+    saved. Tax is not in this preview: it is worked out on the real slip.
+    """
+    _gate("Salary Structure")
+    from hrms.payroll.utils import COMPONENT_EVAL_GLOBALS, _safe_eval
+
+    base_amount = flt(base)
+    if base_amount < 0:
+        frappe.throw(_("Base salary cannot be negative."))
+    doc = frappe.get_doc("Salary Structure", structure)
+    data = {"base": base_amount}
+    globals_ = dict(COMPONENT_EVAL_GLOBALS)
+
+    def compute(rows):
+        out = []
+        for row in rows:
+            if row.condition and not _safe_eval(row.condition, globals_, dict(data)):
+                continue
+            if row.amount_based_on_formula and row.formula:
+                amount = flt(_safe_eval(row.formula, globals_, dict(data)), 2)
+            else:
+                amount = flt(row.amount, 2)
+            if row.abbr:
+                data[row.abbr] = amount
+            out.append({"component": row.salary_component, "abbr": row.abbr, "amount": amount})
+        return out
+
+    earnings = compute(doc.earnings)
+    deductions = compute(doc.deductions)
+    gross = round(sum(r["amount"] for r in earnings), 2)
+    total_deductions = round(sum(r["amount"] for r in deductions), 2)
+    return {
+        "structure": doc.name,
+        "base": base_amount,
+        "earnings": earnings,
+        "deductions": deductions,
+        "gross": gross,
+        "total_deductions": total_deductions,
+        "take_home_before_tax": round(gross - total_deductions, 2),
+        "note": _("Income tax is worked out on the real salary slip, not in this preview."),
     }
