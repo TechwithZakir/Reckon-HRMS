@@ -156,3 +156,71 @@ def preview_payslip(structure: str, base) -> dict:
         "take_home_before_tax": round(gross - total_deductions, 2),
         "note": _("Income tax is worked out on the real salary slip, not in this preview."),
     }
+
+
+BULK_BATCH = 200
+
+
+@frappe.whitelist(methods=["POST"])
+def bulk_assign(structure: str, base, from_date: str, company: str | None = None) -> dict:
+    """Give a structure and base to every active person without one. Runs in the background.
+
+    Idempotent: people who already have this structure from this date are skipped, not doubled.
+    Returns a job id; poll get_bulk_progress with it.
+    """
+    frappe.only_for(["HR Manager", "Payroll Manager", "System Manager"])
+    if not frappe.has_permission("Salary Structure Assignment", "create"):
+        frappe.throw(_("You do not have permission to assign salary structures."), frappe.PermissionError)
+    if not frappe.db.exists("Salary Structure", {"name": structure, "docstatus": 1}):
+        frappe.throw(_("Choose a submitted salary structure."))
+    if flt(base) <= 0:
+        frappe.throw(_("Base salary must be above zero."))
+    job_id = frappe.generate_hash(length=10)
+    frappe.cache().set_value(f"reckon_bulk:{job_id}", {"state": "queued", "created": 0, "skipped": 0,
+                                                        "failed": [], "done": 0, "total": 0})
+    frappe.enqueue(
+        "reckon_hrms.api.salary.run_bulk_assign", queue="long", timeout=3600, job_id=job_id,
+        structure=structure, base=flt(base), from_date=from_date, company=company, job=job_id,
+    )
+    return {"job": job_id}
+
+
+def run_bulk_assign(structure, base, from_date, company, job):
+    """Background worker: assign in batches of 200 and publish progress after each batch."""
+    key = f"reckon_bulk:{job}"
+    filters = {"status": "Active"}
+    if company:
+        filters["company"] = company
+    people = frappe.get_all("Employee", filters=filters, pluck="name", order_by="name asc", limit_page_length=0)
+    have = set(frappe.get_all(
+        "Salary Structure Assignment", filters={"docstatus": 1, "from_date": ["<=", from_date],
+                                                "employee": ["in", people]} if people else {"name": ""},
+        pluck="employee", limit_page_length=0,
+    ))
+    todo = [p for p in people if p not in have]
+    state = {"state": "running", "created": 0, "skipped": len(people) - len(todo), "failed": [],
+             "done": 0, "total": len(todo)}
+    for i in range(0, len(todo), BULK_BATCH):
+        for emp in todo[i:i + BULK_BATCH]:
+            try:
+                ssa = frappe.get_doc({"doctype": "Salary Structure Assignment", "employee": emp,
+                                      "salary_structure": structure, "from_date": from_date, "base": base,
+                                      "company": frappe.db.get_value("Employee", emp, "company")})
+                ssa.insert(ignore_permissions=True)
+                ssa.submit()
+                state["created"] += 1
+            except Exception as exc:
+                state["failed"].append({"employee": emp, "reason": str(exc)[:160]})
+            state["done"] += 1
+        frappe.cache().set_value(key, state)
+        frappe.publish_realtime("reckon_progress", dict(state, job=job), user=frappe.session.user)
+        frappe.db.commit()
+    state["state"] = "done"
+    frappe.cache().set_value(key, state)
+    frappe.publish_realtime("reckon_progress", dict(state, job=job), user=frappe.session.user)
+
+
+@frappe.whitelist(methods=["GET"])
+def get_bulk_progress(job: str) -> dict:
+    frappe.only_for(["HR Manager", "Payroll Manager", "System Manager"])
+    return frappe.cache().get_value(f"reckon_bulk:{job}") or {"state": "unknown"}
