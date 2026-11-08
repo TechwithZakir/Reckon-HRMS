@@ -9,7 +9,14 @@ from __future__ import annotations
 import frappe
 
 from reckon_hrms.access import apply_assignment, ensure_tenant_roles
-from reckon_hrms.defaults import DEPARTMENTS, DESIGNATIONS, LEAVE_TYPES, SALARY_COMPONENTS, SHIFT_TYPES
+from reckon_hrms.defaults import (
+    DEPARTMENTS,
+    DESIGNATIONS,
+    LEAVE_TYPES,
+    SALARY_COMPONENTS,
+    SHIFT_TYPES,
+)
+from reckon_hrms.payroll import ensure_payroll_payable
 
 
 def ensure_shared_defaults() -> dict:
@@ -66,6 +73,8 @@ def run_hrms_seed(company: str, seed_version: str) -> dict:
     roles = ensure_tenant_roles(company)
     shared = ensure_shared_defaults()
     departments = ensure_company_defaults(company)
+    # Payroll needs a payable account before any run can be created, so every HRMS tenant gets one.
+    payroll_payable = ensure_payroll_payable(company)
     assignees = frappe.get_all(
         "Tenant User Assignment", filters={"company": company, "active": 1},
         fields=["user", "role_profile"],
@@ -75,4 +84,4 @@ def run_hrms_seed(company: str, seed_version: str) -> dict:
     frappe.clear_cache()
     return {"company": company, "seed_version": seed_version, "roles": list(roles.values()),
             "shared_created": shared, "departments_created": departments["departments"],
-            "assigned": sorted({r.user for r in assignees})}
+            "assigned": sorted({r.user for r in assignees}), "payroll_payable": payroll_payable}

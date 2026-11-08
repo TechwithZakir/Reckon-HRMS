@@ -34,6 +34,35 @@ def structure_name(company: str) -> str:
     return f"{STRUCTURE_PREFIX} - {company}"[:140]
 
 
+def ensure_payroll_payable(company: str) -> str | None:
+    """Make sure the company has a payroll payable account and make it the company default. Idempotent.
+
+    A payroll run cannot be created without it: HRMS posts the net pay accrual to this account.
+    An existing "Payroll Payable" account is reused; otherwise one is created under the company's
+    current liabilities. Returns None only when the company has no liabilities group to put it under.
+    """
+    current = frappe.db.get_value("Company", company, "default_payroll_payable_account")
+    if current:
+        return current
+    account = frappe.db.get_value("Account", {"company": company, "is_group": 0, "account_type": "Payable",
+                                              "account_name": ["like", "Payroll Payable%"]}, "name")
+    if not account:
+        parent = None
+        payable = frappe.db.get_value("Company", company, "default_payable_account")
+        if payable:
+            parent = frappe.db.get_value("Account", payable, "parent_account")
+        if not parent:
+            parent = frappe.db.get_value("Account", {"company": company, "is_group": 1, "root_type": "Liability",
+                                                     "account_name": ["like", "Current Liabilities%"]}, "name")
+        if not parent:
+            return None
+        account = frappe.get_doc({"doctype": "Account", "account_name": "Payroll Payable", "company": company,
+                                  "parent_account": parent, "account_type": "Payable", "is_group": 0}
+                                 ).insert(ignore_permissions=True).name
+    frappe.db.set_value("Company", company, "default_payroll_payable_account", account)
+    return account
+
+
 @frappe.whitelist(methods=["POST"])
 def setup_bd_payroll(company: str) -> dict:
     """Create the Bangladesh starter components, salary structure and bilingual slip format. Idempotent."""
@@ -87,6 +116,7 @@ def setup_bd_payroll(company: str) -> dict:
                         "html": bilingual_slip_html()}).insert(ignore_permissions=True)
         created["print_format"] = True
 
+    created["payroll_payable"] = ensure_payroll_payable(company)
     frappe.db.commit()
     return created
 
