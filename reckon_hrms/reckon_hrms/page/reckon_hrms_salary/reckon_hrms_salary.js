@@ -19,7 +19,39 @@ frappe.pages["reckon-hrms-salary"].on_page_load = function (wrapper) {
 		<div class="rhs-card"><h2>Salary structures <span class="rhs-map">Salary Structure</span></h2>
 			<table class="rhs-table"><thead><tr><th>Name</th><th>Pay</th><th>Active</th><th>People</th></tr></thead><tbody id="structs"></tbody></table>
 			<div class="rhs-row"><a class="rhs-btn" href="/app/salary-structure/new">+ Add new</a><a class="rhs-btn" href="/app/salary-structure">List</a></div></div>
+		<div class="rhs-card"><h2>Give a salary structure to everyone without one <span class="rhs-map">Salary Structure Assignment</span></h2>
+			<div class="rhs-muted">Each person without a structure gets the one you pick, from the date you choose. People who already have it are skipped.</div>
+			<div class="rhs-row"><label>Salary structure <select id="bkStruct"></select></label>
+			<label>Base salary (৳) <input id="bkBase" type="number" min="1" step="500" value="60000"></label>
+			<label>From <input id="bkDate" type="date"></label></div>
+			<div class="rhs-row"><button class="rhs-btn rhs-pri" id="bkGo" type="button">Assign to everyone without a structure</button></div>
+			<div id="bkOut" class="rhs-muted" style="margin-top:10px"></div></div>
 		<div class="rhs-card"><div class="rhs-row"><a class="rhs-btn rhs-pri" href="/desk/reckon-hrms/reckon-hrms-run">Continue to run salary</a></div></div>`);
+
+		// Bulk assign: starts a background job, then polls its progress every 3 seconds.
+		root.find("#bkDate").val(frappe.datetime.get_today());
+		call("salary.list_structures", { company }).then((r) => {
+			root.find("#bkStruct").html(r.message.rows.map((x) => `<option value="${esc(x.name)}">${esc(x.name)}</option>`).join(""));
+		});
+		let poll = null;
+		const showProgress = (s) => {
+			const line = s.state === "done"
+				? `Done: ${s.created} given a structure, ${s.skipped} already had one.` + (s.failed.length ? ` ${s.failed.length} could not be done.` : "")
+				: `Working… ${s.done} of ${s.total}, ${s.created} done so far.`;
+			root.find("#bkOut").text(line);
+			if (s.state === "done") clearInterval(poll);
+		};
+		root.find("#bkGo").on("click", () => {
+			const args = { structure: root.find("#bkStruct").val(), base: root.find("#bkBase").val(),
+				from_date: root.find("#bkDate").val(), company };
+			frappe.call({ method: "reckon_hrms.api.salary.bulk_assign", args })
+				.then((r) => {
+					root.find("#bkOut").text("Starting…");
+					clearInterval(poll);
+					poll = setInterval(() => call("salary.get_bulk_progress", { job: r.message.job }).then((p) => showProgress(p.message)), 3000);
+				})
+				.catch((e) => root.find("#bkOut").html(`<span class="rhs-err">${esc((e && e.message) || "Could not start the assignment.")}</span>`));
+		});
 
 	const call = (method, args) => frappe.call({ method: "reckon_hrms.api." + method, args: args || {}, type: "GET" });
 	const yesno = (v) => (v ? "Yes" : "No");
