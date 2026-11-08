@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import flt, get_first_day, get_last_day, getdate
+from frappe.utils import add_months, flt, get_first_day, get_last_day, getdate
 
 from reckon_hrms.api.home import _company
 from reckon_hrms.paging import DEFAULT_PAGE, page_bounds
@@ -133,10 +133,13 @@ def exclude_people(name: str, employees: list | str) -> dict:
     doc = frappe.get_doc("Payroll Entry", name)
     if doc.docstatus != 0:
         frappe.throw(_("This run is no longer a draft."))
-    if doc.salary_slips_created:
-        frappe.throw(_("Salary slips already exist. Leave people out at the next steps."))
     before = len(doc.employees)
     drop = set(employees or [])
+    if drop and frappe.db.exists("Salary Slip", {"payroll_entry": name, "docstatus": 1, "employee": ["in", list(drop)]}):
+        frappe.throw(_("A person left out already has a submitted slip. Hold their payment instead."))
+    for slip in frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 0,
+            "employee": ["in", list(drop)]}, pluck="name") if drop else []:
+        frappe.delete_doc("Salary Slip", slip, force=True, ignore_permissions=True)
     doc.employees = [r for r in doc.employees if r.employee not in drop]
     doc.save()
     frappe.db.commit()
@@ -167,3 +170,126 @@ def include_people(name: str, employees: list | str) -> dict:
     doc.save()
     frappe.db.commit()
     return {"added": added, "included": len(doc.employees)}
+
+
+SLIP_BATCH = 200
+
+
+def _slip_args(doc):
+    return frappe._dict({
+        "salary_slip_based_on_timesheet": doc.salary_slip_based_on_timesheet,
+        "payroll_frequency": doc.payroll_frequency, "start_date": doc.start_date, "end_date": doc.end_date,
+        "company": doc.company, "posting_date": doc.posting_date,
+        "deduct_tax_for_unsubmitted_tax_exemption_proof": doc.deduct_tax_for_unsubmitted_tax_exemption_proof,
+        "payroll_entry": doc.name, "exchange_rate": doc.exchange_rate, "currency": doc.currency,
+    })
+
+
+@frappe.whitelist(methods=["POST"])
+def create_slips(name: str) -> dict:
+    """Step 3: create draft salary slips in background batches of 200, grouped by office."""
+    _gate("Payroll Entry", "write")
+    doc = frappe.get_doc("Payroll Entry", name)
+    if doc.docstatus != 0:
+        frappe.throw(_("This run is no longer a draft."))
+    if not doc.employees:
+        frappe.throw(_("Get the list of people first (step 2)."))
+    job = frappe.generate_hash(length=10)
+    frappe.cache().set_value(f"reckon_slips:{job}", {"state": "queued", "branches": {}, "total": len(doc.employees)})
+    frappe.enqueue("reckon_hrms.api.payroll_run.run_create_slips", queue="long", timeout=3600,
+                   job_id=job, name=name, job=job)
+    return {"job": job}
+
+
+def run_create_slips(name, job):
+    from hrms.payroll.doctype.payroll_entry.payroll_entry import create_salary_slips_for_employees
+
+    key = f"reckon_slips:{job}"
+    doc = frappe.get_doc("Payroll Entry", name)
+    people = [r.employee for r in doc.employees]
+    office = {r.name: (r.branch or _("No office")) for r in frappe.get_all(
+        "Employee", filters={"name": ["in", people]}, fields=["name", "branch"], limit_page_length=0)}
+    groups = {}
+    for emp in people:
+        groups.setdefault(office.get(emp, _("No office")), []).append(emp)
+    state = {"state": "running", "branches": {b: {"total": len(e), "done": 0} for b, e in groups.items()},
+             "total": len(people)}
+    args = _slip_args(doc)
+    for branch, emps in groups.items():
+        for i in range(0, len(emps), SLIP_BATCH):
+            create_salary_slips_for_employees(emps[i:i + SLIP_BATCH], args, publish_progress=False)
+            state["branches"][branch]["done"] = min(len(emps), i + SLIP_BATCH)
+            frappe.cache().set_value(key, state)
+            frappe.publish_realtime("reckon_progress", dict(state, job=job, kind="slips"), user=frappe.session.user)
+            frappe.db.commit()
+    created = frappe.db.count("Salary Slip", {"payroll_entry": name, "docstatus": 0})
+    state.update(state="done", created=created, missing=len(people) - created)
+    frappe.cache().set_value(key, state)
+    frappe.publish_realtime("reckon_progress", dict(state, job=job, kind="slips"), user=frappe.session.user)
+
+
+@frappe.whitelist(methods=["GET"])
+def get_slip_progress(job: str) -> dict:
+    _gate("Payroll Entry", "read")
+    return frappe.cache().get_value(f"reckon_slips:{job}") or {"state": "unknown"}
+
+
+@frappe.whitelist(methods=["GET"])
+def review_totals(name: str) -> dict:
+    """Step 4: totals over the draft slips, aggregated in SQL, and last month's submitted net for comparison."""
+    _gate("Payroll Entry", "read")
+    doc = frappe.get_doc("Payroll Entry", name)
+    row = frappe.db.sql(
+        "SELECT COUNT(name), COALESCE(SUM(gross_pay),0), COALESCE(SUM(total_deduction),0), COALESCE(SUM(net_pay),0) "
+        "FROM `tabSalary Slip` WHERE payroll_entry = %(p)s AND docstatus = 0", {"p": name})[0]
+    prev_start = get_first_day(add_months(doc.start_date, -1))
+    last = frappe.db.sql(
+        "SELECT COALESCE(SUM(net_pay),0) FROM `tabSalary Slip` WHERE company = %(c)s AND docstatus = 1 "
+        "AND start_date >= %(s)s AND start_date < %(e)s",
+        {"c": doc.company, "s": prev_start, "e": doc.start_date})[0][0]
+    total_net = flt(row[3])
+    change = round(100 * (total_net - flt(last)) / flt(last), 1) if flt(last) else None
+    return {"slips": int(row[0]), "gross": flt(row[1]), "deductions": flt(row[2]), "net": total_net,
+            "last_month_net": flt(last), "change_percent": change}
+
+
+@frappe.whitelist(methods=["POST"])
+def approve_slips(name: str) -> dict:
+    """Step 4: submit every draft slip in background batches."""
+    _gate("Payroll Entry", "submit")
+    doc = frappe.get_doc("Payroll Entry", name)
+    if doc.docstatus != 0:
+        frappe.throw(_("This run is no longer a draft."))
+    job = frappe.generate_hash(length=10)
+    frappe.cache().set_value(f"reckon_submit:{job}", {"state": "queued", "done": 0, "total": 0, "failed": []})
+    frappe.enqueue("reckon_hrms.api.payroll_run.run_approve", queue="long", timeout=3600,
+                   job_id=job, name=name, job=job)
+    return {"job": job}
+
+
+def run_approve(name, job):
+    from hrms.payroll.doctype.payroll_entry.payroll_entry import submit_salary_slips_for_employees
+
+    key = f"reckon_submit:{job}"
+    slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 0},
+                           fields=["name", "employee"], limit_page_length=0)
+    state = {"state": "running", "done": 0, "total": len(slips), "failed": []}
+    for i in range(0, len(slips), SLIP_BATCH):
+        batch = slips[i:i + SLIP_BATCH]
+        try:
+            submit_salary_slips_for_employees(name, [s.name for s in batch], publish_progress=False)
+        except Exception as exc:
+            state["failed"].append({"batch_start": i, "reason": str(exc)[:160]})
+        state["done"] = min(len(slips), i + SLIP_BATCH)
+        frappe.cache().set_value(key, state)
+        frappe.publish_realtime("reckon_progress", dict(state, job=job, kind="submit"), user=frappe.session.user)
+        frappe.db.commit()
+    state["state"] = "done"
+    frappe.cache().set_value(key, state)
+    frappe.publish_realtime("reckon_progress", dict(state, job=job, kind="submit"), user=frappe.session.user)
+
+
+@frappe.whitelist(methods=["GET"])
+def get_submit_progress(job: str) -> dict:
+    _gate("Payroll Entry", "read")
+    return frappe.cache().get_value(f"reckon_submit:{job}") or {"state": "unknown"}
