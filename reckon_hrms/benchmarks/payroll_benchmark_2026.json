@@ -1,0 +1,660 @@
+{
+  "baseline": "2026-11-08",
+  "currency": "BDT",
+  "period": "monthly gross",
+  "caveat": "Indicative market ranges, not a national average or legal reference. Validate with customer payroll data.",
+  "role_count": 28,
+  "segments": {
+    "it_software": {
+      "label": "IT / Software",
+      "roles": [
+        {
+          "role": "Help Desk / IT Support",
+          "level": "Entry",
+          "min": 18000,
+          "max": 30000,
+          "midpoint": 24000,
+          "confidence": "Low",
+          "source_basis": "SMEF software industry survey (older) + current job-market guides",
+          "notes": "Entry support roles vary widely by employer"
+        },
+        {
+          "role": "Junior Software Developer",
+          "level": "Entry",
+          "min": 35000,
+          "max": 60000,
+          "midpoint": 47500,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd; JobFair.bd; 2026 job guides",
+          "notes": "Gross monthly; Dhaka-oriented"
+        },
+        {
+          "role": "Software Engineer",
+          "level": "Mid",
+          "min": 50000,
+          "max": 130000,
+          "midpoint": 90000,
+          "confidence": "Medium",
+          "source_basis": "Mimu Jobs 2026; Chakri AI 2026; job postings",
+          "notes": "3–5 years indicative"
+        },
+        {
+          "role": "Senior Software Engineer",
+          "level": "Senior",
+          "min": 100000,
+          "max": 180000,
+          "midpoint": 140000,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd; Chakri AI 2026",
+          "notes": "Higher-paying firms can exceed range"
+        },
+        {
+          "role": "AI / Data Engineer",
+          "level": "Mid",
+          "min": 50000,
+          "max": 120000,
+          "midpoint": 85000,
+          "confidence": "Low",
+          "source_basis": "Jobiglo active offers; market postings",
+          "notes": "Small sample; skill and employer premium"
+        },
+        {
+          "role": "DevOps / Cloud Engineer",
+          "level": "Mid",
+          "min": 80000,
+          "max": 160000,
+          "midpoint": 120000,
+          "confidence": "Low",
+          "source_basis": "Jobiglo active offers; Mimu Jobs 2026",
+          "notes": "Very small sample and employer-sensitive"
+        },
+        {
+          "role": "IT Project Manager",
+          "level": "Senior",
+          "min": 120000,
+          "max": 200000,
+          "midpoint": 160000,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd; 2026 salary guides",
+          "notes": "Experience and delivery scope matter"
+        },
+        {
+          "role": "QA / Test Engineer",
+          "level": "Mid",
+          "min": 30000,
+          "max": 80000,
+          "midpoint": 55000,
+          "confidence": "Low",
+          "source_basis": "SMEF survey; job-market estimates",
+          "notes": "Wide variation by automation skills"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Mobile Allowance",
+        "Attendance Incentive",
+        "Performance Bonus",
+        "Festival Bonus",
+        "Overtime"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Engineering",
+        "Quality Assurance",
+        "Product",
+        "Support",
+        "Sales",
+        "Human Resources",
+        "Finance"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    },
+    "manufacturing_rmg_textile": {
+      "label": "Manufacturing / RMG / Textile",
+      "roles": [
+        {
+          "role": "Machine Operator (skilled)",
+          "level": "Operational",
+          "min": 15000,
+          "max": 25000,
+          "midpoint": 20000,
+          "confidence": "Low",
+          "source_basis": "Manpower.com.bd salary benchmark page",
+          "notes": "Company and skill grade vary"
+        },
+        {
+          "role": "Production Supervisor",
+          "level": "Mid",
+          "min": 30000,
+          "max": 50000,
+          "midpoint": 40000,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd salary benchmark page",
+          "notes": "Shift and production incentives may apply"
+        },
+        {
+          "role": "Factory Manager",
+          "level": "Senior",
+          "min": 80000,
+          "max": 150000,
+          "midpoint": 115000,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd salary benchmark page",
+          "notes": "Plant size and export exposure matter"
+        },
+        {
+          "role": "Quality / QA Executive",
+          "level": "Entry-Mid",
+          "min": 25000,
+          "max": 50000,
+          "midpoint": 37500,
+          "confidence": "Low",
+          "source_basis": "Market estimates and job postings",
+          "notes": "Role scope differs significantly"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Meal Allowance",
+        "Attendance Incentive",
+        "Shift Allowance",
+        "Festival Bonus",
+        "Overtime"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Production",
+        "Quality",
+        "Merchandising",
+        "Store",
+        "Human Resources",
+        "Accounts"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    },
+    "construction_engineering": {
+      "label": "Construction / Engineering",
+      "roles": [
+        {
+          "role": "Civil Engineer",
+          "level": "Mid",
+          "min": 50000,
+          "max": 80000,
+          "midpoint": 65000,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd salary benchmark page",
+          "notes": "3–6 years indicative"
+        },
+        {
+          "role": "Site Supervisor",
+          "level": "Mid",
+          "min": 35000,
+          "max": 55000,
+          "midpoint": 45000,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd salary benchmark page",
+          "notes": "Site allowance may be separate"
+        },
+        {
+          "role": "Skilled Technician",
+          "level": "Operational",
+          "min": 20000,
+          "max": 35000,
+          "midpoint": 27500,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd salary benchmark page",
+          "notes": "Trade and location dependent"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Meal Allowance",
+        "Site Allowance",
+        "Shift Allowance",
+        "Festival Bonus",
+        "Overtime"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Project Management",
+        "Site Operations",
+        "Engineering",
+        "Procurement",
+        "Accounts",
+        "Human Resources"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    },
+    "corporate_finance": {
+      "label": "Corporate / Finance",
+      "roles": [
+        {
+          "role": "Accountant / Finance Executive",
+          "level": "Mid",
+          "min": 25000,
+          "max": 70000,
+          "midpoint": 47500,
+          "confidence": "Medium",
+          "source_basis": "Jobiglo; Paylab; Manpower.com.bd",
+          "notes": "Qualification and ERP skills affect pay"
+        },
+        {
+          "role": "HR Executive",
+          "level": "Entry-Mid",
+          "min": 25000,
+          "max": 50000,
+          "midpoint": 37500,
+          "confidence": "Low",
+          "source_basis": "Paylab; job postings",
+          "notes": "Payroll and HRIS skills can increase range"
+        },
+        {
+          "role": "HR Manager",
+          "level": "Senior",
+          "min": 70000,
+          "max": 120000,
+          "midpoint": 95000,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd salary benchmark page",
+          "notes": "Company size matters"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Mobile Allowance",
+        "Performance Bonus",
+        "Festival Bonus",
+        "Overtime"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Finance",
+        "Accounts",
+        "Human Resources",
+        "Operations",
+        "Administration"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    },
+    "sales_marketing": {
+      "label": "Sales / Marketing",
+      "roles": [
+        {
+          "role": "Sales Executive",
+          "level": "Entry-Mid",
+          "min": 19000,
+          "max": 40000,
+          "midpoint": 29500,
+          "confidence": "Medium",
+          "source_basis": "Jobiglo active offers; market postings",
+          "notes": "Commission may be additional"
+        },
+        {
+          "role": "Marketing Manager",
+          "level": "Senior",
+          "min": 60000,
+          "max": 110000,
+          "midpoint": 85000,
+          "confidence": "Medium",
+          "source_basis": "Manpower.com.bd salary benchmark page",
+          "notes": "Performance incentives may be additional"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Mobile Allowance",
+        "Sales Commission",
+        "Performance Bonus",
+        "Festival Bonus"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Sales",
+        "Marketing",
+        "Key Accounts",
+        "Human Resources",
+        "Accounts"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    },
+    "pharmaceuticals": {
+      "label": "Pharmaceuticals",
+      "roles": [
+        {
+          "role": "Medical / Product Sales Representative",
+          "level": "Entry-Mid",
+          "min": 25000,
+          "max": 50000,
+          "midpoint": 37500,
+          "confidence": "Low",
+          "source_basis": "General market estimate; limited transparent data",
+          "notes": "TA/DA and incentive structure varies"
+        },
+        {
+          "role": "Production / QA Executive",
+          "level": "Mid",
+          "min": 30000,
+          "max": 65000,
+          "midpoint": 47500,
+          "confidence": "Low",
+          "source_basis": "General market estimate; limited transparent data",
+          "notes": "Plant and qualification dependent"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Meal Allowance",
+        "Sales Commission",
+        "Performance Bonus",
+        "Festival Bonus",
+        "Overtime"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Production",
+        "Quality Assurance",
+        "Sales",
+        "Regulatory",
+        "Human Resources",
+        "Accounts"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    },
+    "trading_distribution": {
+      "label": "Trading / Distribution",
+      "roles": [
+        {
+          "role": "Sales / Territory Officer",
+          "level": "Entry-Mid",
+          "min": 22000,
+          "max": 45000,
+          "midpoint": 33500,
+          "confidence": "Low",
+          "source_basis": "Job-market estimates; company practices",
+          "notes": "Travel/field allowance and commission common"
+        },
+        {
+          "role": "Warehouse / Inventory Executive",
+          "level": "Entry-Mid",
+          "min": 20000,
+          "max": 40000,
+          "midpoint": 30000,
+          "confidence": "Low",
+          "source_basis": "Job-market estimates; company practices",
+          "notes": "Shift and attendance premiums vary"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Meal Allowance",
+        "Sales Commission",
+        "Shift Allowance",
+        "Festival Bonus",
+        "Overtime"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Sales and Distribution",
+        "Warehouse",
+        "Accounts",
+        "Procurement",
+        "Human Resources"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    },
+    "healthcare": {
+      "label": "Healthcare",
+      "roles": [
+        {
+          "role": "Hospital Admin Executive",
+          "level": "Mid",
+          "min": 25000,
+          "max": 55000,
+          "midpoint": 40000,
+          "confidence": "Low",
+          "source_basis": "General market estimate; limited transparent data",
+          "notes": "Hospital size and shift pattern matter"
+        },
+        {
+          "role": "Accounts / Billing Executive",
+          "level": "Entry-Mid",
+          "min": 22000,
+          "max": 45000,
+          "midpoint": 33500,
+          "confidence": "Low",
+          "source_basis": "General market estimate; limited transparent data",
+          "notes": "ERP and patient billing experience valued"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Meal Allowance",
+        "Shift Allowance",
+        "Festival Bonus",
+        "Overtime"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Clinical",
+        "Administration",
+        "Billing and Accounts",
+        "Human Resources",
+        "Support Services"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    },
+    "education_ngo_services": {
+      "label": "Education / NGO / Services",
+      "roles": [
+        {
+          "role": "Program / Admin Officer",
+          "level": "Mid",
+          "min": 30000,
+          "max": 70000,
+          "midpoint": 50000,
+          "confidence": "Low",
+          "source_basis": "Job postings and market estimates",
+          "notes": "Donor-funded roles may differ"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Mobile Allowance",
+        "Performance Bonus",
+        "Festival Bonus"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Academic",
+        "Programmes",
+        "Administration",
+        "Finance",
+        "Human Resources"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    },
+    "retail_logistics": {
+      "label": "Retail / Logistics",
+      "roles": [
+        {
+          "role": "Store / Operations Supervisor",
+          "level": "Mid",
+          "min": 25000,
+          "max": 50000,
+          "midpoint": 37500,
+          "confidence": "Low",
+          "source_basis": "General market estimate; limited transparent data",
+          "notes": "Multi-site responsibility affects pay"
+        }
+      ],
+      "components": [
+        "Basic Salary",
+        "House Rent Allowance",
+        "Medical Allowance",
+        "Conveyance Allowance",
+        "Meal Allowance",
+        "Shift Allowance",
+        "Attendance Incentive",
+        "Festival Bonus",
+        "Overtime"
+      ],
+      "recovery_deductions": [
+        "Loan Recovery",
+        "Salary Advance Recovery",
+        "Other Adjustment"
+      ],
+      "leave_types": [
+        "Casual Leave",
+        "Sick Leave",
+        "Earned Leave",
+        "Unpaid Leave",
+        "Maternity Leave",
+        "Compensatory Off"
+      ],
+      "departments": [
+        "Store Operations",
+        "Logistics",
+        "Warehouse",
+        "Procurement",
+        "Human Resources",
+        "Accounts"
+      ],
+      "assumptions_note": "Components and departments are starter assumptions; the customer confirms them."
+    }
+  }
+}
