@@ -355,11 +355,18 @@ def payment_files(name: str) -> dict:
     if not frappe.has_permission("Salary Slip", "read"):
         frappe.throw(_("You do not have permission to export payment files."), frappe.PermissionError)
     slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 1},
-                           fields=["employee", "employee_name", "bank_name", "bank_ac_no", "net_pay",
+                           fields=["employee", "employee_name", "net_pay",
                                    "reckon_payment_hold", "reckon_hold_reason"], order_by="employee asc",
                            limit_page_length=0)
-    cell = {r.name: r.cell_number for r in frappe.get_all("Employee", filters={"name": ["in", [s.employee for s in slips] or [""]]},
-                                                          fields=["name", "cell_number"], limit_page_length=0)}
+    # Bank and phone details live on the Employee record, not on the slip.
+    people = {r.name: r for r in frappe.get_all(
+        "Employee", filters={"name": ["in", [s.employee for s in slips] or [""]]},
+        fields=["name", "bank_name", "bank_ac_no", "cell_number"], limit_page_length=0)}
+    for s in slips:
+        person = people.get(s.employee)
+        s.bank_name = person.bank_name if person else None
+        s.bank_ac_no = person.bank_ac_no if person else None
+    cell = {k: v.cell_number for k, v in people.items()}
     bank, wallet, holds = [], [], []
     for s in slips:
         if s.reckon_payment_hold:
