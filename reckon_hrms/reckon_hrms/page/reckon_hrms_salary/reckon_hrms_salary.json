@@ -1,0 +1,14 @@
+{
+ "doctype": "Page",
+ "name": "reckon-hrms-salary",
+ "page_name": "reckon-hrms-salary",
+ "title": "Salary rules",
+ "module": "Reckon HRMS",
+ "standard": "Yes",
+ "roles": [
+  {"role": "HR Manager"},
+  {"role": "HR User"},
+  {"role": "Payroll Manager"},
+  {"role": "System Manager"}
+ ]
+}

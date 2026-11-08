@@ -97,7 +97,7 @@ frappe.pages["reckon-hrms-company"].on_page_load = function (wrapper) {
 		<div class="rhc-card"><h2>Next</h2>
 			<p class="rhc-muted">Adding your people, holidays and leave, and attendance settings come next. Until then use the standard
 			<a href="/app/employee">Employee list</a>.</p>
-			<div class="rhc-row"><a class="rhc-btn rhc-pri" href="/desk/reckon-hrms/salary">Continue to salary rules</a></div></div>`);
+			<div class="rhc-row"><a class="rhc-btn rhc-pri" href="/desk/reckon-hrms/reckon-hrms-salary">Continue to salary rules</a></div></div>`);
 
 	const lists = root.find("#lists");
 	const boxes = LISTS.map((list) => {
