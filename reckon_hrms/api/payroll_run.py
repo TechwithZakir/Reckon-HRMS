@@ -116,7 +116,7 @@ def list_people(name: str, filter: str = "all", search: str | None = None, start
             text = f"{r.employee} {r.employee_name or ''}".lower()
             if search.lower() not in text:
                 continue
-        rows.append({"employee": r.employee, "employee_name": r.employee_name, "branch": r.branch,
+        rows.append({"employee": r.employee, "employee_name": r.employee_name, "branch": r.get("branch"),
                      "department": r.department, "designation": r.designation, "status": status,
                      "included": True})
     total = len(rows)
@@ -158,10 +158,10 @@ def include_people(name: str, employees: list | str) -> dict:
         if emp in present:
             continue
         row = frappe.db.get_value("Employee", {"name": emp, "company": doc.company, "status": "Active"},
-                                  ["employee_name", "branch", "department", "designation", "grade"], as_dict=True)
+                                  ["employee_name", "department", "designation", "grade"], as_dict=True)
         if not row:
             continue
-        doc.append("employees", {"employee": emp, "employee_name": row.employee_name, "branch": row.branch,
+        doc.append("employees", {"employee": emp, "employee_name": row.employee_name, 
                                  "department": row.department, "designation": row.designation, "grade": row.grade})
         added += 1
     doc.save()
