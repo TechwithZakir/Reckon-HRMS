@@ -277,7 +277,7 @@ def run_approve(name, job):
     for i in range(0, len(slips), SLIP_BATCH):
         batch = slips[i:i + SLIP_BATCH]
         try:
-            submit_salary_slips_for_employees(name, [(s.name,) for s in batch], publish_progress=False)
+            submit_salary_slips_for_employees(frappe.get_doc("Payroll Entry", name), [(s.name,) for s in batch], publish_progress=False)
         except Exception as exc:
             state["failed"].append({"batch_start": i, "reason": str(exc)[:160]})
         state["done"] = min(len(slips), i + SLIP_BATCH)
