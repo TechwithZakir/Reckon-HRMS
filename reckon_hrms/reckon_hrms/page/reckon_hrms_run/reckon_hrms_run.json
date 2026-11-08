@@ -1,0 +1,13 @@
+{
+ "doctype": "Page",
+ "name": "reckon-hrms-run",
+ "page_name": "reckon-hrms-run",
+ "title": "Run salary",
+ "module": "Reckon HRMS",
+ "standard": "Yes",
+ "roles": [
+  {"role": "HR Manager"},
+  {"role": "Payroll Manager"},
+  {"role": "System Manager"}
+ ]
+}
