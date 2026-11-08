@@ -30,7 +30,7 @@ frappe.pages["reckon-hrms-salary"].on_page_load = function (wrapper) {
 
 		// Bulk assign: starts a background job, then polls its progress every 3 seconds.
 		root.find("#bkDate").val(frappe.datetime.get_today());
-		call("salary.list_structures", { company }).then((r) => {
+		frappe.call({ method: "reckon_hrms.api.salary.list_structures", args: { company }, type: "GET" }).then((r) => {
 			root.find("#bkStruct").html(r.message.rows.map((x) => `<option value="${esc(x.name)}">${esc(x.name)}</option>`).join(""));
 		});
 		let poll = null;
@@ -48,7 +48,7 @@ frappe.pages["reckon-hrms-salary"].on_page_load = function (wrapper) {
 				.then((r) => {
 					root.find("#bkOut").text("Starting…");
 					clearInterval(poll);
-					poll = setInterval(() => call("salary.get_bulk_progress", { job: r.message.job }).then((p) => showProgress(p.message)), 3000);
+					poll = setInterval(() => frappe.call({ method: "reckon_hrms.api.salary.get_bulk_progress", args: { job: r.message.job }, type: "GET" }).then((p) => showProgress(p.message)), 3000);
 				})
 				.catch((e) => root.find("#bkOut").html(`<span class="rhs-err">${esc((e && e.message) || "Could not start the assignment.")}</span>`));
 		});
