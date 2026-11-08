@@ -1,7 +1,7 @@
 {
  "doctype": "Page",
- "name": "company",
- "page_name": "company",
+ "name": "reckon-hrms-company",
+ "page_name": "reckon-hrms-company",
  "title": "Your company",
  "module": "Reckon HRMS",
  "standard": "Yes",

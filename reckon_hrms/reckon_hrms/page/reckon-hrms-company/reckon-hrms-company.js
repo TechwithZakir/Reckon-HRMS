@@ -1,5 +1,5 @@
-// Page 1 (Your company): checklist and tap-to-add lists. Served at /desk/reckon-hrms/company.
-frappe.pages["company"].on_page_load = function (wrapper) {
+// Page 1 (Your company): checklist and tap-to-add lists. Served at /desk/reckon-hrms/reckon-hrms-company.
+frappe.pages["reckon-hrms-company"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({ parent: wrapper, title: "Your company", single_column: true });
 	const root = $(`<div class="rhc"></div>`).appendTo(page.main);
 	const company = frappe.defaults.get_user_default("Company") || "";
