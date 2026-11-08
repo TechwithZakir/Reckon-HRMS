@@ -94,10 +94,61 @@ frappe.pages["reckon-hrms-company"].on_page_load = function (wrapper) {
 			<div class="rhc-bar"><b id="bar" style="width:0%"></b></div>
 			<ul class="rhc-checks" id="checks"></ul></div>
 		<div id="lists"></div>
+		<div class="rhc-card"><h2>Add your people <span class="rhc-map">Employee · Data Import</span></h2>
+			<div class="rhc-muted">Download the template, fill it in, then upload it. We check the file first; nothing is saved until you press Add.</div>
+			<div class="rhc-row"><button class="rhc-btn" id="tplBtn" type="button">Download template</button>
+			<button class="rhc-btn" id="pickBtn" type="button">Upload CSV file</button></div>
+			<div id="impOut" class="rhc-muted" style="margin-top:10px"></div></div>
 		<div class="rhc-card"><h2>Next</h2>
-			<p class="rhc-muted">Adding your people, holidays and leave, and attendance settings come next. Until then use the standard
+			<p class="rhc-muted">Holidays and leave, and attendance settings come next. Until then use the standard
 			<a href="/app/employee">Employee list</a>.</p>
 			<div class="rhc-row"><a class="rhc-btn rhc-pri" href="/desk/reckon-hrms/reckon-hrms-salary">Continue to salary rules</a></div></div>`);
+
+	// Add your people: template, upload, dry-run check, then a background import with progress.
+	const impOut = () => root.find("#impOut");
+	root.find("#tplBtn").on("click", () => {
+		frappe.call({ method: "reckon_hrms.api.people.employee_template", type: "GET" }).then((r) => {
+			const blob = new Blob([r.message.csv], { type: "text/csv" });
+			const a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.download = r.message.filename;
+			a.click();
+		});
+	});
+	root.find("#pickBtn").on("click", () => {
+		new frappe.ui.FileUploader({
+			allow_multiple: false,
+			restrictions: { allowed_file_types: [".csv"] },
+			on_success: (file) => checkFile(file.file_url),
+		});
+	});
+	const checkFile = (fileUrl) => {
+		impOut().text("Checking the file…");
+		frappe.call({ method: "reckon_hrms.api.people.start_import", args: { file_url: fileUrl } }).then((r) => {
+			const s = r.message;
+			const rows = s.errors.map((e) => `<tr><td>${esc(e.row)}</td><td>${esc(e.name)}</td><td>${esc(e.problems.join(" "))}</td>
+				<td>${e.suggestion ? `<span class="rhc-muted">Did you mean ${esc(e.suggestion)}?</span>` : ""}</td></tr>`).join("");
+			impOut().html(`<div><b>${s.read}</b> rows read · <b>${s.ready}</b> ready · <b>${s.to_fix}</b> to fix</div>
+				${s.ready ? `<div class="rhc-row"><button class="rhc-btn rhc-pri" id="addBtn" type="button">Add ${s.ready} people</button></div>` : ""}
+				${rows ? `<table class="rhc-table" style="margin-top:8px"><tr><th>Row</th><th>Name</th><th>What to fix</th><th></th></tr>${rows}</table>` : ""}
+				<div id="impProg" class="rhc-muted" style="margin-top:8px"></div>`);
+			impOut().find("#addBtn").on("click", () => startImport(fileUrl));
+		}).catch((e) => impOut().html(`<span class="rhc-err">${esc((e && e.message) || "Could not check the file.")}</span>`));
+	};
+	let impPoll = null;
+	const startImport = (fileUrl) => {
+		frappe.call({ method: "reckon_hrms.api.people.apply_import", args: { file_url: fileUrl } }).then((r) => {
+			clearInterval(impPoll);
+			impPoll = setInterval(() => frappe.call({ method: "reckon_hrms.api.people.get_import_progress", args: { job: r.message.job }, type: "GET" })
+				.then((p) => {
+					const s = p.message;
+					impOut().find("#impProg").text(s.state === "done"
+						? `Done: ${s.created} added, ${s.failed.length} could not be added.`
+						: `Adding… ${s.done} of ${s.total}`);
+					if (s.state === "done") { clearInterval(impPoll); loadState(); }
+				}), 3000);
+		});
+	};
 
 	const lists = root.find("#lists");
 	const boxes = LISTS.map((list) => {
@@ -131,5 +182,7 @@ body.map .rhc-map{display:inline-block}
 .rhc-row input{flex:1 1 180px;min-width:0;height:34px;border:1px solid var(--border-color);border-radius:8px;background:var(--card-bg);color:var(--text-color);padding:0 10px}
 .rhc-btn{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);border-radius:8px;padding:6px 12px;cursor:pointer;text-decoration:none}
 .rhc-pri{background:var(--primary);color:#fff;border-color:var(--primary)}
+.rhc-table{width:100%;border-collapse:collapse;font-size:13px}
+.rhc-table th,.rhc-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border-color)}
 .rhc-err{color:var(--red-500);font-size:13px;margin-top:6px}
 `;
