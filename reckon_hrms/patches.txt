@@ -5,3 +5,4 @@ reckon_hrms.patches.workspace_content
 reckon_hrms.patches.payroll_manager_role
 reckon_hrms.patches.workspace_labels
 reckon_hrms.patches.desk_menu_arrangement
+reckon_hrms.patches.payment_hold_fields
