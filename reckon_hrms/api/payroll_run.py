@@ -48,8 +48,12 @@ def start_run(month: str, pay_date: str, branch: str | None = None, department: 
         "company": company, "start_date": start, "end_date": end, "docstatus": 0}, "name")
     if existing:
         return {"name": existing, "created": False}
+    defaults = frappe.db.get_value("Company", company,
+                                   ["default_currency", "default_payroll_payable_account"], as_dict=True) or {}
     doc = frappe.get_doc({
         "doctype": "Payroll Entry", "company": company, "payroll_frequency": "Monthly",
+        "currency": defaults.get("default_currency"), "exchange_rate": 1,
+        "payroll_payable_account": defaults.get("default_payroll_payable_account"),
         "start_date": start, "end_date": end, "posting_date": getdate(pay_date),
         "branch": branch or None, "department": department or None,
         "designation": designation or None, "grade": grade or None,
