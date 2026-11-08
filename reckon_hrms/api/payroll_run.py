@@ -323,8 +323,8 @@ def missing_pay_item_accounts(name):
 
 
 def _is_paid(name) -> bool:
-    return bool(frappe.db.exists("Salary Slip", {"payroll_entry": name, "docstatus": 1,
-                                                 "journal_entry": ["is", "set"]}))
+    count = frappe.db.sql("SELECT COUNT(name) FROM  WHERE payroll_entry = %(p)s AND docstatus = 1 AND IFNULL(journal_entry, '') != ''", {"p": name})[0][0]
+    return bool(count)
 
 
 @frappe.whitelist(methods=["POST"])
