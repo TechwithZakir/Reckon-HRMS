@@ -41,12 +41,13 @@ def usage_counts(doctype: str, names: list[str]) -> dict[str, int]:
     """How many employees use each record. One grouped query, not one per row."""
     if not names:
         return {}
-    field, _label, _name = _chip_type(doctype)
-    rows = frappe.db.get_all(
-        "Employee", filters={field: ["in", names]}, fields=[field, "count(name) as n"],
-        group_by=field, as_list=False,
+    field, _label, _name = _chip_type(doctype)  # field comes from the allow-list, never from input
+    rows = frappe.db.sql(
+        f"SELECT `{field}`, COUNT(`name`) FROM `tabEmployee` "
+        f"WHERE `{field}` IN %(names)s GROUP BY `{field}`",
+        {"names": tuple(names)},
     )
-    return {r[field]: int(r["n"]) for r in rows}
+    return {name: int(n) for name, n in rows}
 
 
 @frappe.whitelist(methods=["GET"])
