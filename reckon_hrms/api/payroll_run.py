@@ -320,3 +320,107 @@ def missing_pay_item_accounts(name):
         if not has:
             missing.append(component)
     return sorted(missing)
+
+
+def _is_paid(name) -> bool:
+    return bool(frappe.db.exists("Salary Slip", {"payroll_entry": name, "docstatus": 1,
+                                                 "journal_entry": ["is", "set"]}))
+
+
+@frappe.whitelist(methods=["POST"])
+def set_payment_hold(name: str, employees: list | str, hold: int = 1, reason: str | None = None) -> dict:
+    """Step 5: hold or release payment for submitted slips. Never cancels a slip. Logged as a comment."""
+    _gate("Payroll Entry", "write")
+    if isinstance(employees, str):
+        employees = frappe.parse_json(employees)
+    if _is_paid(name):
+        frappe.throw(_("This run is already paid. Holds can no longer change."))
+    slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 1,
+                           "employee": ["in", employees or [""]]}, pluck="name")
+    for slip in slips:
+        frappe.db.set_value("Salary Slip", slip, {"reckon_payment_hold": 1 if hold else 0,
+                                                  "reckon_hold_reason": (reason or "") if hold else None})
+    doc = frappe.get_doc("Payroll Entry", name)
+    doc.add_comment("Comment", "{0} {1} payment for {2} {3} at {4}. Reason: {5}".format(
+        frappe.session.user, "held" if hold else "released", len(slips),
+        "slip" if len(slips) == 1 else "slips", frappe.utils.now(), reason or "not given"))
+    frappe.db.commit()
+    return {"changed": len(slips), "hold": bool(hold)}
+
+
+@frappe.whitelist(methods=["GET"])
+def payment_files(name: str) -> dict:
+    """Bank transfer sheet and bKash/Nagad sheet for submitted, non-held slips, plus the hold list."""
+    _gate("Payroll Entry", "read")
+    if not frappe.has_permission("Salary Slip", "read"):
+        frappe.throw(_("You do not have permission to export payment files."), frappe.PermissionError)
+    slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 1},
+                           fields=["employee", "employee_name", "bank_name", "bank_ac_no", "net_pay",
+                                   "reckon_payment_hold", "reckon_hold_reason"], order_by="employee asc",
+                           limit_page_length=0)
+    cell = {r.name: r.cell_number for r in frappe.get_all("Employee", filters={"name": ["in", [s.employee for s in slips] or [""]]},
+                                                          fields=["name", "cell_number"], limit_page_length=0)}
+    bank, wallet, holds = [], [], []
+    for s in slips:
+        if s.reckon_payment_hold:
+            holds.append({"employee": s.employee, "employee_name": s.employee_name, "reason": s.reckon_hold_reason or ""})
+        elif s.bank_ac_no:
+            bank.append([s.employee, s.employee_name, s.bank_name or "", s.bank_ac_no, f"{flt(s.net_pay):.2f}"])
+        elif cell.get(s.employee):
+            wallet.append([s.employee, s.employee_name, cell.get(s.employee), f"{flt(s.net_pay):.2f}"])
+    frappe.get_doc("Payroll Entry", name).add_comment("Comment", "{0} downloaded the payment files at {1}.".format(
+        frappe.session.user, frappe.utils.now()))
+    return {
+        "bank_csv": _csv_text(["Employee", "Name", "Bank", "Account", "Net Pay"], bank),
+        "wallet_csv": _csv_text(["Employee", "Name", "bKash or Nagad number", "Net Pay"], wallet),
+        "bank_count": len(bank), "wallet_count": len(wallet), "hold_count": len(holds), "holds": holds,
+        "total_to_pay": round(sum(flt(r[4]) for r in bank) + sum(flt(r[3]) for r in wallet), 2),
+    }
+
+
+def _csv_text(header, rows):
+    import csv
+    import io
+
+    buf = io.StringIO()
+    csv.writer(buf).writerows([header] + rows)
+    return buf.getvalue()
+
+
+@frappe.whitelist(methods=["POST"])
+def record_payment(name: str, bank_account: str, reference: str, reference_date: str) -> dict:
+    """Step 5: one Journal Entry for the net pay of submitted, non-held slips. Held slips are left out."""
+    _gate("Payroll Entry", "submit")
+    if not frappe.has_permission("Journal Entry", "create"):
+        frappe.throw(_("Only accounts users can record payments."), frappe.PermissionError)
+    if _is_paid(name):
+        frappe.throw(_("This run is already paid."))
+    doc = frappe.get_doc("Payroll Entry", name)
+    if doc.docstatus != 1 and not frappe.db.exists("Salary Slip", {"payroll_entry": name, "docstatus": 1}):
+        frappe.throw(_("Approve the salary slips before recording payment."))
+    if not frappe.db.get_value("Account", {"name": bank_account, "company": doc.company}):
+        frappe.throw(_("Choose a bank account of this company."))
+    slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 1,
+                           "reckon_payment_hold": 0}, fields=["name", "net_pay"], limit_page_length=0)
+    total = round(sum(flt(s.net_pay) for s in slips), 2)
+    if not slips or total <= 0:
+        frappe.throw(_("Nothing to pay: every submitted slip is on hold or has no net pay."))
+    payable = doc.payroll_payable_account
+    if not payable:
+        frappe.throw(_("Set the payroll payable account on this run first."))
+    je = frappe.get_doc({
+        "doctype": "Journal Entry", "voucher_type": "Bank Entry", "company": doc.company,
+        "posting_date": getdate(reference_date), "cheque_no": reference, "cheque_date": getdate(reference_date),
+        "user_remark": f"Salary payment for {name}",
+        "accounts": [
+            {"account": payable, "debit_in_account_currency": total},
+            {"account": bank_account, "credit_in_account_currency": total},
+        ],
+    }).insert()
+    je.submit()
+    for s in slips:
+        frappe.db.set_value("Salary Slip", s.name, "journal_entry", je.name)
+    doc.add_comment("Comment", "{0} recorded payment of {1} through {2} at {3}.".format(
+        frappe.session.user, total, je.name, frappe.utils.now()))
+    frappe.db.commit()
+    return {"journal_entry": je.name, "total": total, "slips": len(slips)}
