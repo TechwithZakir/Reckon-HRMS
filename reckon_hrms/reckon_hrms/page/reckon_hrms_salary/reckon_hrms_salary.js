@@ -23,6 +23,34 @@ frappe.pages["reckon-hrms-salary"].on_page_load = function (wrapper) {
 
 	const call = (method, args) => frappe.call({ method: "reckon_hrms.api." + method, args: args || {}, type: "GET" });
 	const yesno = (v) => (v ? "Yes" : "No");
+	const money = (n) => Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+
+	// Payslip preview: same formula engine as Salary Slip, nothing saved. Debounced 300 ms.
+	const preview = $(`<div class="rhs-card"><h2>Payslip preview</h2>
+		<div class="rhs-row"><label>Salary structure <select id="pvStruct"></select></label>
+		<label>Base salary per month (৳) <input id="pvBase" type="number" min="0" step="500" value="60000"></label></div>
+		<div id="pvOut" class="rhs-muted" style="margin-top:10px"></div></div>`);
+	root.find(".rhs-card").first().after(preview);
+	let timer = null;
+	const runPreview = () => {
+		const structure = preview.find("#pvStruct").val();
+		const base = preview.find("#pvBase").val();
+		if (!structure) return;
+		call("salary.preview_payslip", { structure, base }).then((r) => {
+			const p = r.message;
+			const rows = (list) => list.map((x) => `<tr><td>${esc(x.component)}</td><td style="text-align:right">${money(x.amount)}</td></tr>`).join("");
+			preview.find("#pvOut").html(`<table class="rhs-table"><tbody>${rows(p.earnings)}
+				<tr><th>Gross pay</th><th style="text-align:right">${money(p.gross)}</th></tr>${rows(p.deductions)}
+				<tr><th>Take home before tax</th><th style="text-align:right">${money(p.take_home_before_tax)}</th></tr></tbody></table>
+				<div class="rhs-muted" style="margin-top:6px">${esc(p.note)}</div>`);
+		}).catch(() => preview.find("#pvOut").html(`<div class="rhs-err">Could not work out the preview for these values.</div>`));
+	};
+	preview.find("#pvBase").on("input", () => { clearTimeout(timer); timer = setTimeout(runPreview, 300); });
+	preview.find("#pvStruct").on("change", runPreview);
+	call("salary.list_structures", { company }).then((r) => {
+		preview.find("#pvStruct").html(r.message.rows.map((x) => `<option value="${esc(x.name)}">${esc(x.name)}</option>`).join(""));
+		runPreview();
+	});
 
 	call("salary.assignment_summary", { company }).then((r) => {
 		const s = r.message;
