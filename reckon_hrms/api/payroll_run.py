@@ -260,6 +260,9 @@ def approve_slips(name: str) -> dict:
     doc = frappe.get_doc("Payroll Entry", name)
     if doc.docstatus != 0:
         frappe.throw(_("This run is no longer a draft."))
+    missing = missing_pay_item_accounts(name)
+    if missing:
+        frappe.throw(_("These pay items have no account for this company: {0}. Set an account for each one in Salary rules, then approve again.").format(", ".join(missing)))
     job = frappe.generate_hash(length=10)
     frappe.cache().set_value(f"reckon_submit:{job}", {"state": "queued", "done": 0, "total": 0, "failed": []})
     frappe.enqueue("reckon_hrms.api.payroll_run.run_approve", queue="long", timeout=3600,
@@ -293,3 +296,19 @@ def run_approve(name, job):
 def get_submit_progress(job: str) -> dict:
     _gate("Payroll Entry", "read")
     return frappe.cache().get_value(f"reckon_submit:{job}") or {"state": "unknown"}
+
+
+def missing_pay_item_accounts(name):
+    """Pay items on the run's draft slips that have no account for the company (HRMS needs one to post)."""
+    company = frappe.db.get_value("Payroll Entry", name, "company")
+    rows = frappe.db.sql(
+        "SELECT DISTINCT sd.salary_component FROM  sd "
+        "JOIN  ss ON sd.parent = ss.name "
+        "WHERE ss.payroll_entry = %(p)s AND ss.docstatus = 0 AND sd.parentfield IN ('earnings', 'deductions')",
+        {"p": name})
+    missing = []
+    for (component,) in rows:
+        has = frappe.db.exists("Salary Component Account", {"parent": component, "company": company, "account": ["is", "set"]}) if component else False
+        if not has:
+            missing.append(component)
+    return sorted(missing)
