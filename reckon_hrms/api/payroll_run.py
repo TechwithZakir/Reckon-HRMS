@@ -302,8 +302,8 @@ def missing_pay_item_accounts(name):
     """Pay items on the run's draft slips that have no account for the company (HRMS needs one to post)."""
     company = frappe.db.get_value("Payroll Entry", name, "company")
     rows = frappe.db.sql(
-        "SELECT DISTINCT sd.salary_component FROM  sd "
-        "JOIN  ss ON sd.parent = ss.name "
+        "SELECT DISTINCT sd.salary_component FROM `tabSalary Detail` sd "
+        "JOIN `tabSalary Slip` ss ON sd.parent = ss.name "
         "WHERE ss.payroll_entry = %(p)s AND ss.docstatus = 0 AND sd.parentfield IN ('earnings', 'deductions')",
         {"p": name})
     missing = []
