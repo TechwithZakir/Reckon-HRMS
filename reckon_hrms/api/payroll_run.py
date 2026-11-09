@@ -14,7 +14,7 @@ from reckon_hrms.api.home import _company
 from reckon_hrms.paging import DEFAULT_PAGE, page_bounds
 
 RUN_ROLES = ["HR Manager", "Payroll Manager", "System Manager"]
-FILTER_FIELDS = ("branch", "department", "designation", "grade")
+FILTER_FIELDS = ("branch", "department", "designation", "grade", "employment_type")
 
 
 def _gate(doctype: str, ptype: str = "read"):
@@ -39,7 +39,8 @@ def _has_structure(employee: str, start, end) -> bool:
 
 @frappe.whitelist(methods=["POST"])
 def start_run(month: str, pay_date: str, branch: str | None = None, department: str | None = None,
-              designation: str | None = None, grade: str | None = None) -> dict:
+              designation: str | None = None, grade: str | None = None,
+              employment_type: str | None = None) -> dict:
     """Create the draft Payroll Entry for this month, or return the existing draft. Idempotent."""
     _gate("Payroll Entry", "create")
     company = _company()
@@ -58,6 +59,7 @@ def start_run(month: str, pay_date: str, branch: str | None = None, department: 
         "start_date": start, "end_date": end, "posting_date": getdate(pay_date),
         "branch": branch or None, "department": department or None,
         "designation": designation or None, "grade": grade or None,
+        "employment_type": employment_type or None,
     })
     doc.insert()
     return {"name": doc.name, "created": True}
@@ -91,7 +93,18 @@ def get_run(name: str) -> dict:
     no_structure = [p for p in people if not _has_structure(p, start, end)]
     slips = frappe.db.count("Salary Slip", {"payroll_entry": name, "docstatus": ["!=", 2]}) if people else 0
     step = 1 if not people else (2 if not slips else 3)
+    # Counts for the list screen: who joined or left this month, and who has no bank or phone yet.
+    no_account = 0
+    if people:
+        details = frappe.get_all("Employee", filters={"name": ["in", people]},
+                                 fields=["bank_ac_no", "cell_number"], limit_page_length=0)
+        no_account = sum(1 for d in details if not d.bank_ac_no and not d.cell_number)
+    joined = frappe.db.sql("SELECT COUNT(name) FROM `tabEmployee` WHERE company = %s AND date_of_joining BETWEEN %s AND %s",
+                           (doc.company, start, end))[0][0]
+    left = frappe.db.sql("SELECT COUNT(name) FROM `tabEmployee` WHERE company = %s AND relieving_date BETWEEN %s AND %s",
+                         (doc.company, start, end))[0][0]
     return {
+        "summary": {"joined": joined, "left": left, "no_account": no_account},
         "name": doc.name, "status": doc.status, "docstatus": doc.docstatus, "step": step,
         "company": doc.company, "month": str(start)[:7], "pay_date": str(doc.posting_date),
         "included": len(people), "no_structure": len(no_structure), "slips": slips,

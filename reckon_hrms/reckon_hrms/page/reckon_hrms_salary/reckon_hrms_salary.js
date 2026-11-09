@@ -70,7 +70,7 @@ frappe.pages["reckon-hrms-salary"].on_page_load = function (wrapper) {
 		if (!structure) return;
 		call("salary.preview_payslip", { structure, base }).then((r) => {
 			const p = r.message;
-			const rows = (list) => list.map((x) => `<tr><td>${esc(x.component)}</td><td style="text-align:right">${money(x.amount)}</td></tr>`).join("");
+			const rows = (list) => list.map((x) => `<tr><td>${esc(x.component)}<div class="rhs-muted" style="font-size:12px">${esc(x.how || "")}</div></td><td style="text-align:right">${money(x.amount)}</td></tr>`).join("");
 			preview.find("#pvOut").html(`<table class="rhs-table"><tbody>${rows(p.earnings)}
 				<tr><th>Gross pay</th><th style="text-align:right">${money(p.gross)}</th></tr>${rows(p.deductions)}
 				<tr><th>Take home before tax</th><th style="text-align:right">${money(p.take_home_before_tax)}</th></tr></tbody></table>

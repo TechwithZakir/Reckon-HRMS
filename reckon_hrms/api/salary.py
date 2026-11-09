@@ -12,6 +12,7 @@ from frappe.utils import flt
 
 from reckon_hrms.api.shortcuts import route
 from reckon_hrms.paging import DEFAULT_PAGE, page_bounds
+from reckon_hrms.salary_formula import describe
 
 SALARY_ROLES = ["HR Manager", "HR User", "Payroll Manager", "System Manager"]
 
@@ -128,6 +129,8 @@ def preview_payslip(structure: str, base) -> dict:
     data = {"base": base_amount}
     globals_ = dict(COMPONENT_EVAL_GLOBALS)
 
+    labels: dict[str, str] = {}
+
     def compute(rows):
         out = []
         for row in rows:
@@ -139,7 +142,9 @@ def preview_payslip(structure: str, base) -> dict:
                 amount = flt(row.amount, 2)
             if row.abbr:
                 data[row.abbr] = amount
-            out.append({"component": row.salary_component, "abbr": row.abbr, "amount": amount})
+                labels[row.abbr] = row.salary_component
+            how = describe(row.formula, row.amount_based_on_formula, labels, row.condition)
+            out.append({"component": row.salary_component, "abbr": row.abbr, "amount": amount, "how": how})
         return out
 
     earnings = compute(doc.earnings)
