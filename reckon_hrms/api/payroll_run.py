@@ -356,9 +356,11 @@ def payment_files(name: str, download: int = 0) -> dict:
     if not frappe.has_permission("Salary Slip", "read"):
         frappe.throw(_("You do not have permission to export payment files."), frappe.PermissionError)
     slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 1},
-                           fields=["employee", "employee_name", "net_pay",
+                           fields=["employee", "employee_name", "net_pay", "reckon_payment_entry",
                                    "reckon_payment_hold", "reckon_hold_reason"], order_by="employee asc",
                            limit_page_length=0)
+    # A slip already paid (payment journal entry recorded) must never reappear in a bank or wallet file.
+    slips = [s for s in slips if not s.reckon_payment_entry]
     # Bank and phone details live on the Employee record, not on the slip.
     people = {r.name: r for r in frappe.get_all(
         "Employee", filters={"name": ["in", [s.employee for s in slips] or [""]]},
