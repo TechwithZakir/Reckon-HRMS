@@ -20,7 +20,8 @@ frappe.pages["reckon-hrms-run"].on_page_load = function (wrapper) {
 				<label>Job title <select id="fDesig"><option value="">All job titles</option></select></label>
 				<label>Level <select id="fGrade"><option value="">All levels</option></select></label>
 			</div>
-			<div class="rhr-row"><button class="rhr-btn rhr-pri" id="findBtn" type="button">Find employees</button></div>
+			<div class="rhr-row"><label><input type="checkbox" id="incOt"> Include overtime (approved hours, HRMS overtime slips)</label><label><input type="checkbox" id="incFest"> Include festival bonus (Additional Salary, for people on this run)</label></div>
+				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="findBtn" type="button">Find employees</button></div>
 			<div class="rhr-err" id="err1"></div>
 		</div>
 		<div class="rhr-card" id="step2" style="display:none">
@@ -227,7 +228,7 @@ frappe.pages["reckon-hrms-run"].on_page_load = function (wrapper) {
 			const $btn = root.find("#mkSlips");
 			root.find("#err3").text("");
 			$btn.prop("disabled", true);
-			post("create_slips", { name: state.run }).then((r) => poll("get_slip_progress", r.message.job,
+			post("create_slips", { name: state.run, include_overtime: root.find("#incOt").is(":checked") ? 1 : 0, include_festival: root.find("#incFest").is(":checked") ? 1 : 0 }).then((r) => poll("get_slip_progress", r.message.job,
 				(s) => {
 					const done = Object.values(s.branches || {}).reduce((a, b) => a + b.done, 0);
 					setBar("#slipBar", s.total ? (100 * done) / s.total : 0);

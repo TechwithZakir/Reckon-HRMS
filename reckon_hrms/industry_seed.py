@@ -62,6 +62,44 @@ def _leave_type(name: str) -> str:
     return "created"
 
 
+OVERTIME_TYPE = "Standard Overtime"
+
+
+def _overtime_type() -> str:
+    """Shared overtime rule used by HRMS overtime slips. Created once; the multiplier is a starting point."""
+    if frappe.db.exists("Overtime Type", OVERTIME_TYPE):
+        return "exists"
+    frappe.get_doc({
+        "doctype": "Overtime Type", "name": OVERTIME_TYPE,
+        "overtime_salary_component": "Overtime",
+        "applicable_salary_component": "Basic Salary",
+        "standard_multiplier": 2.0,
+        "applicable_for_weekend": 0, "applicable_for_public_holiday": 0,
+    }).insert(ignore_permissions=True)
+    return "created"
+
+
+def _component_account(company: str, name: str) -> str | None:
+    """The company account a pay item posts to: payroll payable for deductions, a salary expense for earnings."""
+    if name in DEDUCTION_COMPONENTS:
+        return frappe.db.get_value("Company", company, "default_payroll_payable_account")
+    return frappe.db.get_value("Account", {"company": company, "is_group": 0, "root_type": "Expense",
+                                           "account_name": ["like", "%Salar%"]}, "name")
+
+
+def _ensure_component_account(company: str, name: str) -> str:
+    """Add the company's account row to a component master if missing. Returns 'set', 'exists' or 'missing'."""
+    component = frappe.get_doc("Salary Component", name)
+    if any(row.company == company for row in component.accounts):
+        return "exists"
+    account = _component_account(company, name)
+    if not account:
+        return "missing"
+    component.append("accounts", {"company": company, "account": account})
+    component.save(ignore_permissions=True)
+    return "set"
+
+
 def _designation(name: str) -> str:
     if frappe.db.exists("Designation", name):
         return "exists"
@@ -99,7 +137,22 @@ def apply_segment(company: str, segment: str, data: dict | None = None) -> dict:
             skipped.append(name)
     for name in seg["leave_types"]:
         counts["leave_types"] += _leave_type(name) == "created"
+    overtime = "exists"
+    if "Overtime" in seg["components"]:
+        overtime = _overtime_type()
+        counts["overtime_types"] = int(overtime == "created")
+
+    # Each pay item needs an account for this company, or payroll approval refuses the run.
+    accounts = {"set": 0, "exists": 0, "missing": []}
+    for name in seg["components"] + seg["recovery_deductions"]:
+        if not frappe.db.exists("Salary Component", name):
+            continue
+        outcome = _ensure_component_account(company, name)
+        if outcome == "missing":
+            accounts["missing"].append(name)
+        else:
+            accounts[outcome] += 1
 
     frappe.db.set_value("Company", company, "reckon_industry", segment)
     return {"company": company, "segment": segment, "label": seg["label"], "created": counts,
-            "skipped_components": skipped}
+            "skipped_components": skipped, "overtime_type": overtime, "component_accounts": accounts}

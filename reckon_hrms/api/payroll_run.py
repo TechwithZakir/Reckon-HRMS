@@ -200,8 +200,12 @@ def _slip_args(doc):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_slips(name: str) -> dict:
-    """Step 3: create draft salary slips in background batches of 200, grouped by office."""
+def create_slips(name: str, include_overtime: int = 0, include_festival: int = 0) -> dict:
+    """Step 3: create draft salary slips in background batches of 200, grouped by office.
+
+    include_overtime: make HRMS overtime slips first, so approved overtime is paid on each slip.
+    include_festival: add a festival bonus (Additional Salary) for each person on this run first.
+    """
     _gate("Payroll Entry", "write")
     doc = frappe.get_doc("Payroll Entry", name)
     if doc.docstatus != 0:
@@ -211,16 +215,24 @@ def create_slips(name: str) -> dict:
     job = frappe.generate_hash(length=10)
     frappe.cache().set_value(f"reckon_slips:{job}", {"state": "queued", "branches": {}, "total": len(doc.employees)})
     frappe.enqueue("reckon_hrms.api.payroll_run.run_create_slips", queue="long", timeout=3600,
-                   job_id=job, name=name, job=job)
+                   job_id=job, name=name, job=job, include_overtime=int(include_overtime or 0),
+                   include_festival=int(include_festival or 0))
     return {"job": job}
 
 
-def run_create_slips(name, job):
+def run_create_slips(name, job, include_overtime=0, include_festival=0):
     from hrms.payroll.doctype.payroll_entry.payroll_entry import create_salary_slips_for_employees
 
     key = f"reckon_slips:{job}"
     doc = frappe.get_doc("Payroll Entry", name)
     people = [r.employee for r in doc.employees]
+    if include_festival:
+        from reckon_hrms.payroll import create_festival_bonus
+
+        create_festival_bonus(doc.company, "Festival", str(doc.posting_date), employees=people)
+    if include_overtime:
+        doc.create_overtime_slips()
+        doc.reload()
     office = {r.name: (r.branch or _("No office")) for r in frappe.get_all(
         "Employee", filters={"name": ["in", people]}, fields=["name", "branch"], limit_page_length=0)}
     groups = {}
@@ -288,6 +300,9 @@ def run_approve(name, job):
     from hrms.payroll.doctype.payroll_entry.payroll_entry import submit_salary_slips_for_employees
 
     key = f"reckon_submit:{job}"
+    # Overtime slips first, so their amounts are on the salary slips when those are submitted.
+    frappe.get_doc("Payroll Entry", name).submit_overtime_slips()
+    frappe.db.commit()
     slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 0},
                            fields=["name", "employee"], limit_page_length=0)
     state = {"state": "running", "done": 0, "total": len(slips), "failed": []}

@@ -173,14 +173,21 @@ def apply_bd_tax(doc, method=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_festival_bonus(company: str, festival: str, payroll_date: str | None = None) -> dict:
-    """Create one Festival Bonus additional salary per eligible employee for a festival."""
+def create_festival_bonus(company: str, festival: str, payroll_date: str | None = None,
+                          employees: list | None = None) -> dict:
+    """Create one Festival Bonus additional salary per eligible employee for a festival.
+
+    ``employees`` limits it to a list (the people on a salary run). Without it, every assigned employee.
+    """
     frappe.only_for(["HR Manager", "Payroll Manager", "System Manager"])
     if not frappe.db.exists("Salary Component", FESTIVAL_COMPONENT):
         frappe.throw(_("Run the Bangladesh payroll setup first."))
     day = getdate(payroll_date or nowdate())
+    filters = {"company": company, "docstatus": 1}
+    if employees is not None:
+        filters["employee"] = ["in", list(employees) or [""]]
     assignments = frappe.get_all(
-        "Salary Structure Assignment", filters={"company": company, "docstatus": 1},
+        "Salary Structure Assignment", filters=filters,
         fields=["employee", "base"], limit_page_length=0,
     )
     created, skipped = [], []
