@@ -31,8 +31,9 @@ COMPONENT_ABBR = {
     "Loan Recovery": "LOANREC",
     "Salary Advance Recovery": "ADVREC",
     "Other Adjustment": "ADJ",
+    "Late and Early Deduction": "LATEDED",
 }
-DEDUCTION_COMPONENTS = {"Loan Recovery", "Salary Advance Recovery", "Other Adjustment"}
+DEDUCTION_COMPONENTS = {"Loan Recovery", "Salary Advance Recovery", "Other Adjustment", "Late and Early Deduction"}
 LWP_LEAVE_TYPES = {"Unpaid Leave"}
 
 

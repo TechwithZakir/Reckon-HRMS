@@ -8,3 +8,4 @@ reckon_hrms.patches.desk_menu_arrangement
 reckon_hrms.patches.payment_hold_fields
 reckon_hrms.patches.payroll_payable_default
 reckon_hrms.patches.company_industry_field
+reckon_hrms.patches.attendance_deduction_policy

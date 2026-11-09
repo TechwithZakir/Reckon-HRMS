@@ -46,6 +46,16 @@ frappe.pages["reckon-hrms-run"].on_page_load = function (wrapper) {
 			<div class="rhr-row"><span class="rhr-muted">Uncheck a person to leave them out of this run. Nothing is paid to anyone left out.</span></div>
 			<div class="rhr-err" id="err2"></div>
 			</div>
+			<div class="rhr-card" id="deds" style="display:none">
+				<h2>Late and early deductions <span class="rhr-map">Additional Salary</span></h2>
+				<div class="rhr-muted">Late entries and early exits this month, under the company's rule. Nothing is deducted until you apply.</div>
+				<div class="rhr-muted" id="dedPolicy" style="margin-top:6px"></div>
+				<table class="rhr-table"><thead><tr><th><input type="checkbox" id="dedAll" aria-label="Select everyone shown"></th><th>ID</th><th>Name</th><th>Marks</th><th>Days</th><th>Base</th><th>Deduction</th><th>Status</th></tr></thead>
+					<tbody id="dedRows"></tbody></table>
+				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="dedApply" type="button">Apply selected deductions</button></div>
+				<div class="rhr-muted" id="dedMsg"></div>
+				<div class="rhr-err" id="err2b"></div>
+			</div>
 			<div class="rhr-card" id="step3" style="display:none">
 				<h2>3 · Make draft slips <span class="rhr-map">Salary Slip (draft)</span></h2>
 				<div class="rhr-muted">One draft pay slip for each person on the list. Nothing is paid yet.</div>
@@ -183,7 +193,38 @@ frappe.pages["reckon-hrms-run"].on_page_load = function (wrapper) {
 			}, 1500);
 		}
 		// Show each step once the run has reached it (step comes from get_run: 1 no people, 2 no slips, 3 slips).
+		function loadDeductions(run) {
+			const card = root.find("#deds");
+			if (run.step >= 3) { card.hide(); return; }
+			card.show();
+			frappe.call({ method: "reckon_hrms.api.deductions.attendance_deductions", args: { name: run.name }, type: "GET" }).then((r) => {
+				const d = r.message;
+				root.find("#dedPolicy").text(`Policy: every ${d.policy.marks_per_day} marks = 1 day. Daily pay = base ÷ ${d.policy.divisor}.` + (d.policy.cap ? ` Cap ${money(d.policy.cap)}.` : " No cap."));
+				root.find("#dedRows").html(d.rows.map((x) => `<tr>
+					<td><input type="checkbox" class="dpick" data-e="${esc(x.employee)}" ${x.already_applied ? "disabled" : "checked"}></td>
+					<td>${esc(x.employee)}</td><td>${esc(x.employee_name)}</td><td>${x.marks}</td><td>${x.days}</td><td>${money(x.base)}</td>
+					<td>${money(x.amount)}</td><td>${x.already_applied ? '<span class="rhr-chip good">Applied</span>' : '<span class="rhr-chip warn">Not applied</span>'}</td></tr>`).join("")
+					|| `<tr><td colspan="8" class="rhr-muted">No late or early marks this month.</td></tr>`);
+				root.find("#dedMsg").text("");
+			}).catch((e) => root.find("#err2b").text((e && e.message) || "Could not load deductions."));
+		}
+		root.find("#dedAll").on("change", function () { root.find("input.dpick:not(:disabled)").prop("checked", this.checked); });
+		root.find("#dedApply").on("click", () => {
+			const chosen = root.find("input.dpick:checked").map((_, el) => $(el).data("e")).get();
+			root.find("#err2b").text("");
+			if (!chosen.length) return root.find("#err2b").text("Tick the people to apply.");
+			frappe.confirm(`Apply deductions to ${chosen.length} people? They will show on this month's salary slips.`, () => {
+				frappe.call({ method: "reckon_hrms.api.deductions.apply_attendance_deductions", args: { name: state.run, employees: chosen } })
+					.then((r) => {
+						root.find("#dedMsg").text(`${r.message.created} deduction(s) applied.`);
+						call("get_run", { name: state.run }).then((x) => loadDeductions(x.message));
+					})
+					.catch((e) => root.find("#err2b").text((e && e.message) || "Could not apply the deductions."));
+			});
+		});
+
 		function showSteps(run) {
+			loadDeductions(run);
 			root.find("#step3").show();
 			root.find("#step4").toggle(run.step >= 3);
 			root.find("#step5").toggle(run.step >= 3);
