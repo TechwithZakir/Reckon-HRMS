@@ -72,7 +72,7 @@ def _overtime_type() -> str:
     frappe.get_doc({
         "doctype": "Overtime Type", "name": OVERTIME_TYPE,
         "overtime_salary_component": "Overtime",
-        "applicable_salary_component": "Basic Salary",
+        "applicable_salary_component": [{"salary_component": "Basic Salary"}],
         "standard_multiplier": 2.0,
         "applicable_for_weekend": 0, "applicable_for_public_holiday": 0,
     }).insert(ignore_permissions=True)
