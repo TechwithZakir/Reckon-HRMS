@@ -11,3 +11,4 @@ reckon_hrms.patches.company_industry_field
 reckon_hrms.patches.attendance_deduction_policy
 reckon_hrms.patches.setup_single_page_menu
 reckon_hrms.patches.menu_hr_payroll_reports
+reckon_hrms.patches.payslip_print_format
