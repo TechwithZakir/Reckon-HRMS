@@ -62,7 +62,7 @@ def _table(name: str) -> dict:
     paid = any(r["status"] == "Paid" for r in rows)
     run = frappe.db.get_value("Payroll Entry", name, ["company", "start_date"], as_dict=True)
     return {
-        "title": "Salary statement (Paid)" if paid else "Draft pay slips (Draft)",
+        "title": "Salary sheet (Paid statement)" if paid else "Salary sheet (Draft)",
         "status_word": "PAID STATEMENT" if paid else "DRAFT",
         "company": run.company,
         "month_label": run.start_date.strftime("%B %Y"),
@@ -81,7 +81,7 @@ def slip_table(name: str) -> dict:
 
 @frappe.whitelist(methods=["GET"])
 def slip_pdf(name: str):
-    """Landscape consolidated salary sheet: earnings under TOTAL GROSS SALARY, deductions under TOTAL DEDUCTIONS."""
+    """Landscape salary sheet: earnings under TOTAL GROSS SALARY, deductions under TOTAL DEDUCTIONS."""
     from frappe.utils.pdf import get_pdf
 
     data = _table(name)
@@ -120,7 +120,7 @@ def slip_pdf(name: str):
       .legend td {{ text-align: left; }}
     </style></head><body>
       <div class="company">{esc(data['company'])}</div>
-      <div class="title">Consolidated Salary Sheet for the month of {esc(data['month_label'])}</div>
+      <div class="title">Salary Sheet for the month of {esc(data['month_label'])}</div>
       <div class="status">{esc(data['status_word'])} · Run {esc(name)} · Amounts in BDT</div>
       <table><thead>{group_row}{code_row}</thead>
         <tbody>{''.join(body)}

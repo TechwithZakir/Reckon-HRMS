@@ -775,7 +775,7 @@ window.ReckonSetupStages.run = function (parent) {
 					const legend = t.legend.map((l) => `<span class="rhr-chip" style="margin:2px">${esc(l.code)} = ${esc(l.name)}</span>`).join("");
 					root.find("#slipPrev").html(`<div class="rhr-row" style="justify-content:space-between;align-items:center">
 							<b>${esc(t.title)}</b>
-							<a class="rhr-btn" href="/api/method/reckon_hrms.api.slip_report.slip_pdf?name=${encodeURIComponent(state.run)}" target="_blank" rel="noopener">Download PDF (landscape)</a>
+							<a class="rhr-btn" href="/api/method/reckon_hrms.api.slip_report.slip_pdf?name=${encodeURIComponent(state.run)}" target="_blank" rel="noopener">Download salary sheet (PDF)</a>
 						</div>
 						<div class="rhr-scroll" style="margin-top:8px"><table class="rhr-table"><thead><tr><th>#</th><th>ID</th><th>Name</th>${head}<th class="rhr-num">Gross</th><th class="rhr-num">Deductions</th><th class="rhr-num">Net pay</th><th>Status</th></tr></thead>
 						<tbody>${body}</tbody></table></div>
