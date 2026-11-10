@@ -771,13 +771,14 @@ window.ReckonSetupStages.run = function (parent) {
 					const body = t.rows.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.employee)}</td><td>${esc(x.employee_name)}</td>
 						${cols.map((c) => `<td class="rhr-num">${money(x.components[c.code] || 0)}</td>`).join("")}
 						<td class="rhr-num">${money(x.gross)}</td><td class="rhr-num">${money(x.deductions)}</td><td class="rhr-num">${money(x.net)}</td>
-						<td>${esc(x.status)}${x.held ? " · held" : ""}</td></tr>`).join("");
+						<td>${esc(x.status)}${x.held ? " · held" : ""}</td>
+						<td><a class="rhr-btn" target="_blank" rel="noopener" href="/api/method/frappe.utils.print_format.download_pdf?doctype=Salary%20Slip&name=${encodeURIComponent(x.slip)}&format=Reckon%20Payslip&no_letterhead=1">Payslip PDF</a></td></tr>`).join("");
 					const legend = t.legend.map((l) => `<span class="rhr-chip" style="margin:2px">${esc(l.code)} = ${esc(l.name)}</span>`).join("");
 					root.find("#slipPrev").html(`<div class="rhr-row" style="justify-content:space-between;align-items:center">
 							<b>${esc(t.title)}</b>
 							<a class="rhr-btn" href="/api/method/reckon_hrms.api.slip_report.slip_pdf?name=${encodeURIComponent(state.run)}" target="_blank" rel="noopener">Download consolidated salary sheet (PDF)</a>
 						</div>
-						<div class="rhr-scroll" style="margin-top:8px"><table class="rhr-table"><thead><tr><th>#</th><th>ID</th><th>Name</th>${head}<th class="rhr-num">Gross</th><th class="rhr-num">Deductions</th><th class="rhr-num">Net pay</th><th>Status</th></tr></thead>
+						<div class="rhr-scroll" style="margin-top:8px"><table class="rhr-table"><thead><tr><th>#</th><th>ID</th><th>Name</th>${head}<th class="rhr-num">Gross</th><th class="rhr-num">Deductions</th><th class="rhr-num">Net pay</th><th>Status</th><th>Payslip</th></tr></thead>
 						<tbody>${body}</tbody></table></div>
 						<div class="rhr-muted" style="margin-top:8px">${legend}</div>`);
 				})

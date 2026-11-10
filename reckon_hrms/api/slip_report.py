@@ -54,7 +54,7 @@ def _table(name: str) -> dict:
         else:
             status = "Draft"
         rows.append({
-            "employee": s.employee, "employee_name": s.employee_name, "status": status,
+            "slip": s.name, "employee": s.employee, "employee_name": s.employee_name, "status": status,
             "held": bool(s.reckon_payment_hold), "components": by_slip.get(s.name, {}),
             "gross": flt(s.gross_pay), "deductions": flt(s.total_deduction), "net": flt(s.net_pay),
         })
