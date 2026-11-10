@@ -27,6 +27,9 @@ DEDUCTIONS = (
     {"salary_component": "Provident Fund (Employee)", "abbr": "PFEMP", "formula": "BASIC * 0.05", "depends_on_payment_days": 0},
     # Filled in by apply_bd_tax on every slip, so the formula is a placeholder.
     {"salary_component": "Income Tax (TDS)", "abbr": "TDS", "amount": 0},
+    # Zero in the structure; the late and early deduction for each run is an approved Additional Salary.
+    # Having it here lets that record overwrite the structure amount on the slip.
+    {"salary_component": "Late and Early Deduction", "abbr": "LATEDED", "amount": 0},
 )
 
 
@@ -94,6 +97,9 @@ def setup_bd_payroll(company: str) -> dict:
         hla.submit()
         created["holiday_assignment"] = True
 
+    from reckon_hrms import industry_seed
+
+    industry_seed._component("Late and Early Deduction")
     name = structure_name(company)
     if not frappe.db.exists("Salary Structure", name):
         earnings = [dict(row, amount_based_on_formula=1 if "formula" in row else 0,
