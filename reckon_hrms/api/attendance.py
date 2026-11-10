@@ -25,17 +25,26 @@ def _my_employee():
     if user in {"Guest"}:
         frappe.throw(_("Sign in to check in."), frappe.PermissionError)
     employee = frappe.db.get_value(
-        "Employee", {"user_id": user, "status": "Active"}, ["name", "company", "employee_name"], as_dict=True
+        "Employee", {"user_id": user, "status": "Active"}, ["name", "company", "employee_name", "branch"], as_dict=True
     )
     if not employee:
         frappe.throw(_("No active employee record is linked to your login."), frappe.PermissionError)
     return employee
 
 
-def _check_geofence(company: str, latitude, longitude) -> dict:
-    office = frappe.db.get_value(
-        "HRMS Office Location", company, ["latitude", "longitude", "radius_m"], as_dict=True
-    )
+def _office_for(company: str, branch: str | None):
+    """The employee's branch location. Without one, the company's first Office Location."""
+    fields = ["latitude", "longitude", "radius_m"]
+    if branch:
+        office = frappe.db.get_value("HRMS Office Location", {"company": company, "branch": branch}, fields, as_dict=True)
+        if office:
+            return office
+    return frappe.db.get_value("HRMS Office Location", {"company": company}, fields, as_dict=True,
+                               order_by="creation asc")
+
+
+def _check_geofence(company: str, latitude, longitude, branch: str | None = None) -> dict:
+    office = _office_for(company, branch)
     if not office:
         return {"geofence": False}
     inside, distance = within_geofence(latitude, longitude, office.latitude, office.longitude, office.radius_m)
@@ -111,7 +120,7 @@ def punch(log_type: str, latitude: float | None = None, longitude: float | None 
     employee = _my_employee()
     lat = flt(latitude) if latitude not in (None, "") else None
     lon = flt(longitude) if longitude not in (None, "") else None
-    geo = _check_geofence(employee.company, lat, lon)
+    geo = _check_geofence(employee.company, lat, lon, employee.get("branch"))
 
     last = frappe.db.get_value(
         "Employee Checkin", {"employee": employee.name}, "log_type", order_by="time desc, creation desc"

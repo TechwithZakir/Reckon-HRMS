@@ -166,7 +166,7 @@ def _manager(company: str) -> dict:
         suggestions.append(_("Attendance is {0}% over the last 30 days. Review absences by department.").format(attendance_rate))
     if pending_leaves:
         suggestions.append(_("Approve or reject the {0} open leave requests so employees can plan.").format(len(pending_leaves)))
-    if not frappe.db.exists("HRMS Office Location", company):
+    if not frappe.db.exists("HRMS Office Location", {"company": company}):
         suggestions.append(_("Set the office location so check-in can use the geofence."))
 
     kpis = [
@@ -307,7 +307,7 @@ def _manager_onboarding(company: str, headcount: int) -> list[dict]:
     return [
         {"label": _("Departments"), "done": has("Department", {"company": company}), "route": "/app/department/new"},
         {"label": _("Holiday calendar"), "done": has("Holiday List", {"company": company}), "route": "/app/holiday-list/new"},
-        {"label": _("Office location for check-in"), "done": bool(frappe.db.exists("HRMS Office Location", company)),
+        {"label": _("Office location for check-in"), "done": bool(frappe.db.exists("HRMS Office Location", {"company": company})),
          "route": "/app/hrms-office-location/new"},
         {"label": _("Leave types"), "done": has("Leave Type", {}), "route": "/app/leave-type/new"},
         {"label": _("Shift type"), "done": has("Shift Type", {}), "route": "/app/shift-type/new"},

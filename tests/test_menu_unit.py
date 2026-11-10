@@ -2,7 +2,7 @@
 
 import unittest
 
-from reckon_hrms.menu import ICONS, MENU
+from reckon_hrms.menu import DOCTYPE_LABELS, ICONS, MENU
 
 
 def _labels():
@@ -34,7 +34,7 @@ class MenuTests(unittest.TestCase):
         for _group, items in MENU:
             for item in items:
                 if item[0] in ("Report", "DocType"):
-                    self.assertIn(item[1], ICONS, item[1])
+                    self.assertIn(DOCTYPE_LABELS.get(item[1], item[1]), ICONS, item[1])
 
 
 if __name__ == "__main__":

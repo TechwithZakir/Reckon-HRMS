@@ -13,13 +13,15 @@ import frappe
 WORKSPACE = "Reckon HRMS"
 
 # (group, items). Items: ("DocType", name) | ("Report", name) | ("URL", path, label)
-from reckon_hrms.menu import ICONS, MENU  # noqa: E402  (single source for the menu)
+from reckon_hrms.menu import DOCTYPE_LABELS, ICONS, MENU  # noqa: E402  (single source for the menu)
 
 STOCK_HR_NAMES = ("Frappe HR", "HR", "HR Setup", "Human Resources", "Frappe HRMS", "HRMS", "Payroll", "Tax & Benefits")
 
 
 def _item_label(item) -> str:
-    return item[2] if item[0] in ("URL", "Page") else item[1]
+    if item[0] in ("URL", "Page"):
+        return item[2]
+    return DOCTYPE_LABELS.get(item[1], item[1])
 
 
 def _exists(item) -> bool:
@@ -48,7 +50,7 @@ def _link_rows() -> list[dict]:
             if not _exists(item):
                 continue
             if item[0] == "DocType":
-                rows.append({"type": "Link", "link_type": "DocType", "link_to": item[1], "label": item[1]})
+                rows.append({"type": "Link", "link_type": "DocType", "link_to": item[1], "label": _item_label(item)})
             elif item[0] == "Page":
                 rows.append({"type": "Link", "link_type": "Page", "link_to": item[1], "label": item[2]})
             else:
@@ -67,7 +69,7 @@ def _shortcut_rows() -> list[dict]:
             if item[0] == "URL":
                 rows.append({"type": "URL", "url": item[1], "label": item[2], "color": "Blue"})
             elif item[0] == "DocType":
-                rows.append({"type": "DocType", "link_to": item[1], "label": item[1], "color": "Blue"})
+                rows.append({"type": "DocType", "link_to": item[1], "label": _item_label(item), "color": "Blue"})
             elif item[0] == "Page":
                 rows.append({"type": "Page", "link_to": item[1], "label": item[2], "color": "Blue"})
             else:
@@ -149,8 +151,8 @@ def _sidebar_items() -> list[dict]:
                 continue
             seen.add(entry[1])
             link_type = "DocType" if entry[0] == "DocType" else "Report"
-            items.append({"type": "Link", "label": entry[1], "link_type": link_type, "link_to": entry[1],
-                          "icon": ICONS.get(entry[1], "circle")})
+            items.append({"type": "Link", "label": _item_label(entry), "link_type": link_type, "link_to": entry[1],
+                          "icon": ICONS.get(_item_label(entry), ICONS.get(entry[1], "circle"))})
     return items
 
 

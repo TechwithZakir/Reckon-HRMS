@@ -79,10 +79,10 @@ function build(root, d) {
 	const section = (key, body) => `<section class="rhd-section"><h3 class="rhd-section-title">${TABS[key]}</h3>${body}</section>`;
 	root.html(`<style>${STYLE}</style>
 		<div class="rhd-head"><div><h2 class="rhd-title">${title}</h2><div class="rhd-muted">${esc(d.greeting_date)}</div></div></div>
-		${section("kpi", panel_kpi(d))}
+		${available.includes("analytics") ? section("analytics", panel_analytics(d)) : ""}
 		${available.includes("hr") ? section("hr", panel_hr(d)) : ""}
-		${available.includes("payroll") ? section("payroll", panel_payroll(d)) : ""}
-		${available.includes("analytics") ? section("analytics", panel_analytics(d)) : ""}`);
+		${section("kpi", panel_kpi(d))}
+		${available.includes("payroll") ? section("payroll", panel_payroll(d)) : ""}`);
 
 	root.find("[data-route]").on("click", function () {
 		window.location.href = $(this).attr("data-route");
