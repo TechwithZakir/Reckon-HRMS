@@ -399,7 +399,7 @@ window.ReckonSetupStages.run = function (parent) {
 				<label>Job title <select id="fDesig"><option value="">All job titles</option></select></label>
 				<label>Level <select id="fGrade"><option value="">All levels</option></select></label>
 			</div>
-			<div class="rhr-row"><label><input type="checkbox" id="incOt"> Include overtime (approved hours, HRMS overtime slips)</label><label><input type="checkbox" id="incFest"> Include festival bonus (Additional Salary, for people on this run)</label></div>
+			<div class="rhr-row"><label class="rhr-check"><input type="checkbox" id="incOt"> Include overtime (approved hours, HRMS overtime slips)</label><label class="rhr-check"><input type="checkbox" id="incFest"> Include festival bonus (Additional Salary, for people on this run)</label></div>
 				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="findBtn" type="button">Find employees</button></div>
 			<div class="rhr-err" id="err1"></div>
 		</div>
@@ -820,6 +820,8 @@ body.map .rhr-map{display:inline-block}
 .rhr-alert{background:var(--control-bg);border-radius:8px;padding:10px;font-size:13px;margin:8px 0}
 .rhr-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
 .rhr-row input[type=checkbox]{height:auto;width:auto;margin:0 6px 0 0;padding:0;flex:none}
+.rhr-row label.rhr-check{display:flex;align-items:center;gap:10px;border:1px solid var(--primary);border-radius:8px;padding:10px 14px;background:var(--card-bg);font-size:14px;font-weight:500;cursor:pointer}
+.rhr-row label.rhr-check input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary);margin:0}
 .rhr-row label:has(input[type=checkbox]){display:flex;align-items:center;font-size:13px}
 .rhr-sub h3{font-size:14px;margin:0 0 8px}
 .rhr-num{text-align:right;white-space:nowrap}
