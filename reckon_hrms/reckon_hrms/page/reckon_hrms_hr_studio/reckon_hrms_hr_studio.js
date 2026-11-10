@@ -1,0 +1,65 @@
+// HR Studio (one page): Your company, Time and attendance, Leave and holidays, each a step you can open at any time.
+// Served at /desk/reckon-hrms/reckon-hrms-hr-studio. "Your company" is the shared company stage.
+frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
+	const page = frappe.ui.make_app_page({ parent: wrapper, title: "HR Studio", single_column: true });
+	const STAGES = [["company", "Your company"], ["attendance", "Time and attendance"], ["leave", "Leave and holidays"]];
+	const shell = $(`<div class="rhs-shell" style="display:block"></div>`).appendTo(page.main);
+	const nav = $(`<nav class="rhs-stages" role="tablist" aria-label="HR Studio steps" style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border-color);margin:10px 0 14px"></nav>`).appendTo(shell);
+	const body = $(`<div class="rhs-body" style="min-width:0"></div>`).appendTo(shell);
+	const style = `<style>.rhs-stages button{border:0;border-bottom:2px solid transparent;background:none;color:var(--text-muted);padding:10px 16px;cursor:pointer;font-weight:500;font-size:14px}.rhs-stages button:hover{color:var(--text-color)}.rhs-stages button[aria-current="step"]{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}.rhs-stages button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}</style>`;
+	nav.append(style);
+
+	function go(key) {
+		const stage = STAGES.find((s) => s[0] === key) ? key : "company";
+		nav.find("button").attr("aria-current", null);
+		nav.find(`[data-stage="${stage}"]`).attr("aria-current", "step");
+		body.empty();
+		if (stage === "company") window.ReckonSetupStages.company(body);
+		else window.ReckonHrStages[stage](body);
+		history.replaceState(null, "", `#${stage}`);
+	}
+
+	STAGES.forEach(([key, label]) => {
+		$(`<button type="button" role="tab" data-stage="${key}">${label}</button>`).on("click", () => go(key)).appendTo(nav);
+	});
+
+	const fromRoute = frappe.route_options && frappe.route_options.stage;
+	const fromHash = (location.hash || "").replace("#", "");
+	frappe.route_options = null;
+	go(fromRoute || fromHash || "company");
+};
+
+// Steps that open the standard lists: an icon to open the list and an icon to add a record.
+window.ReckonHrStages = window.ReckonHrStages || {};
+(function () {
+	const esc = (t) => frappe.utils.escape_html(t == null ? "" : String(t));
+	const icon = (name) => (frappe.utils && frappe.utils.icon ? frappe.utils.icon(name, "sm") : (name === "add" ? "+" : "≡"));
+	const slug = (doctype) => "/app/" + doctype.toLowerCase().replace(/ /g, "-");
+	const CARD = `<style>.rhh-card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:12px;padding:16px;margin-top:14px}.rhh-card h2{font-size:15px;margin:0 0 8px}.rhh-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dotted var(--border-color)}.rhh-row:last-child{border-bottom:0}.rhh-acts{display:inline-flex;gap:6px}.rhh-ico{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid var(--border-color);border-radius:8px;background:var(--card-bg);color:var(--text-color);text-decoration:none;cursor:pointer;padding:0}.rhh-ico:hover{border-color:var(--primary);color:var(--primary)}.rhh-muted{color:var(--text-muted);font-size:13px}</style>`;
+
+	function lists(parent, sections) {
+		const root = $(`<div class="rhh">${CARD}</div>`).appendTo(parent);
+		sections.forEach((sec) => {
+			const card = $(`<section class="rhh-card"><h2>${esc(sec.title)}</h2>${sec.note ? `<div class="rhh-muted" style="margin-bottom:6px">${esc(sec.note)}</div>` : ""}</section>`).appendTo(root);
+			sec.lists.forEach((l) => {
+				$(`<div class="rhh-row"><span>${esc(l.title)}</span>
+					<span class="rhh-acts"><a class="rhh-ico" href="${slug(l.doctype)}" title="Open the ${esc(l.title)} list" aria-label="Open the ${esc(l.title)} list">${icon("list")}</a>
+					<a class="rhh-ico" href="${slug(l.doctype)}/new" title="Add new" aria-label="Add new ${esc(l.title)}">${icon("add")}</a></span></div>`).appendTo(card);
+			});
+		});
+	}
+
+	window.ReckonHrStages.attendance = function (parent) {
+		lists(parent, [
+			{ title: "Working hours", note: "Shift timings used for late entry and early exit.", lists: [{ title: "Work shifts", doctype: "Shift Type" }, { title: "Shift assignments", doctype: "Shift Assignment" }] },
+			{ title: "Attendance records", note: "Daily attendance, device punches and overtime.", lists: [{ title: "Attendance", doctype: "Attendance" }, { title: "Employee check-ins", doctype: "Employee Checkin" }] },
+		]);
+	};
+
+	window.ReckonHrStages.leave = function (parent) {
+		lists(parent, [
+			{ title: "Leave", note: "Leave types and balances.", lists: [{ title: "Leave types", doctype: "Leave Type" }, { title: "Leave applications", doctype: "Leave Application" }, { title: "Leave allocations", doctype: "Leave Allocation" }] },
+			{ title: "Holidays", note: "Company holiday calendars.", lists: [{ title: "Holiday lists", doctype: "Holiday List" }, { title: "Holiday list assignments", doctype: "Holiday List Assignment" }] },
+		]);
+	};
+})();

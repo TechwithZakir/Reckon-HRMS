@@ -14,3 +14,4 @@ reckon_hrms.patches.menu_hr_payroll_reports
 reckon_hrms.patches.payslip_print_format
 reckon_hrms.patches.payslip_print_format
 reckon_hrms.patches.payslip_print_format_refresh
+reckon_hrms.patches.studios_menu

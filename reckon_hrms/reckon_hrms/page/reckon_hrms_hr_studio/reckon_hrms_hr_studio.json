@@ -1,0 +1,13 @@
+{
+ "doctype": "Page",
+ "name": "reckon-hrms-hr-studio",
+ "page_name": "reckon-hrms-hr-studio",
+ "title": "HR Studio",
+ "module": "Reckon HRMS",
+ "standard": "Yes",
+ "roles": [
+  {"role": "HR Manager"},
+  {"role": "HR User"},
+  {"role": "System Manager"}
+ ]
+}

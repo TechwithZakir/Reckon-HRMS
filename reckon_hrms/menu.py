@@ -3,14 +3,17 @@
 Items: ("DocType", name) | ("Report", name) | ("Page", page_name, label). Icons are Lucide names.
 Reports or DocTypes that do not exist on a site are skipped when the menu is built.
 
-Each item appears once. Setup runs company, salary rules and salary run as stages of one page.
+Each item appears once. HR Studio and Payroll Studio are one page each, with steps.
 The old "Monthly payroll payout" page is not listed: Run salary does that job.
 """
 
 # Each item appears once, so the left nav and the cards stay in step.
 MENU = (
-    ("Setup", (
-        ("Page", "reckon-hrms-setup", "Setup"),
+    ("HR Studio", (
+        ("Page", "reckon-hrms-hr-studio", "HR Studio"),
+    )),
+    ("Payroll Studio", (
+        ("Page", "reckon-hrms-setup", "Payroll Studio"),
     )),
     ("Dashboard", (
         ("Page", "reckon-hrms-home", "Dashboard"),
@@ -75,7 +78,8 @@ MENU = (
 
 # Lucide icon names for each left-nav item, keyed by its label.
 ICONS = {
-    "Setup": "settings",
+    "HR Studio": "users",
+    "Payroll Studio": "wallet",
     "Dashboard": "gauge",
     "Check in / out": "log-in",
     "Employee": "users",
