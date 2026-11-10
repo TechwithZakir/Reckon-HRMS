@@ -7,5 +7,3 @@ class HRMSOfficeLocation(Document):
             from frappe import throw, _
 
             throw(_("Enter a valid latitude (-90 to 90) and longitude (-180 to 180)."))
-        if (self.radius_m or 0) <= 0:
-            self.radius_m = 150

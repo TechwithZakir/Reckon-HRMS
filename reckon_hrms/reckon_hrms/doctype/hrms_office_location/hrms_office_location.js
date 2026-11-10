@@ -20,15 +20,7 @@ function use_current_location(frm) {
 			const { latitude, longitude, accuracy } = pos.coords;
 			frm.set_value("latitude", Number(latitude.toFixed(6)));
 			frm.set_value("longitude", Number(longitude.toFixed(6)));
-			if (accuracy > 50) {
-				frappe.msgprint({
-					title: __("Location set, but the reading is rough"),
-					message: __("The device reports an accuracy of about {0} metres. Move near a window or outdoors and press the button again, or check the point on a map.", [Math.round(accuracy)]),
-					indicator: "orange",
-				});
-			} else {
-				frappe.show_alert({ message: __("Location set. Accuracy about {0} m.", [Math.round(accuracy)]), indicator: "green" });
-			}
+			frappe.show_alert({ message: __("Location set. Accuracy about {0} m.", [Math.round(accuracy)]), indicator: "green" });
 		},
 		(err) => {
 			const reason = err.code === 1
