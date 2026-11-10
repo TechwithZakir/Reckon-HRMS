@@ -1,0 +1,14 @@
+{
+ "doctype": "Page",
+ "name": "reckon-hrms-setup",
+ "page_name": "reckon-hrms-setup",
+ "title": "Setup",
+ "module": "Reckon HRMS",
+ "standard": "Yes",
+ "roles": [
+  {"role": "HR Manager"},
+  {"role": "HR User"},
+  {"role": "Payroll Manager"},
+  {"role": "System Manager"}
+ ]
+}

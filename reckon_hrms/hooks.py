@@ -10,6 +10,9 @@ app_license = "GPL-3.0-or-later"
 # Frappe HRMS is the engine. The SaaS platform provides tenants and companies.
 required_apps = ["frappe", "erpnext", "hrms", "reckon_saas_platform"]
 
+# Shared stage code for the single Setup page (Your company, Salary rules, Run salary).
+app_include_js = ["/assets/reckon_hrms/js/reckon_setup_stages.js"]
+
 # The Reckon HRMS tile on the Desk apps screen, and the landing page for HRMS-only tenants.
 add_to_apps_screen = [
     {

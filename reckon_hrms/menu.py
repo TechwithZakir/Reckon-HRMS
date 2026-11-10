@@ -6,6 +6,10 @@ Reports or DocTypes that do not exist on a site are skipped when the menu is bui
 
 # Each item appears once, so the left nav and the cards stay in step.
 MENU = (
+    # Setup comes first: company, salary rules and salary run are stages of one page.
+    ("Setup", (
+        ("Page", "reckon-hrms-setup", "Setup"),
+    )),
     ("Dashboard", (
         ("Page", "reckon-hrms-home", "Dashboard"),
     )),
@@ -56,6 +60,7 @@ MENU = (
 
 # Lucide icon names for each left-nav item, keyed by its label.
 ICONS = {
+    "Setup": "settings",
     "Dashboard": "gauge",
     "Check in / out": "log-in",
     "Leave Application": "calendar-days",
