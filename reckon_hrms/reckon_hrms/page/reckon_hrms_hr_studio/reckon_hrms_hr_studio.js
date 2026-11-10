@@ -2,7 +2,7 @@
 // Served at /desk/reckon-hrms/reckon-hrms-hr-studio. "Your company" is the shared company stage.
 frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({ parent: wrapper, title: "HR Studio", single_column: true });
-	const STAGES = [["hiring", "Hiring"], ["company", "Company and employee setup"], ["onboarding", "Onboarding"],
+	const STAGES = [["hiring", "Hiring"], ["company", "Company and employee setup"], ["employees", "Employee details"], ["onboarding", "Onboarding"],
 		["attendance", "Time and attendance"], ["leave", "Leave and holidays"], ["exit", "Exit"]];
 	const shell = $(`<div class="rhs-shell" style="display:block"></div>`).appendTo(page.main);
 	const nav = $(`<nav class="rhs-stages" role="tablist" aria-label="HR Studio steps" style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border-color);margin:10px 0 14px"></nav>`).appendTo(shell);
@@ -50,6 +50,28 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 			});
 		});
 	}
+
+	window.ReckonHrStages.employees = function (parent) {
+		const esc = (t) => frappe.utils.escape_html(t == null ? "" : String(t));
+		const root = $(`<div class="rhh-card"><h2>Employee details</h2>
+			<div class="rhh-row"><span class="rhh-muted">Everyone in the company, with branch, department, job title and joining date.</span>
+			<span class="rhh-acts"><button type="button" class="rhh-ico" data-add title="Add employee" aria-label="Add employee">${icon("add")}</button></span></div>
+			<div class="rhh-scroll" style="overflow-x:auto"><table class="rhr-table" style="width:100%;font-size:13px"><thead><tr>
+			<th>ID</th><th>Name</th><th>Branch</th><th>Department</th><th>Job title</th><th>Joined</th><th>Status</th></tr></thead>
+			<tbody data-rows><tr><td colspan="7" class="rhh-muted">Loading...</td></tr></tbody></table></div></div>`).appendTo(parent);
+		const load = () => frappe.call({ method: "frappe.client.get_list", args: {
+			doctype: "Employee", fields: ["name", "employee_name", "branch", "department", "designation", "date_of_joining", "status"],
+			order_by: "employee_name asc", limit_page_length: 500 } }).then((r) => {
+			const rows = r.message || [];
+			root.find("[data-rows]").html(rows.length ? rows.map((x) => `<tr>
+				<td><a href="/app/employee/${encodeURIComponent(x.name)}">${esc(x.name)}</a></td>
+				<td>${esc(x.employee_name)}</td><td>${esc(x.branch || "")}</td><td>${esc(x.department || "")}</td>
+				<td>${esc(x.designation || "")}</td><td>${esc(x.date_of_joining || "")}</td><td>${esc(x.status)}</td></tr>`).join("")
+				: `<tr><td colspan="7" class="rhh-muted">No employees yet. Use the add icon to add one.</td></tr>`);
+		});
+		root.find("[data-add]").on("click", () => frappe.ui.form.make_quick_entry("Employee", () => load(), null, {}));
+		load();
+	};
 
 	window.ReckonHrStages.hiring = function (parent) {
 		lists(parent, [
