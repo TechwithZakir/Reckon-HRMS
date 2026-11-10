@@ -60,8 +60,12 @@ def _table(name: str) -> dict:
         })
 
     paid = any(r["status"] == "Paid" for r in rows)
+    run = frappe.db.get_value("Payroll Entry", name, ["company", "start_date"], as_dict=True)
     return {
         "title": "Salary statement (Paid)" if paid else "Draft pay slips (Draft)",
+        "status_word": "PAID STATEMENT" if paid else "DRAFT",
+        "company": run.company,
+        "month_label": run.start_date.strftime("%B %Y"),
         "run": name,
         "columns": [{"code": codes[n], "name": n, "type": kinds[n]} for n in names],
         "rows": rows,
@@ -77,38 +81,56 @@ def slip_table(name: str) -> dict:
 
 @frappe.whitelist(methods=["GET"])
 def slip_pdf(name: str):
-    """Landscape PDF of the slip table, with a legend for the two-character codes."""
+    """Landscape consolidated salary sheet: earnings under TOTAL GROSS SALARY, deductions under TOTAL DEDUCTIONS."""
     from frappe.utils.pdf import get_pdf
 
     data = _table(name)
     esc = html_lib.escape
-    head = "".join(f"<th>{esc(c['code'])}</th>" for c in data["columns"])
+    earn = [c for c in data["columns"] if c["type"] == "Earning"]
+    dedu = [c for c in data["columns"] if c["type"] == "Deduction"]
+
+    group_row = (f"<tr><th rowspan='2'>SL</th><th rowspan='2' class='l'>ID</th><th rowspan='2' class='l'>Name of employee</th>"
+                 f"<th colspan='{len(earn)}' class='grp'>TOTAL GROSS SALARY</th><th rowspan='2'>Gross</th>"
+                 f"<th colspan='{len(dedu)}' class='grp'>TOTAL DEDUCTIONS</th><th rowspan='2'>Total deductions</th>"
+                 f"<th rowspan='2'>Net payable</th><th rowspan='2' class='l'>Status</th></tr>")
+    code_row = "<tr>" + "".join(f"<th title='{esc(c['name'])}'>{esc(c['code'])}</th>" for c in earn + dedu) + "</tr>"
+
     body = []
     for i, r in enumerate(data["rows"], start=1):
-        cells = "".join(f"<td>{r['components'].get(c['code'], 0):,.2f}</td>" for c in data["columns"])
+        earn_cells = "".join(f"<td>{r['components'].get(c['code'], 0):,.2f}</td>" for c in earn)
+        dedu_cells = "".join(f"<td>{r['components'].get(c['code'], 0):,.2f}</td>" for c in dedu)
         body.append(f"<tr><td>{i}</td><td class='l'>{esc(r['employee'])}</td><td class='l'>{esc(r['employee_name'] or '')}</td>"
-                    f"{cells}<td>{r['gross']:,.2f}</td><td>{r['deductions']:,.2f}</td><td>{r['net']:,.2f}</td>"
-                    f"<td class='l'>{esc(r['status'])}{' (held)' if r['held'] else ''}</td></tr>")
+                    f"{earn_cells}<td>{r['gross']:,.2f}</td>{dedu_cells}<td>{r['deductions']:,.2f}</td>"
+                    f"<td>{r['net']:,.2f}</td><td class='l'>{esc(r['status'])}{' (held)' if r['held'] else ''}</td></tr>")
+    totals = {"gross": sum(r["gross"] for r in data["rows"]), "ded": sum(r["deductions"] for r in data["rows"]),
+              "net": sum(r["net"] for r in data["rows"])}
     legend = "".join(f"<tr><td><b>{esc(l['code'])}</b></td><td>{esc(l['name'])}</td></tr>" for l in data["legend"])
     html = f"""<html><head><style>
       body {{ font-family: Arial, sans-serif; font-size: 9px; }}
-      h1 {{ font-size: 15px; margin: 0 0 4px 0; }}
-      table {{ border-collapse: collapse; width: 100%; margin-top: 8px; }}
-      th, td {{ border: 1px solid #999; padding: 3px 4px; text-align: right; }}
-      th {{ background: #eef2f1; }}
+      .company {{ text-align: center; font-size: 15px; font-weight: bold; }}
+      .title {{ text-align: center; font-size: 12px; margin: 4px 0 2px 0; font-weight: bold; }}
+      .status {{ text-align: center; font-size: 10px; margin-bottom: 6px; }}
+      table {{ border-collapse: collapse; width: 100%; }}
+      th, td {{ border: 1px solid #777; padding: 3px 4px; text-align: right; }}
+      th {{ background: #eef2f1; text-align: center; }}
+      th.grp {{ background: #dfe9e6; }}
       td.l, th.l {{ text-align: left; }}
-      .legend {{ width: 60%; margin-top: 12px; }}
+      tr.total td {{ font-weight: bold; background: #f4f4f4; }}
+      .legend {{ width: 55%; margin-top: 12px; }}
       .legend td {{ text-align: left; }}
     </style></head><body>
-      <h1>{esc(data['title'])}</h1>
-      <div>Run {esc(name)}. Amounts in BDT. Codes are explained at the end.</div>
-      <table><thead><tr><th>#</th><th class='l'>ID</th><th class='l'>Name</th>{head}
-        <th>Gross</th><th>Deductions</th><th>Net pay</th><th class='l'>Status</th></tr></thead>
-        <tbody>{''.join(body)}</tbody></table>
-      <h1 style="margin-top:14px;font-size:11px">Codes</h1>
-      <table class='legend'><tbody>{legend}</tbody></table>
+      <div class="company">{esc(data['company'])}</div>
+      <div class="title">Consolidated Salary Sheet for the month of {esc(data['month_label'])}</div>
+      <div class="status">{esc(data['status_word'])} · Run {esc(name)} · Amounts in BDT</div>
+      <table><thead>{group_row}{code_row}</thead>
+        <tbody>{''.join(body)}
+          <tr class="total"><td colspan='3' class='l'>Total</td>{''.join('<td></td>' for _ in earn)}
+            <td>{totals['gross']:,.2f}</td>{''.join('<td></td>' for _ in dedu)}<td>{totals['ded']:,.2f}</td>
+            <td>{totals['net']:,.2f}</td><td class='l'></td></tr>
+        </tbody></table>
+      <table class='legend'><thead><tr><th>Code</th><th class='l'>Pay item</th></tr></thead><tbody>{legend}</tbody></table>
     </body></html>"""
     pdf = get_pdf(html, {"orientation": "Landscape", "page-size": "A4"})
-    frappe.local.response.filename = f"{name}-{'paid' if 'Paid' in data['title'] else 'draft'}.pdf"
+    frappe.local.response.filename = f"{name}-{'paid' if data['status_word'] == 'PAID STATEMENT' else 'draft'}.pdf"
     frappe.local.response.filecontent = pdf
     frappe.local.response.type = "download"
