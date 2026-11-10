@@ -109,8 +109,9 @@ def apply_attendance_deductions(name: str, employees: list | str) -> dict:
         additional = frappe.get_doc({
             "doctype": "Additional Salary", "employee": row["employee"], "company": doc.company,
             "salary_component": DEDUCTION_COMPONENT, "amount": row["amount"],
-            "payroll_date": doc.end_date, "notes": note,
+            "payroll_date": doc.end_date,
         }).insert(ignore_permissions=True)
+        additional.add_comment("Comment", note)  # Additional Salary has no notes field
         additional.submit()
         created.append(additional.name)
     doc.add_comment("Comment", f"{frappe.session.user} applied late and early deductions for {len(created)} people.")

@@ -50,8 +50,9 @@ def request_increase(name: str, employee: str, kind: str, amount: float, reason:
     request = frappe.get_doc({
         "doctype": "Additional Salary", "employee": employee, "company": doc.company,
         "salary_component": component, "amount": amount, "payroll_date": doc.end_date,
-        "notes": f"Run {name}: {reason}. Requested by {frappe.session.user}.",
     }).insert(ignore_permissions=True)
+    # Additional Salary has no notes field, so the reason is kept as a comment on the request.
+    request.add_comment("Comment", f"Run {name}: {reason}. Requested by {frappe.session.user}.")
     doc.add_comment("Comment", f"{frappe.session.user} requested {kind} of {amount:,.2f} for {employee}: {reason}.")
     frappe.db.commit()
     return {"name": request.name, "status": "Pending approval"}
@@ -69,9 +70,11 @@ def pending_requests(name: str) -> list[dict]:
         "employee": ["in", people], "docstatus": 0, "company": doc.company,
         "salary_component": ["in", list(COMPONENTS.values())],
         "payroll_date": ["between", [doc.start_date, doc.end_date]]},
-        fields=["name", "employee", "employee_name", "salary_component", "amount", "notes", "owner"],
+        fields=["name", "employee", "employee_name", "salary_component", "amount", "owner"],
         order_by="creation asc", limit_page_length=0)
-    return [{**r, "kind": "additions" if r.salary_component == COMPONENTS["additions"] else "deductions",
+    reasons = _first_comments("Additional Salary", [r.name for r in rows])
+    return [{**r, "notes": reasons.get(r.name, ""),
+             "kind": "additions" if r.salary_component == COMPONENTS["additions"] else "deductions",
              "requested_by": r.owner, "can_decide": r.owner != frappe.session.user} for r in rows]
 
 
@@ -106,9 +109,24 @@ def reject_request(request: str, reason: str | None = None) -> dict:
     return {"name": request, "status": "Rejected"}
 
 
+def _first_comments(doctype: str, names: list[str]) -> dict[str, str]:
+    """The first comment on each record (its reason), keyed by record name."""
+    if not names:
+        return {}
+    found: dict[str, str] = {}
+    for row in frappe.get_all("Comment", filters={"reference_doctype": doctype, "reference_name": ["in", names],
+                                                  "comment_type": "Comment"},
+                              fields=["reference_name", "content"], order_by="creation asc", limit_page_length=0):
+        found.setdefault(row.reference_name, row.content)
+    return found
+
+
 def _run_for(additional) -> str | None:
-    """The run a request belongs to, read from its notes (Run <name>: ...)."""
-    notes = additional.get("notes") or ""
-    if notes.startswith("Run "):
-        return notes[4:].split(":", 1)[0].strip()
+    """The draft run this request belongs to: a draft that lists the person and covers the request's date."""
+    runs = frappe.get_all("Payroll Employee Detail", filters={"employee": additional.employee,
+                                                             "parenttype": "Payroll Entry"}, pluck="parent")
+    for run in runs:
+        row = frappe.db.get_value("Payroll Entry", run, ["docstatus", "end_date"], as_dict=True)
+        if row and row.docstatus == 0 and str(row.end_date) >= str(additional.payroll_date):
+            return run
     return None
