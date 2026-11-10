@@ -2,7 +2,10 @@
 // Stand at the office (or open the form on the office's own device) and press the button.
 frappe.ui.form.on("HRMS Office Location", {
 	refresh(frm) {
-		frm.add_custom_button(__("Use my current location"), () => use_current_location(frm));
+		if (frm.__get_location_btn || !frm.fields_dict.longitude) return;
+		frm.__get_location_btn = $(`<button type="button" class="btn btn-default btn-sm" style="margin-top:4px">${__("Get lat & lon")}</button>`)
+			.on("click", () => use_current_location(frm));
+		frm.fields_dict.longitude.$wrapper.after(frm.__get_location_btn);
 	},
 });
 
