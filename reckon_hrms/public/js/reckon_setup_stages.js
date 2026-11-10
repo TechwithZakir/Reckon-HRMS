@@ -440,16 +440,17 @@ window.ReckonSetupStages.run = function (parent) {
 			<div class="rhr-card" id="step3" style="display:none">
 				<h2>3 · Make draft slips <span class="rhr-map">Salary Slip (draft)</span></h2>
 				<div class="rhr-muted">One draft pay slip for each person on the list. Nothing is paid yet.</div>
-				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="mkSlips" type="button">Create draft slips</button></div>
+				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="mkSlips" type="button">Create draft slips</button> <button class="rhr-btn" id="prevSlips" type="button">Preview draft slips</button></div>
 				<div class="rhr-bar"><div id="slipBar"></div></div>
 				<div class="rhr-muted" id="slipText"></div>
+				<div id="slipPrev" style="margin-top:12px"></div>
 				<div class="rhr-err" id="err3"></div>
 			</div>
 			<div class="rhr-card" id="step4" style="display:none">
 				<h2>4 · Review and approve <span class="rhr-map">Submit Salary Slip</span></h2>
 				<div class="rhr-sum" id="tot"></div>
 				<div class="rhr-alert" id="totNote" style="display:none"></div>
-				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="approve" type="button">Approve all slips</button></div>
+				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="approve" type="button">Submit slips</button></div>
 				<div class="rhr-bar"><div id="subBar"></div></div>
 				<div class="rhr-muted" id="subText"></div>
 				<div class="rhr-err" id="err4"></div>
@@ -719,6 +720,18 @@ window.ReckonSetupStages.run = function (parent) {
 				.catch((e) => { $btn.prop("disabled", false); root.find("#err3").text((e && e.message) || "Could not make the slips."); });
 		});
 
+		root.find("#prevSlips").on("click", () => {
+			root.find("#err3").text("");
+			frappe.call({ method: "frappe.client.get_list", args: { doctype: "Salary Slip", filters: { payroll_entry: state.run, docstatus: 0 },
+				fields: ["employee", "employee_name", "gross_pay", "total_deduction", "net_pay"], order_by: "employee asc", limit_page_length: 500 } })
+				.then((r) => {
+					const rows = r.message || [];
+					root.find("#slipPrev").html(rows.length
+						? `<table class="rhr-table"><thead><tr><th>ID</th><th>Name</th><th class="rhr-num">Gross</th><th class="rhr-num">Deductions</th><th class="rhr-num">Net pay</th></tr></thead><tbody>${rows.map((x) => `<tr><td>${esc(x.employee)}</td><td>${esc(x.employee_name)}</td><td class="rhr-num">${money(x.gross_pay)}</td><td class="rhr-num">${money(x.total_deduction)}</td><td class="rhr-num">${money(x.net_pay)}</td></tr>`).join("")}</tbody></table>`
+						: `<div class="rhr-muted">No draft slips yet. Create them first.</div>`);
+				})
+				.catch((e) => root.find("#err3").text((e && e.message) || "Could not load the draft slips."));
+		});
 		root.find("#approve").on("click", () => {
 			root.find("#err4").text("");
 			frappe.confirm("Approve every draft slip in this run? Approved slips cannot be edited.", () => {
