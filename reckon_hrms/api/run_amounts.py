@@ -1,8 +1,10 @@
-"""Per-person pay amounts for the Run salary list: basic, additions, deductions and gross.
+"""Per-person pay amounts for the Run salary list: each component, additions, deductions and gross.
 
-Built from the person's current salary structure (same formula engine as the payslip preview), plus
-the run's Additional Salary: submitted ones count, draft ones are pending approval and do not.
-Income tax is worked out on the slip, so it is not here.
+Each component starts from the person's salary structure (same formula engine as the payslip preview).
+The run's Additional Salary then changes it, as HRMS does on the slip:
+- an approved change with "overwrite salary structure amount" replaces the component's amount;
+- any other approved Additional Salary (festival bonus, late and early deduction) is added to it.
+Drafts are pending approval and do not count. Income tax is worked out on the slip, so it is not here.
 """
 
 from __future__ import annotations
@@ -22,32 +24,25 @@ def person_amounts(doc, employees: list[str]) -> dict[str, dict]:
             fields=["employee", "salary_structure", "base"], order_by="from_date desc", limit_page_length=0):
         assignments.setdefault(row.employee, row)
 
-    extra = {emp: {"additions": 0.0, "deductions": 0.0, "pending": 0} for emp in employees}
     rows = frappe.get_all("Additional Salary", filters={
         "employee": ["in", employees], "payroll_date": ["between", [doc.start_date, doc.end_date]],
-        "docstatus": ["!=", 2]}, fields=["employee", "salary_component", "amount", "docstatus"],
+        "docstatus": ["!=", 2]},
+        fields=["employee", "salary_component", "amount", "docstatus", "overwrite_salary_structure_amount"],
         limit_page_length=0)
-    component_types = dict(frappe.get_all("Salary Component", filters={
+    kinds: dict[str, str] = dict(frappe.get_all("Salary Component", filters={
         "name": ["in", list({r.salary_component for r in rows}) or [""]]},
         fields=["name", "type"], as_list=True, limit_page_length=0))
-    for row in rows:
-        bucket = extra.setdefault(row.employee, {"additions": 0.0, "deductions": 0.0, "pending": 0})
-        if row.docstatus == 0:
-            bucket["pending"] += 1
-        elif component_types.get(row.salary_component) == "Deduction":
-            bucket["deductions"] += flt(row.amount)
-        else:
-            bucket["additions"] += flt(row.amount)
 
-    # One line per component for each person: structure pay items, plus the run's Additional Salary
-    # (festival bonus, late and early deduction, approved changes) under their own component.
-    components: dict[str, dict[str, float]] = {emp: {} for emp in employees}
+    pending: dict[str, int] = {emp: 0 for emp in employees}
+    overwrites: dict[str, dict[str, float]] = {}
+    adds: dict[str, dict[str, float]] = {}
     for row in rows:
         if row.docstatus == 0:
+            pending[row.employee] = pending.get(row.employee, 0) + 1
             continue
-        bucket = components.setdefault(row.employee, {})
+        target = overwrites if row.overwrite_salary_structure_amount else adds
+        bucket = target.setdefault(row.employee, {})
         bucket[row.salary_component] = bucket.get(row.salary_component, 0.0) + flt(row.amount)
-    kinds: dict[str, str] = dict(component_types)
 
     overtime: dict[str, float] = {emp: 0.0 for emp in employees}
     for row in frappe.get_all("Overtime Slip", filters={
@@ -60,26 +55,31 @@ def person_amounts(doc, employees: list[str]) -> dict[str, dict]:
     out = {}
     for emp in employees:
         assignment = assignments.get(emp)
-        amounts = {"basic": 0.0, "additions": 0.0, "gross": 0.0, "deductions": 0.0, "lines": []}
+        lines: list[tuple[str, str, float]] = []
         if assignment:
             key = (assignment.salary_structure, flt(assignment.base))
             if key not in cache:
                 cache[key] = structure_amounts(assignment.salary_structure, assignment.base)
-            amounts = cache[key]
-        person = {}
-        for component, kind, amount in amounts.get("lines", []):
+            lines = cache[key]["lines"]
+
+        person: dict[str, float] = {}
+        for component, kind, amount in lines:
             kinds.setdefault(component, kind)
-            person[component] = round(person.get(component, 0.0) + flt(amount), 2)
-        for component, amount in components.get(emp, {}).items():
+            person[component] = flt(amount)
+        for component, amount in overwrites.get(emp, {}).items():
+            person[component] = amount
+        for component, amount in adds.get(emp, {}).items():
             person[component] = round(person.get(component, 0.0) + amount, 2)
-        adj = extra.get(emp, {"additions": 0.0, "deductions": 0.0, "pending": 0})
-        additions = round(flt(amounts["additions"]) + adj["additions"], 2)
-        deductions = round(flt(amounts["deductions"]) + adj["deductions"], 2)
-        basic = round(flt(amounts["basic"]), 2)
+        person = {c: round(v, 2) for c, v in person.items()}
+
+        basic = round(person.get("Basic Salary", 0.0), 2)
+        additions = round(sum(v for c, v in person.items()
+                              if c != "Basic Salary" and kinds.get(c, "Earning") == "Earning"), 2)
+        deductions = round(sum(v for c, v in person.items() if kinds.get(c) == "Deduction"), 2)
         out[emp] = {
             "basic": basic, "additions": additions, "deductions": deductions,
-            "components": person, "overtime_hours": round(overtime.get(emp, 0.0), 2),
-            "gross": round(basic + additions, 2), "pending_requests": adj["pending"],
+            "gross": round(basic + additions, 2), "components": person,
+            "overtime_hours": round(overtime.get(emp, 0.0), 2), "pending_requests": pending.get(emp, 0),
             "structure": assignment.salary_structure if assignment else None,
             "base": flt(assignment.base) if assignment else 0.0,
         }

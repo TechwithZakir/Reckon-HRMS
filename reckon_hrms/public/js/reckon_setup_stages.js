@@ -511,26 +511,62 @@ window.ReckonSetupStages.run = function (parent) {
 		loadPeople();
 	}
 
-	function bindTotals() {
+	function recalcRow(tr) {
+			const val = (el) => Number(el.value) || 0;
+			let basic = 0, additions = 0, deductions = 0;
+			tr.find("input[data-comp]").each(function () {
+				const comp = this.dataset.comp;
+				if (comp === "Basic Salary") basic = val(this);
+				else if (this.dataset.kind === "Deduction") deductions += val(this);
+				else additions += val(this);
+			});
+			tr.find('[data-tot="additions"]').text(money(additions));
+			tr.find('[data-tot="deductions"]').text(money(deductions));
+			tr.find("input[data-gross]").val(basic + additions);
+		}
+
+		// Any pay item or gross can change. Totals recalculate as you type; each change needs a reason and an
+		// approval before it reaches a slip. A gross change is put on Basic Salary.
+		function bindTotals() {
+			root.find("input.amt").on("input", function () {
+				recalcRow($(this).closest("tr"));
+			});
 			root.find("input.amt").on("change", function () {
+				const input = this;
+				const tr = $(this).closest("tr");
+				const emp = this.dataset.e;
 				const cur = Number(this.dataset.cur) || 0;
 				const next = Number(this.value) || 0;
-				const emp = this.dataset.e;
-				const kind = this.dataset.kind;
-				const input = this;
 				root.find("#err2").text("");
-				if (next < cur) {
-					input.value = cur;
-					return root.find("#err2").text("A lower amount needs a change to the salary structure, on Salary rules.");
-				}
 				if (next === cur) return;
-				frappe.prompt([{ fieldname: "reason", label: "Reason for the change", fieldtype: "Small Text", reqd: 1 }],
-					(v) => {
-						frappe.call({ method: "reckon_hrms.api.adjustments.request_increase",
-							args: { name: state.run, employee: emp, kind, amount: next - cur, reason: v.reason } })
-							.then(() => { input.value = cur; root.find("#dedMsg").text("Sent for approval. The total changes once a Payroll Manager approves it."); loadRequests(); })
-							.catch((e) => { input.value = cur; root.find("#err2").text((e && e.message) || "Could not send the request."); });
-					}, "Request an increase", "Send for approval");
+				const isGross = this.dataset.gross === "1";
+				const component = isGross ? "Basic Salary" : this.dataset.comp;
+				const amount = isGross ? (Number(tr.find('input[data-comp="Basic Salary"]').attr("data-cur")) || 0) + (next - cur) : next;
+				if (amount < 0) {
+					input.value = cur; recalcRow(tr);
+					return root.find("#err2").text("The amount cannot be negative.");
+				}
+				const revert = () => { input.value = cur; recalcRow(tr); };
+				let saved = false;
+				const dlg = new frappe.ui.Dialog({
+					title: "Request a change",
+					fields: [{ fieldname: "reason", label: `Reason for changing ${isGross ? "gross" : component}`, fieldtype: "Small Text", reqd: 1 }],
+					primary_action_label: "Send for approval",
+					primary_action(v) {
+						saved = true;
+						dlg.hide();
+						frappe.call({ method: "reckon_hrms.api.adjustments.request_change",
+							args: { name: state.run, employee: emp, component, amount, reason: v.reason } })
+							.then(() => {
+								input.dataset.cur = next;
+								root.find("#dedMsg").text(`${component} change sent for approval. It applies when a Payroll Manager approves it.`);
+								loadRequests();
+							})
+							.catch((e) => { revert(); root.find("#err2").text((e && e.message) || "Could not send the change."); });
+					},
+				});
+				dlg.onhide = () => { if (!saved) revert(); };
+				dlg.show();
 			});
 		}
 
@@ -541,7 +577,7 @@ window.ReckonSetupStages.run = function (parent) {
 				root.find("#reqs").toggle(rows.length > 0);
 				const approver = (frappe.user_roles || []).some((x) => x === "Payroll Manager" || x === "System Manager");
 				root.find("#reqList").html(rows.map((x) => `<div class="rhr-row" style="align-items:center">
-					<span><b>${esc(x.employee_name)}</b> · ${x.kind === "additions" ? "additions" : "deductions"} +${money(x.amount)} · <span class="rhr-muted">${esc(x.notes)}</span></span>
+					<span><b>${esc(x.employee_name)}</b> · ${esc(x.salary_component)} → ${money(x.amount)} · <span class="rhr-muted">${esc(x.notes)}</span></span>
 					${approver && x.can_decide ? `<button class="rhr-btn rhr-pri" data-approve="${esc(x.name)}" type="button">Approve</button><button class="rhr-btn" data-reject="${esc(x.name)}" type="button">Reject</button>` : `<span class="rhr-muted">Waiting for a Payroll Manager</span>`}
 					</div>`).join(""));
 				root.find("#reqList [data-approve]").on("click", function () {
@@ -567,16 +603,19 @@ window.ReckonSetupStages.run = function (parent) {
 				const cols = p.columns || [];
 					root.find("#phead").html(`<tr><th><input type="checkbox" id="all" aria-label="Include or leave out everyone shown"></th><th>ID</th><th>Name</th><th>Department</th><th>Job title</th>${cols.map((c) => `<th class="rhr-num">${esc(c.name)}</th>`).join("")}<th class="rhr-num">Overtime (hrs)</th><th class="rhr-num">Total additions</th><th class="rhr-num">Total deductions</th><th class="rhr-num">Gross</th><th>Status</th></tr>`);
 					root.find("#all").on("change", function () { root.find("input.pick").prop("checked", this.checked).trigger("change"); });
-					root.find("#rows").html(p.rows.map((x) => `<tr>
+					root.find("#rows").html(p.rows.map((x) => {
+						const comp = x.components || {};
+						return `<tr data-row="${esc(x.employee)}">
 						<td><input type="checkbox" class="pick" data-e="${esc(x.employee)}" ${x.included ? "checked" : ""}></td>
 						<td>${esc(x.employee)}</td><td>${esc(x.employee_name)}</td><td>${esc(x.department || "")}</td>
 						<td>${esc(x.designation || "")}</td>
-						${cols.map((c) => `<td class="rhr-num">${money((x.components || {})[c.name] || 0)}</td>`).join("")}
+						${cols.map((c) => `<td class="rhr-num"><input class="amt" type="number" min="0" step="1" data-comp="${esc(c.name)}" data-kind="${esc(c.type)}" data-e="${esc(x.employee)}" data-cur="${comp[c.name] || 0}" value="${comp[c.name] || 0}" aria-label="${esc(c.name)} for ${esc(x.employee_name)}"></td>`).join("")}
 						<td class="rhr-num">${money(x.overtime_hours || 0)}</td>
-						<td class="rhr-num"><input class="amt" type="number" min="0" step="1" data-kind="additions" data-e="${esc(x.employee)}" data-cur="${x.additions || 0}" value="${x.additions || 0}" aria-label="Total additions for ${esc(x.employee_name)}"></td>
-						<td class="rhr-num"><input class="amt" type="number" min="0" step="1" data-kind="deductions" data-e="${esc(x.employee)}" data-cur="${x.deductions || 0}" value="${x.deductions || 0}" aria-label="Total deductions for ${esc(x.employee_name)}"></td>
-						<td class="rhr-num rhr-gross">${money(x.gross)}</td>
-						<td>${x.status === "no_structure" ? '<span class="rhr-chip warn">No salary structure</span>' : '<span class="rhr-chip good">Included</span>'}</td></tr>`).join("")
+						<td class="rhr-num" data-tot="additions">${money(x.additions)}</td>
+						<td class="rhr-num" data-tot="deductions">${money(x.deductions)}</td>
+						<td class="rhr-num"><input class="amt rhr-gross-in" type="number" min="0" step="1" data-gross="1" data-e="${esc(x.employee)}" data-cur="${x.gross || 0}" value="${x.gross || 0}" aria-label="Gross for ${esc(x.employee_name)}"></td>
+						<td>${x.status === "no_structure" ? '<span class="rhr-chip warn">No salary structure</span>' : '<span class="rhr-chip good">Included</span>'}</td></tr>`;
+					}).join("")
 						|| `<tr><td colspan="${cols.length + 9}" class="rhr-muted">Nobody matches.</td></tr>`);
 				const last = Math.min(p.start + PAGE, p.total);
 				root.find("#range").text(p.total ? `Showing ${p.start + 1} to ${last} of ${p.total}` : "No results");
