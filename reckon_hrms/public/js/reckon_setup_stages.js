@@ -106,7 +106,7 @@ window.ReckonSetupStages.company = function (parent) {
 			<ul class="rhc-checks" id="checks"></ul></div>
 		<div class="rhc-card"><h2>Your industry <span class="rhc-map">Company · reckon_industry</span></h2>
 			<div class="rhc-muted" id="indNow">Not chosen yet.</div>
-			<div class="rhc-row"><select id="indSel" aria-label="Industry" style="height:34px;border:1px solid var(--border-color);border-radius:8px;background:var(--card-bg);color:var(--text-color);padding:0 8px;flex:1 1 260px"><option value="">Choose an industry</option></select>
+			<div class="rhc-row"><select id="indSel" aria-label="Industry" class="form-control" style="flex:1 1 260px"><option value="">Choose an industry</option></select>
 			<button class="rhc-btn rhc-pri" id="indBtn" type="button">Set up for this industry</button></div>
 			<div class="rhc-muted" id="indMsg" style="margin-top:8px">Adds starter job titles, departments, salary components and leave types for your industry. Nothing is paid, and salary amounts stay for you to set.</div></div>
 		<div id="lists"></div>
@@ -225,7 +225,6 @@ body.map .rhc-map{display:inline-block}
 .rhc-n{color:var(--text-muted);font-size:11px}
 .rhc-suggest{border:1px dashed var(--text-muted);background:none;color:var(--text-muted);border-radius:99px;padding:4px 10px;cursor:pointer;font-size:13px;margin:0 6px 6px 0}
 .rhc-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
-.rhc-row input{flex:1 1 180px;min-width:0;height:34px;border:1px solid var(--border-color);border-radius:8px;background:var(--card-bg);color:var(--text-color);padding:0 10px}
 .rhc-acts{display:inline-flex;gap:6px;flex:none}
 .rhc-ico{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid var(--border-color);border-radius:8px;background:var(--card-bg);color:var(--text-color);cursor:pointer;text-decoration:none;padding:0}
 .rhc-ico:hover{border-color:var(--primary);color:var(--primary)}
@@ -861,7 +860,6 @@ const STYLE = `
 body.map .rhr-map{display:inline-block}
 .rhr-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:8px}
 .rhr-row label{display:grid;gap:4px;font-size:13px}
-.rhr-row select,.rhr-row input{height:34px;border:1px solid var(--border-color);border-radius:8px;background:var(--card-bg);color:var(--text-color);padding:0 8px}
 .rhr-btn{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);border-radius:8px;padding:6px 12px;cursor:pointer}
 .rhr-pri{background:var(--primary);color:#fff;border-color:var(--primary)}
 .rhr-seg button{border:1px solid var(--border-color);background:var(--card-bg);padding:6px 10px;cursor:pointer}
@@ -876,7 +874,7 @@ body.map .rhr-map{display:inline-block}
 .rhr-sub h3{font-size:14px;margin:0 0 8px}
 .rhr-num{text-align:right;white-space:nowrap}
 .rhr-scroll{overflow-x:auto;max-width:100%}
-.rhr-table input.amt{width:96px;height:30px;border:1px solid var(--border-color);border-radius:6px;background:var(--card-bg);color:var(--text-color);padding:0 6px;text-align:right}
+.rhr-table input.amt{width:110px;text-align:right}
 .rhr-gross{font-weight:600}
 .rhr-table th,.rhr-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border-color)}
 .rhr-chip{border-radius:99px;padding:2px 8px;font-size:12px}
@@ -887,3 +885,15 @@ body.map .rhr-map{display:inline-block}
 .rhr-bar div{height:100%;width:0;background:var(--primary);transition:width .3s}
 `;
 })();
+
+// Frappe's standard form controls: every input, dropdown and text box gets the desk's form-control class,
+// including ones added later. Used by the Payroll Studio and HR Studio pages.
+window.ReckonFormControls = function (root) {
+	const fix = () => root.find("input:not([type=checkbox]):not([type=hidden]), select, textarea").not(".form-control").addClass("form-control");
+	fix();
+	const el = root.get(0);
+	if (el && !el.__rfc) {
+		el.__rfc = new MutationObserver(fix);
+		el.__rfc.observe(el, { childList: true, subtree: true });
+	}
+};

@@ -15,6 +15,7 @@ frappe.pages["reckon-hrms-setup"].on_page_load = function (wrapper) {
 		nav.find(`[data-stage="${stage}"]`).attr("aria-current", "step");
 		body.empty();
 		window.ReckonSetupStages[stage](body);
+		window.ReckonFormControls(body);
 		history.replaceState(null, "", `#${stage}`);
 	}
 

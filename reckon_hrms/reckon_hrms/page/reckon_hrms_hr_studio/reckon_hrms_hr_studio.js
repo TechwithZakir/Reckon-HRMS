@@ -17,6 +17,7 @@ frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
 		body.empty();
 		if (stage === "company") window.ReckonSetupStages.company(body);
 		else window.ReckonHrStages[stage](body);
+		window.ReckonFormControls(body);
 		history.replaceState(null, "", `#${stage}`);
 	}
 
