@@ -763,15 +763,25 @@ window.ReckonSetupStages.run = function (parent) {
 
 		root.find("#prevSlips").on("click", () => {
 			root.find("#err3").text("");
-			frappe.call({ method: "frappe.client.get_list", args: { doctype: "Salary Slip", filters: { payroll_entry: state.run, docstatus: 0 },
-				fields: ["employee", "employee_name", "gross_pay", "total_deduction", "net_pay"], order_by: "employee asc", limit_page_length: 500 } })
+			frappe.call({ method: "reckon_hrms.api.slip_report.slip_table", args: { name: state.run }, type: "GET" })
 				.then((r) => {
-					const rows = r.message || [];
-					root.find("#slipPrev").html(rows.length
-						? `<table class="rhr-table"><thead><tr><th>ID</th><th>Name</th><th class="rhr-num">Gross</th><th class="rhr-num">Deductions</th><th class="rhr-num">Net pay</th></tr></thead><tbody>${rows.map((x) => `<tr><td>${esc(x.employee)}</td><td>${esc(x.employee_name)}</td><td class="rhr-num">${money(x.gross_pay)}</td><td class="rhr-num">${money(x.total_deduction)}</td><td class="rhr-num">${money(x.net_pay)}</td></tr>`).join("")}</tbody></table>`
-						: `<div class="rhr-muted">No draft slips yet. Create them first.</div>`);
+					const t = r.message;
+					const cols = t.columns || [];
+					const head = cols.map((c) => `<th class="rhr-num" title="${esc(c.name)}">${esc(c.code)}</th>`).join("");
+					const body = t.rows.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.employee)}</td><td>${esc(x.employee_name)}</td>
+						${cols.map((c) => `<td class="rhr-num">${money(x.components[c.code] || 0)}</td>`).join("")}
+						<td class="rhr-num">${money(x.gross)}</td><td class="rhr-num">${money(x.deductions)}</td><td class="rhr-num">${money(x.net)}</td>
+						<td>${esc(x.status)}${x.held ? " · held" : ""}</td></tr>`).join("");
+					const legend = t.legend.map((l) => `<span class="rhr-chip" style="margin:2px">${esc(l.code)} = ${esc(l.name)}</span>`).join("");
+					root.find("#slipPrev").html(`<div class="rhr-row" style="justify-content:space-between;align-items:center">
+							<b>${esc(t.title)}</b>
+							<a class="rhr-btn" href="/api/method/reckon_hrms.api.slip_report.slip_pdf?name=${encodeURIComponent(state.run)}" target="_blank" rel="noopener">Download PDF (landscape)</a>
+						</div>
+						<div class="rhr-scroll" style="margin-top:8px"><table class="rhr-table"><thead><tr><th>#</th><th>ID</th><th>Name</th>${head}<th class="rhr-num">Gross</th><th class="rhr-num">Deductions</th><th class="rhr-num">Net pay</th><th>Status</th></tr></thead>
+						<tbody>${body}</tbody></table></div>
+						<div class="rhr-muted" style="margin-top:8px">${legend}</div>`);
 				})
-				.catch((e) => root.find("#err3").text((e && e.message) || "Could not load the draft slips."));
+				.catch((e) => root.find("#err3").text((e && e.message) || "Could not load the slips."));
 		});
 		root.find("#approve").on("click", () => {
 			root.find("#err4").text("");
