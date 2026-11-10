@@ -133,4 +133,4 @@ def slip_pdf(name: str):
     pdf = get_pdf(html, {"orientation": "Landscape", "page-size": "A4"})
     frappe.local.response.filename = f"{name}-{'paid' if data['status_word'] == 'PAID STATEMENT' else 'draft'}.pdf"
     frappe.local.response.filecontent = pdf
-    frappe.local.response.type = "download"
+    frappe.local.response.type = "pdf"
