@@ -193,8 +193,9 @@ def structure_amounts(structure: str, base) -> dict:
     deductions = compute(doc.deductions)
     basic = sum(amount for component, amount in earnings if component == "Basic Salary")
     gross = round(sum(amount for _component, amount in earnings), 2)
+    lines = [(c, "Earning", a) for c, a in earnings] + [(c, "Deduction", a) for c, a in deductions]
     return {"basic": round(basic, 2), "additions": round(gross - basic, 2), "gross": gross,
-            "deductions": round(sum(amount for _component, amount in deductions), 2)}
+            "deductions": round(sum(amount for _component, amount in deductions), 2), "lines": lines}
 
 
 BULK_BATCH = 200

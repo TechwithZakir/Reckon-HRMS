@@ -140,8 +140,17 @@ def list_people(name: str, filter: str = "all", search: str | None = None, start
     amounts = person_amounts(doc, [r["employee"] for r in page])
     for r in page:
         r.update(amounts.get(r["employee"], {}))
-    return {"rows": page, "total": total, "start": start_i,
-            "page_length": length_i}
+    from reckon_hrms.api.run_amounts import component_kinds
+
+    names: list[str] = []
+    for r in page:
+        for name in r.get("components", {}):
+            if name not in names:
+                names.append(name)
+    kinds = component_kinds(names)
+    columns = [{"name": n, "type": kinds.get(n, "Earning")} for n in names if kinds.get(n, "Earning") == "Earning"]
+    columns += [{"name": n, "type": "Deduction"} for n in names if kinds.get(n) == "Deduction"]
+    return {"rows": page, "total": total, "start": start_i, "page_length": length_i, "columns": columns}
 
 
 @frappe.whitelist(methods=["POST"])

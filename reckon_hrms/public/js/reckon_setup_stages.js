@@ -416,10 +416,8 @@ window.ReckonSetupStages.run = function (parent) {
 				<input type="search" id="q" placeholder="Search name or ID" aria-label="Search people">
 				<button class="rhr-btn" id="fetchAgain" type="button">Refresh list</button>
 			</div>
-			<table class="rhr-table"><thead><tr>
-				<th><input type="checkbox" id="all" aria-label="Include or leave out everyone shown"></th>
-				<th>ID</th><th>Name</th><th>Department</th><th>Job title</th><th class="rhr-num">Basic</th><th class="rhr-num">Total additions</th><th class="rhr-num">Total deductions</th><th class="rhr-num">Gross</th><th>Status</th></tr></thead>
-				<tbody id="rows"></tbody></table>
+			<div class="rhr-scroll"><table class="rhr-table" id="ptable"><thead id="phead"></thead>
+				<tbody id="rows"></tbody></table></div>
 			<div class="rhr-row"><span id="range" class="rhr-muted"></span>
 				<span><button class="rhr-btn" id="prev" type="button">Previous</button> <button class="rhr-btn" id="next" type="button">Next</button></span></div>
 			<div class="rhr-row"><span class="rhr-muted">Uncheck a person to leave them out of this run. Nothing is paid to anyone left out.</span></div>
@@ -566,16 +564,20 @@ window.ReckonSetupStages.run = function (parent) {
 		call("list_people", { name: state.run, filter: state.filter, search: state.search, start: state.start, page_length: PAGE })
 			.then((r) => {
 				const p = r.message;
-				root.find("#rows").html(p.rows.map((x) => `<tr>
-					<td><input type="checkbox" class="pick" data-e="${esc(x.employee)}" ${x.included ? "checked" : ""}></td>
-					<td>${esc(x.employee)}</td><td>${esc(x.employee_name)}</td><td>${esc(x.department || "")}</td>
-					<td>${esc(x.designation || "")}</td>
-						<td class="rhr-num">${money(x.basic)}</td>
+				const cols = p.columns || [];
+					root.find("#phead").html(`<tr><th><input type="checkbox" id="all" aria-label="Include or leave out everyone shown"></th><th>ID</th><th>Name</th><th>Department</th><th>Job title</th>${cols.map((c) => `<th class="rhr-num">${esc(c.name)}</th>`).join("")}<th class="rhr-num">Overtime (hrs)</th><th class="rhr-num">Total additions</th><th class="rhr-num">Total deductions</th><th class="rhr-num">Gross</th><th>Status</th></tr>`);
+					root.find("#all").on("change", function () { root.find("input.pick").prop("checked", this.checked).trigger("change"); });
+					root.find("#rows").html(p.rows.map((x) => `<tr>
+						<td><input type="checkbox" class="pick" data-e="${esc(x.employee)}" ${x.included ? "checked" : ""}></td>
+						<td>${esc(x.employee)}</td><td>${esc(x.employee_name)}</td><td>${esc(x.department || "")}</td>
+						<td>${esc(x.designation || "")}</td>
+						${cols.map((c) => `<td class="rhr-num">${money((x.components || {})[c.name] || 0)}</td>`).join("")}
+						<td class="rhr-num">${money(x.overtime_hours || 0)}</td>
 						<td class="rhr-num"><input class="amt" type="number" min="0" step="1" data-kind="additions" data-e="${esc(x.employee)}" data-cur="${x.additions || 0}" value="${x.additions || 0}" aria-label="Total additions for ${esc(x.employee_name)}"></td>
 						<td class="rhr-num"><input class="amt" type="number" min="0" step="1" data-kind="deductions" data-e="${esc(x.employee)}" data-cur="${x.deductions || 0}" value="${x.deductions || 0}" aria-label="Total deductions for ${esc(x.employee_name)}"></td>
 						<td class="rhr-num rhr-gross">${money(x.gross)}</td>
-					<td>${x.status === "no_structure" ? '<span class="rhr-chip warn">No salary structure</span>' : '<span class="rhr-chip good">Included</span>'}</td></tr>`).join("")
-					|| `<tr><td colspan="10" class="rhr-muted">Nobody matches.</td></tr>`);
+						<td>${x.status === "no_structure" ? '<span class="rhr-chip warn">No salary structure</span>' : '<span class="rhr-chip good">Included</span>'}</td></tr>`).join("")
+						|| `<tr><td colspan="${cols.length + 9}" class="rhr-muted">Nobody matches.</td></tr>`);
 				const last = Math.min(p.start + PAGE, p.total);
 				root.find("#range").text(p.total ? `Showing ${p.start + 1} to ${last} of ${p.total}` : "No results");
 				root.find("#prev").prop("disabled", p.start === 0);
@@ -823,6 +825,7 @@ body.map .rhr-map{display:inline-block}
 .rhr-row label:has(input[type=checkbox]){display:flex;align-items:center;font-size:13px}
 .rhr-sub h3{font-size:14px;margin:0 0 8px}
 .rhr-num{text-align:right;white-space:nowrap}
+.rhr-scroll{overflow-x:auto;max-width:100%}
 .rhr-table input.amt{width:96px;height:30px;border:1px solid var(--border-color);border-radius:6px;background:var(--card-bg);color:var(--text-color);padding:0 6px;text-align:right}
 .rhr-gross{font-weight:600}
 .rhr-table th,.rhr-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border-color)}
