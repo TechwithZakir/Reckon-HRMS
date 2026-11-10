@@ -3,10 +3,10 @@
 frappe.pages["reckon-hrms-setup"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({ parent: wrapper, title: "Setup", single_column: true });
 	const STAGES = [["company", "Your company"], ["salary", "Salary rules"], ["run", "Run salary"]];
-	const shell = $(`<div class="rhs-shell" style="display:grid;grid-template-columns:190px minmax(0,1fr);gap:18px;align-items:start"></div>`).appendTo(page.main);
-	const nav = $(`<nav class="rhs-stages" aria-label="Setup stages" style="display:grid;gap:4px;position:sticky;top:70px"></nav>`).appendTo(shell);
+	const shell = $(`<div class="rhs-shell" style="display:block"></div>`).appendTo(page.main);
+	const nav = $(`<nav class="rhs-stages" role="tablist" aria-label="Setup stages" style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border-color);margin:10px 0 14px"></nav>`).appendTo(shell);
 	const body = $(`<div class="rhs-body" style="min-width:0"></div>`).appendTo(shell);
-	const style = `<style>.rhs-stages button{text-align:left;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);border-radius:8px;padding:8px 12px;cursor:pointer}.rhs-stages button[aria-current="step"]{background:var(--primary);color:#fff;border-color:var(--primary)}@media (max-width:760px){.rhs-shell{grid-template-columns:minmax(0,1fr)!important}.rhs-stages{position:static!important;grid-auto-flow:column;overflow-x:auto}}</style>`;
+	const style = `<style>.rhs-stages button{border:0;border-bottom:2px solid transparent;background:none;color:var(--text-muted);padding:10px 16px;cursor:pointer;font-weight:500;font-size:14px}.rhs-stages button:hover{color:var(--text-color)}.rhs-stages button[aria-current="step"]{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}.rhs-stages button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}</style>`;
 	nav.append(style);
 
 	function go(key) {
@@ -19,7 +19,7 @@ frappe.pages["reckon-hrms-setup"].on_page_load = function (wrapper) {
 	}
 
 	STAGES.forEach(([key, label]) => {
-		$(`<button type="button" data-stage="${key}">${label}</button>`).on("click", () => go(key)).appendTo(nav);
+		$(`<button type="button" role="tab" data-stage="${key}">${label}</button>`).on("click", () => go(key)).appendTo(nav);
 	});
 
 	const fromRoute = frappe.route_options && frappe.route_options.stage;
