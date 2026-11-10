@@ -53,23 +53,93 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 
 	window.ReckonHrStages.employees = function (parent) {
 		const esc = (t) => frappe.utils.escape_html(t == null ? "" : String(t));
-		const root = $(`<div class="rhh-card"><h2>Employee details</h2>
-			<div class="rhh-row"><span class="rhh-muted">Everyone in the company, with branch, department, job title and joining date.</span>
-			<span class="rhh-acts"><button type="button" class="rhh-ico" data-add title="Add employee" aria-label="Add employee">${icon("add")}</button></span></div>
-			<div class="rhh-scroll" style="overflow-x:auto"><table class="rhr-table" style="width:100%;font-size:13px"><thead><tr>
-			<th>ID</th><th>Name</th><th>Branch</th><th>Department</th><th>Job title</th><th>Joined</th><th>Status</th></tr></thead>
-			<tbody data-rows><tr><td colspan="7" class="rhh-muted">Loading...</td></tr></tbody></table></div></div>`).appendTo(parent);
-		const load = () => frappe.call({ method: "frappe.client.get_list", args: {
-			doctype: "Employee", fields: ["name", "employee_name", "branch", "department", "designation", "date_of_joining", "status"],
-			order_by: "employee_name asc", limit_page_length: 500 } }).then((r) => {
-			const rows = r.message || [];
-			root.find("[data-rows]").html(rows.length ? rows.map((x) => `<tr>
-				<td><a href="/app/employee/${encodeURIComponent(x.name)}">${esc(x.name)}</a></td>
-				<td>${esc(x.employee_name)}</td><td>${esc(x.branch || "")}</td><td>${esc(x.department || "")}</td>
-				<td>${esc(x.designation || "")}</td><td>${esc(x.date_of_joining || "")}</td><td>${esc(x.status)}</td></tr>`).join("")
-				: `<tr><td colspan="7" class="rhh-muted">No employees yet. Use the add icon to add one.</td></tr>`);
+		const COLS = [
+			{ key: "name", label: "ID" }, { key: "employee_name", label: "Name" }, { key: "branch", label: "Branch" },
+			{ key: "department", label: "Department" }, { key: "designation", label: "Job title" },
+			{ key: "date_of_joining", label: "Joined" }, { key: "status", label: "Status" }, { key: "missing", label: "Missing details" },
+		];
+		const state = { rows: [], sort: { key: "employee_name", dir: 1 }, f: { q: "", branch: "", department: "", designation: "", status: "", missingOnly: false } };
+		const root = $(`<div class="hrs-emp">
+			<div class="rhh-card">
+				<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+					<div><h2 style="margin:0">Employee details</h2>
+					<div class="rhh-muted">Everyone in the company. Filter by branch, department, job title or status.</div></div>
+					<button type="button" class="btn btn-primary btn-sm" data-add>${frappe.utils.icon ? frappe.utils.icon("add", "sm") : "+"} Add employee</button>
+				</div>
+				<div class="hrs-filters" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:14px">
+					<input type="text" class="form-control" data-f="q" placeholder="Search name or ID" aria-label="Search">
+					<select class="form-control" data-f="branch" aria-label="Branch"><option value="">All branches</option></select>
+					<select class="form-control" data-f="department" aria-label="Department"><option value="">All departments</option></select>
+					<select class="form-control" data-f="designation" aria-label="Job title"><option value="">All job titles</option></select>
+					<select class="form-control" data-f="status" aria-label="Status"><option value="">All statuses</option><option>Active</option><option>Inactive</option><option>Suspended</option><option>Left</option></select>
+					<div class="checkbox" style="margin:0;align-self:center"><label><input type="checkbox" data-f="missingOnly"> <span class="label-area">Missing details only</span></label></div>
+				</div>
+				<div class="rhh-muted" data-count style="margin-top:10px">Loading...</div>
+			</div>
+			<div class="rhh-card" style="padding:0;overflow:hidden">
+				<div style="overflow-x:auto"><table class="table table-bordered" style="margin:0;font-size:13px">
+					<thead data-head></thead><tbody data-rows></tbody></table></div>
+			</div></div>`).appendTo(parent);
+
+		const opts = (values) => values.map((v) => `<option>${esc(v)}</option>`).join("");
+		const fill = (field, values) => root.find(`select[data-f="${field}"]`).append(opts(values));
+
+		const missing = (r) => [!r.branch && "branch", !r.department && "department", !r.designation && "job title"].filter(Boolean);
+
+		function view() {
+			const f = state.f;
+			let list = state.rows.filter((r) => {
+				if (f.q && !`${r.name} ${r.employee_name}`.toLowerCase().includes(f.q.toLowerCase())) return false;
+				if (f.branch && r.branch !== f.branch) return false;
+				if (f.department && r.department !== f.department) return false;
+				if (f.designation && r.designation !== f.designation) return false;
+				if (f.status && r.status !== f.status) return false;
+				if (f.missingOnly && !missing(r).length) return false;
+				return true;
+			});
+			const { key, dir } = state.sort;
+			list = list.slice().sort((a, b) => String(a[key] ?? "").localeCompare(String(b[key] ?? "")) * dir);
+			root.find("[data-count]").text(`Showing ${list.length} of ${state.rows.length} employees`);
+			root.find("[data-head]").html(`<tr>${COLS.map((c) => {
+				const arrow = state.sort.key === c.key ? (dir > 0 ? " ▲" : " ▼") : "";
+				return `<th style="cursor:pointer;white-space:nowrap" data-sort="${c.key}">${esc(c.label)}${arrow}</th>`;
+			}).join("")}</tr>`);
+			root.find("[data-rows]").html(list.length ? list.map((r) => {
+				const miss = missing(r);
+				return `<tr>
+					<td><a href="/app/employee/${encodeURIComponent(r.name)}">${esc(r.name)}</a></td>
+					<td>${esc(r.employee_name)}</td><td>${esc(r.branch || "—")}</td><td>${esc(r.department || "—")}</td>
+					<td>${esc(r.designation || "—")}</td><td>${esc(r.date_of_joining || "")}</td>
+					<td>${r.status === "Active" ? '<span class="indicator-pill green">Active</span>' : `<span class="indicator-pill gray">${esc(r.status)}</span>`}</td>
+					<td>${miss.length ? `<span class="indicator-pill orange">${esc(miss.join(", "))}</span>` : ""}</td></tr>`;
+			}).join("") : `<tr><td colspan="${COLS.length}" class="text-muted" style="padding:16px">No employees match these filters.</td></tr>`);
+		}
+
+		root.on("input change", "[data-f]", function () {
+			const k = this.dataset.f;
+			state.f[k] = this.type === "checkbox" ? this.checked : this.value.trim();
+			view();
+		});
+		root.on("click", "[data-sort]", function () {
+			const k = this.dataset.sort;
+			state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : 1 };
+			view();
 		});
 		root.find("[data-add]").on("click", () => frappe.ui.form.make_quick_entry("Employee", () => load(), null, {}));
+
+		function load() {
+			frappe.call({ method: "frappe.client.get_list", args: {
+				doctype: "Employee", fields: ["name", "employee_name", "branch", "department", "designation", "date_of_joining", "status"],
+				order_by: "employee_name asc", limit_page_length: 1000 } }).then((r) => {
+				state.rows = r.message || [];
+				const uniq = (k) => [...new Set(state.rows.map((x) => x[k]).filter(Boolean))].sort();
+				root.find('select[data-f="branch"] option:not(:first-child)').remove();
+				root.find('select[data-f="department"] option:not(:first-child)').remove();
+				root.find('select[data-f="designation"] option:not(:first-child)').remove();
+				fill("branch", uniq("branch")); fill("department", uniq("department")); fill("designation", uniq("designation"));
+				view();
+			});
+		}
 		load();
 	};
 
