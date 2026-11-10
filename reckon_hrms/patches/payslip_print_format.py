@@ -1,4 +1,4 @@
-"""Add the Reckon Payslip print format for a Salary Slip: summary, net pay, earnings and deductions with YTD. Idempotent."""
+"""Add the Reckon Payslip print format for a Salary Slip: one employee per page, Draft or Paid marked. Idempotent."""
 
 import frappe
 
@@ -51,7 +51,7 @@ HTML = """
       <th style="text-align:right; border-bottom:1px solid #999; padding:6px;">YTD</th>
     </tr>
     {% set earn = doc.earnings %}{% set dedu = doc.deductions %}
-    {% for i in range(earn|length if earn|length > dedu|length else dedu|length) %}
+    {% for i in range(max(earn|length, dedu|length)) %}
     <tr>
       <td style="padding:6px; border-bottom:1px dotted #ccc;">{{ earn[i].salary_component if i < earn|length else "" }}</td>
       <td style="text-align:right; padding:6px; border-bottom:1px dotted #ccc;">{{ "{:,.2f}".format(earn[i].amount) if i < earn|length else "" }}</td>
@@ -75,7 +75,7 @@ HTML = """
       <td style="text-align:right; font-size:16px; font-weight:bold;">{{ frappe.utils.fmt_money(doc.net_pay, currency=doc.currency) }}</td>
     </tr></table>
   </div>
-  <div style="text-align:right; margin-top:10px;"><span style="color:#666;">Amount in words:</span> {{ money_in_words(doc.net_pay, doc.currency) }}</div>
+  <div style="text-align:right; margin-top:10px;"><span style="color:#666;">Amount in words:</span> {{ frappe.utils.money_in_words(doc.net_pay, doc.currency) }}</div>
   <div style="text-align:center; color:#777; margin-top:22px; font-size:10px;">This payslip is generated automatically; a signature is not required.</div>
 </div>
 """
@@ -87,5 +87,5 @@ def execute():
     frappe.get_doc({
         "doctype": "Print Format", "name": NAME, "doc_type": "Salary Slip", "module": "Reckon HRMS",
         "print_format_type": "Jinja", "custom_format": 1, "standard": "No", "html": HTML,
-        "disabled": 0,
+        "orientation": "Portrait", "disabled": 0,
     }).insert(ignore_permissions=True)
