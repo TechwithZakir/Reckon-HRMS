@@ -17,6 +17,8 @@ from frappe import _
 from frappe.utils import flt
 
 REQUEST_ROLES = ["HR Manager", "Payroll Manager", "System Manager"]
+# Older requests that add to pay rather than replace it.
+ADDITIVE = {"Run Adjustment Earning", "Run Adjustment Deduction"}
 APPROVE_ROLES = ["Payroll Manager", "System Manager"]
 
 
@@ -51,10 +53,11 @@ def request_change(name: str, employee: str, component: str, amount: float, reas
             "payroll_date": doc.end_date}, pluck="name"):
         frappe.delete_doc("Additional Salary", old, ignore_permissions=True)
 
+    # HRMS only allows overwriting a component that is in the employee's salary structure.
     request = frappe.get_doc({
         "doctype": "Additional Salary", "employee": employee, "company": doc.company,
         "salary_component": component, "amount": amount, "payroll_date": doc.end_date,
-        "overwrite_salary_structure_amount": 1,
+        "overwrite_salary_structure_amount": 1 if _in_structure(employee, component, doc.end_date) else 0,
     }).insert(ignore_permissions=True)
     # Additional Salary has no notes field, so the reason is kept as a comment on the request.
     request.add_comment("Comment", f"Run {name}: {reason}. Requested by {frappe.session.user}.")
@@ -92,7 +95,7 @@ def approve_request(request: str) -> dict:
         frappe.throw(_("Someone else must approve this request. You made it."))
     if frappe.db.exists("Salary Slip", {"payroll_entry": _run_for(doc), "docstatus": ["!=", 2]}):
         frappe.throw(_("Salary slips already exist for this run."))
-    if doc.overwrite_salary_structure_amount:
+    if doc.salary_component not in ADDITIVE:
         for earlier in frappe.get_all("Additional Salary", filters={
                 "employee": doc.employee, "salary_component": doc.salary_component, "docstatus": 1,
                 "payroll_date": doc.payroll_date}, pluck="name"):
@@ -138,3 +141,13 @@ def _run_for(additional) -> str | None:
         if row and row.docstatus == 0 and str(row.end_date) >= str(additional.payroll_date):
             return run
     return None
+
+
+def _in_structure(employee: str, component: str, on_date) -> bool:
+    """Whether the component is a row of the employee's current salary structure."""
+    structure = frappe.db.get_value("Salary Structure Assignment", {
+        "employee": employee, "docstatus": 1, "from_date": ["<=", on_date]}, "salary_structure",
+        order_by="from_date desc")
+    if not structure:
+        return False
+    return bool(frappe.db.exists("Salary Detail", {"parent": structure, "salary_component": component}))
