@@ -1,8 +1,9 @@
-// HR Studio (one page): Your company, Time and attendance, Leave and holidays, each a step you can open at any time.
+// HR Studio (one page): the employee lifecycle as steps, from hiring to exit. Each step opens at any time.
 // Served at /desk/reckon-hrms/reckon-hrms-hr-studio. "Your company" is the shared company stage.
 frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({ parent: wrapper, title: "HR Studio", single_column: true });
-	const STAGES = [["company", "Your company"], ["attendance", "Time and attendance"], ["leave", "Leave and holidays"]];
+	const STAGES = [["hiring", "Hiring"], ["company", "Company and employee setup"], ["onboarding", "Onboarding"],
+		["attendance", "Time and attendance"], ["leave", "Leave and holidays"], ["exit", "Exit"]];
 	const shell = $(`<div class="rhs-shell" style="display:block"></div>`).appendTo(page.main);
 	const nav = $(`<nav class="rhs-stages" role="tablist" aria-label="HR Studio steps" style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border-color);margin:10px 0 14px"></nav>`).appendTo(shell);
 	const body = $(`<div class="rhs-body" style="min-width:0"></div>`).appendTo(shell);
@@ -10,7 +11,7 @@ frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
 	nav.append(style);
 
 	function go(key) {
-		const stage = STAGES.find((s) => s[0] === key) ? key : "company";
+		const stage = STAGES.find((s) => s[0] === key) ? key : "hiring";
 		nav.find("button").attr("aria-current", null);
 		nav.find(`[data-stage="${stage}"]`).attr("aria-current", "step");
 		body.empty();
@@ -26,7 +27,7 @@ frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
 	const fromRoute = frappe.route_options && frappe.route_options.stage;
 	const fromHash = (location.hash || "").replace("#", "");
 	frappe.route_options = null;
-	go(fromRoute || fromHash || "company");
+	go(fromRoute || fromHash || "hiring");
 };
 
 // Steps that open the standard lists: an icon to open the list and an icon to add a record.
@@ -48,6 +49,31 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 			});
 		});
 	}
+
+	window.ReckonHrStages.hiring = function (parent) {
+		lists(parent, [
+			{ title: "Recruitment", note: "From a vacancy to an accepted offer.", lists: [
+				{ title: "Job openings", doctype: "Job Opening" }, { title: "Job applicants", doctype: "Job Applicant" },
+				{ title: "Job offers", doctype: "Job Offer" }] },
+		]);
+	};
+
+	window.ReckonHrStages.onboarding = function (parent) {
+		lists(parent, [
+			{ title: "New joiners", note: "Checklists for a new employee's first days.", lists: [
+				{ title: "Employee onboarding", doctype: "Employee Onboarding" },
+				{ title: "Onboarding templates", doctype: "Employee Onboarding Template" }] },
+		]);
+	};
+
+	window.ReckonHrStages.exit = function (parent) {
+		lists(parent, [
+			{ title: "Leaving employees", note: "Separation, exit interview and final settlement.", lists: [
+				{ title: "Employee separation", doctype: "Employee Separation" },
+				{ title: "Separation templates", doctype: "Employee Separation Template" },
+				{ title: "Exit interviews", doctype: "Exit Interview" }] },
+		]);
+	};
 
 	window.ReckonHrStages.attendance = function (parent) {
 		lists(parent, [
