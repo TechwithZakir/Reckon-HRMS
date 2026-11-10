@@ -251,13 +251,13 @@ window.ReckonSetupStages.salary = function (parent) {
 		<div class="rhs-card" id="summary"><h2>Who has a salary structure</h2><div class="rhs-muted">Loading…</div></div>
 		<div class="rhs-card"><h2>Tax years <span class="rhs-map">Income Tax Slab</span></h2>
 			<table class="rhs-table"><tbody id="slabs"></tbody></table>
-			<div class="rhs-row"><a class="rhs-btn" href="/app/income-tax-slab/new">+ Add new</a><a class="rhs-btn" href="/app/income-tax-slab">List</a></div></div>
+			<div class="rhs-row"><a class="rhc-ico" href="/app/income-tax-slab/new" title="Add new" aria-label="Add new tax year">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("add", "sm") : "+")}</a><a class="rhc-ico" href="/app/income-tax-slab" title="Open the list" aria-label="Open the tax years list">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("list", "sm") : "≡")}</a></div></div>
 		<div class="rhs-card"><h2>What you pay and deduct <span class="rhs-map">Salary Component</span></h2>
 			<table class="rhs-table"><thead><tr><th>Item</th><th>Kind</th><th>Cut for unpaid leave</th><th>Taxable</th></tr></thead><tbody id="comps"></tbody></table>
-			<div class="rhs-row"><a class="rhs-btn" href="/app/salary-component/new">+ Add new</a><a class="rhs-btn" href="/app/salary-component">List</a></div></div>
+			<div class="rhs-row"><a class="rhc-ico" href="/app/salary-component/new" title="Add new" aria-label="Add new pay item">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("add", "sm") : "+")}</a><a class="rhc-ico" href="/app/salary-component" title="Open the list" aria-label="Open the pay items list">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("list", "sm") : "≡")}</a></div></div>
 		<div class="rhs-card"><h2>Salary structures <span class="rhs-map">Salary Structure</span></h2>
 			<table class="rhs-table"><thead><tr><th>Name</th><th>Pay</th><th>Active</th><th>People</th></tr></thead><tbody id="structs"></tbody></table>
-			<div class="rhs-row"><a class="rhs-btn" href="/app/salary-structure/new">+ Add new</a><a class="rhs-btn" href="/app/salary-structure">List</a></div></div>
+			<div class="rhs-row"><a class="rhc-ico" href="/app/salary-structure/new" title="Add new" aria-label="Add new salary structure">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("add", "sm") : "+")}</a><a class="rhc-ico" href="/app/salary-structure" title="Open the list" aria-label="Open the salary structures list">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("list", "sm") : "≡")}</a></div></div>
 		<div class="rhs-card"><h2>Give a salary structure to everyone without one <span class="rhs-map">Salary Structure Assignment</span></h2>
 			<div class="rhs-muted">Each person without a structure gets the one you pick, from the date you choose. People who already have it are skipped.</div>
 			<div class="rhs-row"><label>Salary structure <select id="bkStruct"></select></label>
@@ -371,7 +371,7 @@ body.map .rhs-map{display:inline-block}
 .rhs-warn{color:var(--orange-500)}
 .rhs-alert{margin-top:10px;background:var(--control-bg);border-radius:8px;padding:10px;font-size:13px}
 .rhs-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.rhs-btn{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);border-radius:8px;padding:6px 12px;text-decoration:none}
+.rhs-btn{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);border-radius:8px;padding:6px 12px;text-decoration:none}.rhc-ico{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid var(--border-color);border-radius:8px;background:var(--card-bg);color:var(--text-color);cursor:pointer;text-decoration:none;padding:0}.rhc-ico:hover{border-color:var(--primary);color:var(--primary)}
 .rhs-pri{background:var(--primary);color:#fff;border-color:var(--primary)}
 .rhs-err{color:var(--red-500);font-size:13px;margin-top:6px}
 `;
