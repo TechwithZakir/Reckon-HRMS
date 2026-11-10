@@ -33,13 +33,22 @@ window.ReckonSetupStages.company = function (parent) {
 	}
 	const loadState = () => frappe.call({ method: "reckon_hrms.api.setup.get_state", type: "GET" }).then((r) => renderState(r.message));
 
-	function chipSection(list) {
+	function stageIcon(name) {
+			return frappe.utils && frappe.utils.icon ? frappe.utils.icon(name, "sm") : esc(name === "add" ? "+" : name);
+		}
+
+		function chipSection(list) {
 		const box = $(`<section class="rhc-card">
 			<h2>${esc(list.title)}<span class="rhc-map">${esc(list.map)}</span></h2>
 			<div class="rhc-chips"></div>
 			<div class="rhc-row"><input type="text" maxlength="140" placeholder="Type a name and press Enter" aria-label="Add ${esc(list.title)}">
-			<a class="rhc-btn" href="${slug(list.doctype)}">List</a></div>
+			<span class="rhc-acts"><a class="rhc-ico" href="${slug(list.doctype)}" title="Open the ${esc(list.title)} list" aria-label="Open the ${esc(list.title)} list">${stageIcon("list")}</a><button type="button" class="rhc-ico" data-new title="Add new" aria-label="Add new ${esc(list.title)}">${stageIcon("add")}</button></span></div>
 			<div class="rhc-row" data-suggest></div><div class="rhc-err" data-err></div></section>`);
+		box.find("[data-new]").on("click", () => {
+			// Full form in a quick-entry dialog, so the list reloads when a record is saved.
+			const prefill = list.doctype === "Department" && company ? { company } : {};
+			frappe.ui.form.make_quick_entry(list.doctype, () => { loadChips(list, box); loadState(); }, null, prefill);
+		});
 		const input = box.find("input");
 		input.on("keydown", (e) => {
 			if (e.key === "Enter" && input.val().trim()) {
@@ -217,6 +226,9 @@ body.map .rhc-map{display:inline-block}
 .rhc-suggest{border:1px dashed var(--text-muted);background:none;color:var(--text-muted);border-radius:99px;padding:4px 10px;cursor:pointer;font-size:13px;margin:0 6px 6px 0}
 .rhc-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 .rhc-row input{flex:1 1 180px;min-width:0;height:34px;border:1px solid var(--border-color);border-radius:8px;background:var(--card-bg);color:var(--text-color);padding:0 10px}
+.rhc-acts{display:inline-flex;gap:6px;flex:none}
+.rhc-ico{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid var(--border-color);border-radius:8px;background:var(--card-bg);color:var(--text-color);cursor:pointer;text-decoration:none;padding:0}
+.rhc-ico:hover{border-color:var(--primary);color:var(--primary)}
 .rhc-btn{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);border-radius:8px;padding:6px 12px;cursor:pointer;text-decoration:none}
 .rhc-pri{background:var(--primary);color:#fff;border-color:var(--primary)}
 .rhc-table{width:100%;border-collapse:collapse;font-size:13px}
