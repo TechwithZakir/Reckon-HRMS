@@ -50,7 +50,7 @@ const TABS = {
 	kpi: "KPI overview",
 	hr: "HR",
 	payroll: "Payroll",
-	analytics: "Analytics",
+	analytics: "HR analytics",
 };
 
 function esc(text) {
