@@ -821,7 +821,7 @@ body.map .rhr-map{display:inline-block}
 .rhr-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
 .rhr-row input[type=checkbox]{height:auto;width:auto;margin:0 6px 0 0;padding:0;flex:none}
 .rhr-row label.rhr-check{display:flex;align-items:center;gap:10px;border:1px solid var(--primary);border-radius:8px;padding:10px 14px;background:var(--card-bg);font-size:14px;font-weight:500;cursor:pointer}
-.rhr-row label.rhr-check input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary);margin:0}
+.rhr-row label.rhr-check input[type=checkbox]{width:18px!important;height:18px!important;min-width:18px;accent-color:var(--primary);margin:0!important}
 .rhr-row label:has(input[type=checkbox]){display:flex;align-items:center;font-size:13px}
 .rhr-sub h3{font-size:14px;margin:0 0 8px}
 .rhr-num{text-align:right;white-space:nowrap}
