@@ -772,7 +772,7 @@ window.ReckonSetupStages.run = function (parent) {
 						${cols.map((c) => `<td class="rhr-num">${money(x.components[c.code] || 0)}</td>`).join("")}
 						<td class="rhr-num">${money(x.gross)}</td><td class="rhr-num">${money(x.deductions)}</td><td class="rhr-num">${money(x.net)}</td>
 						<td>${esc(x.status)}${x.held ? " · held" : ""}</td>
-						<td><a class="rhr-btn" target="_blank" rel="noopener" href="/api/method/frappe.utils.print_format.download_pdf?doctype=Salary%20Slip&name=${encodeURIComponent(x.slip)}&format=Reckon%20Payslip&no_letterhead=1">Payslip PDF</a></td></tr>`).join("");
+						<td><a class="rhr-btn" title="Payslip PDF" aria-label="Payslip PDF for ${esc(x.employee_name)}" style="display:inline-flex;padding:4px 8px" target="_blank" rel="noopener" href="/api/method/frappe.utils.print_format.download_pdf?doctype=Salary%20Slip&name=${encodeURIComponent(x.slip)}&format=Reckon%20Payslip&no_letterhead=1">${frappe.utils && frappe.utils.icon ? frappe.utils.icon("file-text", "sm") : "PDF"}</a></td></tr>`).join("");
 					const legend = t.legend.map((l) => `<span class="rhr-chip" style="margin:2px">${esc(l.code)} = ${esc(l.name)}</span>`).join("");
 					root.find("#slipPrev").html(`<div class="rhr-row" style="justify-content:space-between;align-items:center">
 							<b>${esc(t.title)}</b>
