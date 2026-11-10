@@ -163,6 +163,40 @@ def preview_payslip(structure: str, base) -> dict:
     }
 
 
+def structure_amounts(structure: str, base) -> dict:
+    """Basic, additions, gross and deductions for a base salary, for the run list.
+
+    Same formula engine as the payslip preview. Income tax is not included: it is worked out on the slip.
+    """
+    from hrms.payroll.utils import COMPONENT_EVAL_GLOBALS, _safe_eval
+
+    base_amount = flt(base)
+    doc = frappe.get_cached_doc("Salary Structure", structure)
+    data = {"base": base_amount}
+    globals_ = dict(COMPONENT_EVAL_GLOBALS)
+
+    def compute(rows):
+        out = []
+        for row in rows:
+            if row.condition and not _safe_eval(row.condition, globals_, dict(data)):
+                continue
+            if row.amount_based_on_formula and row.formula:
+                amount = flt(_safe_eval(row.formula, globals_, dict(data)), 2)
+            else:
+                amount = flt(row.amount, 2)
+            if row.abbr:
+                data[row.abbr] = amount
+            out.append((row.salary_component, amount))
+        return out
+
+    earnings = compute(doc.earnings)
+    deductions = compute(doc.deductions)
+    basic = sum(amount for component, amount in earnings if component == "Basic Salary")
+    gross = round(sum(amount for _component, amount in earnings), 2)
+    return {"basic": round(basic, 2), "additions": round(gross - basic, 2), "gross": gross,
+            "deductions": round(sum(amount for _component, amount in deductions), 2)}
+
+
 BULK_BATCH = 200
 
 

@@ -391,7 +391,7 @@ window.ReckonSetupStages.run = function (parent) {
 				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="findBtn" type="button">Find employees</button></div>
 			<div class="rhr-err" id="err1"></div>
 		</div>
-		<div class="rhr-card" id="step2" style="display:none">
+		<div class="rhr-card" id="step2" style="display:none"><div>
 			<h2>2 · Check the list <span class="rhr-map">Get Employees</span></h2>
 			<div class="rhr-sum" id="sum"></div>
 			<div class="rhr-alert" id="warn" style="display:none"></div>
@@ -406,15 +406,16 @@ window.ReckonSetupStages.run = function (parent) {
 			</div>
 			<table class="rhr-table"><thead><tr>
 				<th><input type="checkbox" id="all" aria-label="Include or leave out everyone shown"></th>
-				<th>ID</th><th>Name</th><th>Department</th><th>Job title</th><th>Status</th></tr></thead>
+				<th>ID</th><th>Name</th><th>Department</th><th>Job title</th><th class="rhr-num">Basic</th><th class="rhr-num">Total additions</th><th class="rhr-num">Total deductions</th><th class="rhr-num">Gross</th><th>Status</th></tr></thead>
 				<tbody id="rows"></tbody></table>
 			<div class="rhr-row"><span id="range" class="rhr-muted"></span>
 				<span><button class="rhr-btn" id="prev" type="button">Previous</button> <button class="rhr-btn" id="next" type="button">Next</button></span></div>
 			<div class="rhr-row"><span class="rhr-muted">Uncheck a person to leave them out of this run. Nothing is paid to anyone left out.</span></div>
-			<div class="rhr-err" id="err2"></div>
+			<div class="rhr-sub" id="reqs" style="display:none;margin-top:14px;border-top:1px solid var(--border-color);padding-top:12px"><h3>Changes waiting for approval</h3><div id="reqList" class="rhr-muted">None.</div></div>
+				<div class="rhr-err" id="err2"></div>
 			</div>
-			<div class="rhr-card" id="deds" style="display:none">
-				<h2>Late and early deductions <span class="rhr-map">Additional Salary</span></h2>
+			<div class="rhr-sub" id="deds" style="display:none;margin-top:16px;border-top:1px solid var(--border-color);padding-top:12px">
+				<h3>Late and early deductions <span class="rhr-map">Additional Salary</span></h3>
 				<div class="rhr-muted">Late entries and early exits this month, under the company's rule. Nothing is deducted until you apply.</div>
 				<div class="rhr-muted" id="dedPolicy" style="margin-top:6px"></div>
 				<table class="rhr-table"><thead><tr><th><input type="checkbox" id="dedAll" aria-label="Select everyone shown"></th><th>ID</th><th>Name</th><th>Marks</th><th>Days</th><th>Base</th><th>Deduction</th><th>Status</th></tr></thead>
@@ -422,6 +423,7 @@ window.ReckonSetupStages.run = function (parent) {
 				<div class="rhr-row"><button class="rhr-btn rhr-pri" id="dedApply" type="button">Apply selected deductions</button></div>
 				<div class="rhr-muted" id="dedMsg"></div>
 				<div class="rhr-err" id="err2b"></div>
+			</div>
 			</div>
 			<div class="rhr-card" id="step3" style="display:none">
 				<h2>3 · Make draft slips <span class="rhr-map">Salary Slip (draft)</span></h2>
@@ -498,7 +500,56 @@ window.ReckonSetupStages.run = function (parent) {
 		loadPeople();
 	}
 
-	function loadPeople() {
+	function bindTotals() {
+			root.find("input.amt").on("change", function () {
+				const cur = Number(this.dataset.cur) || 0;
+				const next = Number(this.value) || 0;
+				const emp = this.dataset.e;
+				const kind = this.dataset.kind;
+				const input = this;
+				root.find("#err2").text("");
+				if (next < cur) {
+					input.value = cur;
+					return root.find("#err2").text("A lower amount needs a change to the salary structure, on Salary rules.");
+				}
+				if (next === cur) return;
+				frappe.prompt([{ fieldname: "reason", label: "Reason for the change", fieldtype: "Small Text", reqd: 1 }],
+					(v) => {
+						frappe.call({ method: "reckon_hrms.api.adjustments.request_increase",
+							args: { name: state.run, employee: emp, kind, amount: next - cur, reason: v.reason } })
+							.then(() => { input.value = cur; root.find("#dedMsg").text("Sent for approval. The total changes once a Payroll Manager approves it."); loadRequests(); })
+							.catch((e) => { input.value = cur; root.find("#err2").text((e && e.message) || "Could not send the request."); });
+					}, "Request an increase", "Send for approval");
+			});
+		}
+
+		function loadRequests() {
+			if (!state.run) return;
+			frappe.call({ method: "reckon_hrms.api.adjustments.pending_requests", args: { name: state.run }, type: "GET" }).then((r) => {
+				const rows = r.message || [];
+				root.find("#reqs").toggle(rows.length > 0);
+				const approver = (frappe.user_roles || []).some((x) => x === "Payroll Manager" || x === "System Manager");
+				root.find("#reqList").html(rows.map((x) => `<div class="rhr-row" style="align-items:center">
+					<span><b>${esc(x.employee_name)}</b> · ${x.kind === "additions" ? "additions" : "deductions"} +${money(x.amount)} · <span class="rhr-muted">${esc(x.notes)}</span></span>
+					${approver && x.can_decide ? `<button class="rhr-btn rhr-pri" data-approve="${esc(x.name)}" type="button">Approve</button><button class="rhr-btn" data-reject="${esc(x.name)}" type="button">Reject</button>` : `<span class="rhr-muted">Waiting for a Payroll Manager</span>`}
+					</div>`).join(""));
+				root.find("#reqList [data-approve]").on("click", function () {
+					frappe.call({ method: "reckon_hrms.api.adjustments.approve_request", args: { request: $(this).data("approve") } })
+						.then(() => { loadRequests(); loadPeople(); })
+						.catch((e) => root.find("#err2").text((e && e.message) || "Could not approve."));
+				});
+				root.find("#reqList [data-reject]").on("click", function () {
+					frappe.prompt([{ fieldname: "reason", label: "Reason", fieldtype: "Small Text" }], (v) => {
+						frappe.call({ method: "reckon_hrms.api.adjustments.reject_request", args: { request: $(this).data("reject"), reason: v.reason } })
+							.then(() => loadRequests())
+							.catch((e) => root.find("#err2").text((e && e.message) || "Could not reject."));
+					}, "Reject request", "Reject");
+				});
+			});
+		}
+
+		function loadPeople() {
+			loadRequests();
 		call("list_people", { name: state.run, filter: state.filter, search: state.search, start: state.start, page_length: PAGE })
 			.then((r) => {
 				const p = r.message;
@@ -506,13 +557,18 @@ window.ReckonSetupStages.run = function (parent) {
 					<td><input type="checkbox" class="pick" data-e="${esc(x.employee)}" ${x.included ? "checked" : ""}></td>
 					<td>${esc(x.employee)}</td><td>${esc(x.employee_name)}</td><td>${esc(x.department || "")}</td>
 					<td>${esc(x.designation || "")}</td>
+						<td class="rhr-num">${money(x.basic)}</td>
+						<td class="rhr-num"><input class="amt" type="number" min="0" step="1" data-kind="additions" data-e="${esc(x.employee)}" data-cur="${x.additions || 0}" value="${x.additions || 0}" aria-label="Total additions for ${esc(x.employee_name)}"></td>
+						<td class="rhr-num"><input class="amt" type="number" min="0" step="1" data-kind="deductions" data-e="${esc(x.employee)}" data-cur="${x.deductions || 0}" value="${x.deductions || 0}" aria-label="Total deductions for ${esc(x.employee_name)}"></td>
+						<td class="rhr-num rhr-gross">${money(x.gross)}</td>
 					<td>${x.status === "no_structure" ? '<span class="rhr-chip warn">No salary structure</span>' : '<span class="rhr-chip good">Included</span>'}</td></tr>`).join("")
-					|| `<tr><td colspan="6" class="rhr-muted">Nobody matches.</td></tr>`);
+					|| `<tr><td colspan="10" class="rhr-muted">Nobody matches.</td></tr>`);
 				const last = Math.min(p.start + PAGE, p.total);
 				root.find("#range").text(p.total ? `Showing ${p.start + 1} to ${last} of ${p.total}` : "No results");
 				root.find("#prev").prop("disabled", p.start === 0);
 				root.find("#next").prop("disabled", p.start + PAGE >= p.total);
-				root.find(".pick").on("change", function () {
+				bindTotals();
+					root.find(".pick").on("change", function () {
 					const emp = $(this).data("e");
 					const action = this.checked ? "include_people" : "exclude_people";
 					post(action, { name: state.run, employees: [emp] })
@@ -738,6 +794,12 @@ body.map .rhr-map{display:inline-block}
 .rhr-sum span{color:var(--text-muted);font-size:12px}
 .rhr-alert{background:var(--control-bg);border-radius:8px;padding:10px;font-size:13px;margin:8px 0}
 .rhr-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.rhr-row input[type=checkbox]{height:auto;width:auto;margin:0 6px 0 0;padding:0;flex:none}
+.rhr-row label:has(input[type=checkbox]){display:flex;align-items:center;font-size:13px}
+.rhr-sub h3{font-size:14px;margin:0 0 8px}
+.rhr-num{text-align:right;white-space:nowrap}
+.rhr-table input.amt{width:96px;height:30px;border:1px solid var(--border-color);border-radius:6px;background:var(--card-bg);color:var(--text-color);padding:0 6px;text-align:right}
+.rhr-gross{font-weight:600}
 .rhr-table th,.rhr-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border-color)}
 .rhr-chip{border-radius:99px;padding:2px 8px;font-size:12px}
 .rhr-chip.good{background:var(--control-bg)}

@@ -134,7 +134,13 @@ def list_people(name: str, filter: str = "all", search: str | None = None, start
                      "department": r.department, "designation": r.designation, "status": status,
                      "included": True})
     total = len(rows)
-    return {"rows": rows[start_i:start_i + length_i], "total": total, "start": start_i,
+    page = rows[start_i:start_i + length_i]
+    from reckon_hrms.api.run_amounts import person_amounts
+
+    amounts = person_amounts(doc, [r["employee"] for r in page])
+    for r in page:
+        r.update(amounts.get(r["employee"], {}))
+    return {"rows": page, "total": total, "start": start_i,
             "page_length": length_i}
 
 
