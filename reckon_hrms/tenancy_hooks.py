@@ -100,3 +100,25 @@ def read_only_permission(doc, user=None, permission_type=None, ptype=None, **_ig
     if bypass:
         return True
     return (permission_type or ptype) not in {"create", "write", "delete", "submit", "cancel", "amend"}
+
+
+def ensure_holiday_assignment(doc, method=None, *args, **kwargs):
+    """``Employee`` after_insert: HRMS wants a Holiday List Assignment for leave and payroll.
+
+    A new employee gets one from their own holiday list, or the company's default, starting on the joining date,
+    so leave and salary work from the first day without a separate setup step.
+    """
+    holiday_list = doc.get("holiday_list") or frappe.db.get_value("Company", doc.get("company"), "default_holiday_list")
+    if not holiday_list or not doc.get("date_of_joining"):
+        return
+    if frappe.db.exists("Holiday List Assignment", {"applicable_for": "Employee", "assigned_to": doc.name, "docstatus": 1}):
+        return
+    try:
+        assignment = frappe.get_doc({
+            "doctype": "Holiday List Assignment", "applicable_for": "Employee", "assigned_to": doc.name,
+            "holiday_list": holiday_list, "from_date": doc.date_of_joining,
+        })
+        assignment.insert(ignore_permissions=True)
+        assignment.submit()
+    except Exception:  # noqa: BLE001  (never block saving an employee over this)
+        frappe.log_error(title="Holiday list assignment for a new employee failed")

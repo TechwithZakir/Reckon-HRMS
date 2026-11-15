@@ -82,7 +82,7 @@ doc_events.setdefault("Tenant User Assignment", {}).update({
     "on_update": ["reckon_hrms.access.sync_self_service"],
 })
 doc_events.setdefault("Employee", {}).update({
-    "after_insert": ["reckon_hrms.access.sync_employee_self_service"],
+    "after_insert": ["reckon_hrms.access.sync_employee_self_service", "reckon_hrms.tenancy_hooks.ensure_holiday_assignment"],
     "on_update": ["reckon_hrms.access.sync_employee_self_service"],
 })
 

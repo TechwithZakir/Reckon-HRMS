@@ -67,3 +67,10 @@ class ComponentAccountsTests(unittest.TestCase):
         self.assertIn("reckon_hrms.tenancy_hooks.bind_company", hooks.doc_events["Salary Slip"]["before_validate"])
         for event in ("validate", "before_submit"):
             self.assertIn("reckon_hrms.component_accounts.ensure_component_accounts", hooks.doc_events["Salary Slip"][event])
+
+
+class HolidayAssignmentTests(unittest.TestCase):
+    def test_a_new_employee_gets_a_holiday_list_assignment(self):
+        from reckon_hrms import hooks
+
+        self.assertIn("reckon_hrms.tenancy_hooks.ensure_holiday_assignment", hooks.doc_events["Employee"]["after_insert"])

@@ -26,3 +26,4 @@ reckon_hrms.patches.menu_drop_india_reports
 reckon_hrms.patches.menu_more_doctypes
 reckon_hrms.patches.payroll_payable_account_type
 reckon_hrms.patches.component_accounts_existing_slips
+reckon_hrms.patches.holiday_assignment_for_employees
