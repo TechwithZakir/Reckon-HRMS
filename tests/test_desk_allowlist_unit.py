@@ -74,3 +74,27 @@ class HolidayAssignmentTests(unittest.TestCase):
         from reckon_hrms import hooks
 
         self.assertIn("reckon_hrms.tenancy_hooks.ensure_holiday_assignment", hooks.doc_events["Employee"]["after_insert"])
+
+
+class PayrollPaymentRowsTests(unittest.TestCase):
+    def test_the_payment_debits_each_employee_on_the_payable_account(self):
+        import sys
+        import types
+        from unittest.mock import MagicMock
+
+        frappe = MagicMock()
+        frappe._ = lambda text: text
+        frappe.whitelist = lambda *a, **k: (lambda fn: fn)
+        for name in ("frappe", "frappe.utils"):
+            sys.modules.setdefault(name, types.ModuleType(name))
+        # The helper is plain arithmetic: load just it from the source.
+        import ast
+        from pathlib import Path
+
+        source = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "api" / "payroll_run.py").read_text(encoding="utf-8")
+        node = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == "_net_by_employee")
+        namespace = {"flt": float}
+        exec(compile(ast.Module([node], []), "payroll_run", "exec"), namespace)  # noqa: S102
+        slips = [types.SimpleNamespace(employee="E1", net_pay=100), types.SimpleNamespace(employee="E2", net_pay=50),
+                 types.SimpleNamespace(employee="E1", net_pay=25)]
+        self.assertEqual(namespace["_net_by_employee"](slips), [("E1", 125.0), ("E2", 50.0)])

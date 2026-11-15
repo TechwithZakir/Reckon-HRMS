@@ -443,6 +443,13 @@ def _csv_text(header, rows):
     return buf.getvalue()
 
 
+def _net_by_employee(slips) -> list[tuple[str, float]]:
+    totals: dict[str, float] = {}
+    for slip in slips:
+        totals[slip.employee] = round(totals.get(slip.employee, 0) + flt(slip.net_pay), 2)
+    return list(totals.items())
+
+
 @frappe.whitelist(methods=["POST"])
 def record_payment(name: str, bank_account: str, reference: str, reference_date: str) -> dict:
     """Step 5: one Journal Entry for the net pay of submitted, non-held slips. Held slips are left out."""
@@ -457,7 +464,7 @@ def record_payment(name: str, bank_account: str, reference: str, reference_date:
     if not frappe.db.get_value("Account", {"name": bank_account, "company": doc.company}):
         frappe.throw(_("Choose a bank account of this company."))
     slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 1,
-                           "reckon_payment_hold": 0}, fields=["name", "net_pay"], limit_page_length=0)
+                           "reckon_payment_hold": 0}, fields=["name", "net_pay", "employee"], limit_page_length=0)
     total = round(sum(flt(s.net_pay) for s in slips), 2)
     if not slips or total <= 0:
         frappe.throw(_("Nothing to pay: every submitted slip is on hold or has no net pay."))
@@ -468,8 +475,10 @@ def record_payment(name: str, bank_account: str, reference: str, reference_date:
         "doctype": "Journal Entry", "voucher_type": "Bank Entry", "company": doc.company,
         "posting_date": getdate(reference_date), "cheque_no": reference, "cheque_date": getdate(reference_date),
         "user_remark": f"Salary payment for {name}",
+        # The payroll payable account is of type Payable, so each debit names the employee it settles.
         "accounts": [
-            {"account": payable, "debit_in_account_currency": total},
+            *[{"account": payable, "party_type": "Employee", "party": employee, "debit_in_account_currency": amount}
+              for employee, amount in _net_by_employee(slips)],
             {"account": bank_account, "credit_in_account_currency": total},
         ],
     }).insert()
