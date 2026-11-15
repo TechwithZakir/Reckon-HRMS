@@ -15,11 +15,7 @@ def execute():
         frappe.get_doc({
             "doctype": "Custom Field", "dt": "Salary Component", "fieldname": "component_type", "label": "Component Type",
             "fieldtype": "Select", "insert_after": "description", "translatable": 0,
-            "options": "
-Provident Fund
-Additional Provident Fund
-Provident Fund Loan
-Professional Tax",
+            "options": "\nProvident Fund\nAdditional Provident Fund\nProvident Fund Loan\nProfessional Tax",
             "depends_on": 'eval:doc.type == "Deduction"',
         }).insert(ignore_permissions=True)
         frappe.clear_cache(doctype="Salary Component")
