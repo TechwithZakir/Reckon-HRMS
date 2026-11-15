@@ -200,7 +200,7 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 
 	window.ReckonHrStages.leave = function (parent) {
 		lists(parent, [
-			{ title: "Leave", note: "Leave types and balances.", lists: [{ title: "Leave types", doctype: "Leave Type" }, { title: "Leave applications", doctype: "Leave Application" }, { title: "Leave allocations", doctype: "Leave Allocation" }] },
+			{ title: "Leave", note: "Leave types and balances.", lists: [{ title: "Leave types", doctype: "Leave Type" }, { title: "Leave applications", doctype: "Leave Application" }, { title: "Leave allocations", doctype: "Leave Allocation" }, { title: "Leave ledger entries", doctype: "Leave Ledger Entry" }, { title: "Leave policy assignments", doctype: "Leave Policy Assignment" }] },
 			{ title: "Holidays", note: "Company holiday calendars.", lists: [{ title: "Holiday lists", doctype: "Holiday List" }, { title: "Holiday list assignments", doctype: "Holiday List Assignment" }] },
 		]);
 	};
