@@ -63,7 +63,8 @@ def holiday_assignment_query(user=None, doctype=None):
     )
 
 
-def holiday_assignment_permission(doc, user=None, permission_type=None):
+def holiday_assignment_permission(doc, user=None, permission_type=None, ptype=None, **_ignored):
+    permission_type = permission_type or ptype  # Frappe passes the right as ptype
     company, bypass = _tenant_company()
     if bypass:
         return True
@@ -83,7 +84,8 @@ def employee_linked_query(user=None, doctype=None):
     return f"{table}.`employee` in (select `name` from `tabEmployee` where `company` = {frappe.db.escape(company)})"
 
 
-def employee_linked_permission(doc, user=None, permission_type=None):
+def employee_linked_permission(doc, user=None, permission_type=None, ptype=None, **_ignored):
+    permission_type = permission_type or ptype  # Frappe passes the right as ptype
     company, bypass = _tenant_company()
     if bypass:
         return True
