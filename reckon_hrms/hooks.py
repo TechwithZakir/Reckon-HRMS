@@ -1,4 +1,4 @@
-from reckon_hrms.constants import SHARED_CATALOG_DOCTYPES, TENANT_OWNED_DOCTYPES
+from reckon_hrms.constants import READ_ONLY_SETTINGS, SHARED_CATALOG_DOCTYPES, TENANT_OWNED_DOCTYPES
 
 app_name = "reckon_hrms"
 app_title = "Reckon HRMS"
@@ -45,6 +45,9 @@ permission_query_conditions.update({
 has_permission.update({
     doctype: "reckon_saas_platform.tenant_security.has_tenant_shared_permission" for doctype in SHARED_CATALOG_DOCTYPES
 })
+# Vendor-wide settings: read-only for tenants (single records, so no row filter is needed).
+for _settings in READ_ONLY_SETTINGS:
+    has_permission[_settings] = "reckon_hrms.tenancy_hooks.read_only_permission"
 # Rows that name another record are scoped through it.
 permission_query_conditions["Holiday List Assignment"] = "reckon_hrms.tenancy_hooks.holiday_assignment_query"
 has_permission["Holiday List Assignment"] = "reckon_hrms.tenancy_hooks.holiday_assignment_permission"

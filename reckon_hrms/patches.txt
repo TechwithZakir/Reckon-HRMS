@@ -24,3 +24,4 @@ reckon_hrms.patches.company_on_shared_masters
 reckon_hrms.patches.company_on_more_masters
 reckon_hrms.patches.menu_drop_india_reports
 reckon_hrms.patches.menu_more_doctypes
+reckon_hrms.patches.payroll_payable_account_type

@@ -40,12 +40,13 @@ class TenantScopingTests(unittest.TestCase):
 
     def test_every_reachable_doctype_has_a_scoping_rule(self):
         from reckon_hrms import hooks
-        from reckon_hrms.constants import EMPLOYEE_CHECKIN, HOLIDAY_ASSIGNMENT, SHARED_CATALOG_DOCTYPES
+        from reckon_hrms.constants import EMPLOYEE_CHECKIN, HOLIDAY_ASSIGNMENT, READ_ONLY_SETTINGS, SHARED_CATALOG_DOCTYPES
 
-        scoped = set(TENANT_OWNED_DOCTYPES) | set(SHARED_CATALOG_DOCTYPES) | {EMPLOYEE_CHECKIN, HOLIDAY_ASSIGNMENT}
+        scoped = set(TENANT_OWNED_DOCTYPES) | set(SHARED_CATALOG_DOCTYPES) | set(READ_ONLY_SETTINGS) | {EMPLOYEE_CHECKIN, HOLIDAY_ASSIGNMENT}
         self.assertEqual(sorted(set(DESK_DOCTYPES) - scoped), [])
         for doctype in set(DESK_DOCTYPES):
-            self.assertIn(doctype, hooks.permission_query_conditions, doctype)
+            if doctype not in READ_ONLY_SETTINGS:  # single records have no rows to filter
+                self.assertIn(doctype, hooks.permission_query_conditions, doctype)
             self.assertIn(doctype, hooks.has_permission, doctype)
 
     def test_company_less_masters_get_a_company_field_and_stamping(self):

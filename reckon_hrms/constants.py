@@ -58,7 +58,10 @@ def tenant_role(kind: str, company: str) -> str:
 
 # Desk reach for a tenant on the compact HRMS module: its four modules and their masters.
 DESK_GUARD = True
-DESK_DOCTYPES = TENANT_OWNED_DOCTYPES + (
+# Vendor-wide settings forms read for their defaults: tenants read them, only vendor staff change them.
+READ_ONLY_SETTINGS = ("HR Settings", "Payroll Settings")
+
+DESK_DOCTYPES = TENANT_OWNED_DOCTYPES + READ_ONLY_SETTINGS + (
     "Branch",
     "Employment Type",
     "Leave Type",

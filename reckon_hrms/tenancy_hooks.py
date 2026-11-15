@@ -92,3 +92,11 @@ def employee_linked_permission(doc, user=None, permission_type=None, ptype=None,
     if not company:
         return False
     return bool(doc.get("employee")) and frappe.db.get_value("Employee", doc.employee, "company") == company
+
+
+def read_only_permission(doc, user=None, permission_type=None, ptype=None, **_ignored):
+    """HR Settings and Payroll Settings: every tenant reads them, only vendor staff change them."""
+    _company, bypass = _tenant_company()
+    if bypass:
+        return True
+    return (permission_type or ptype) not in {"create", "write", "delete", "submit", "cancel", "amend"}

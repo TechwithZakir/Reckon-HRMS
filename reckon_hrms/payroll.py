@@ -46,6 +46,7 @@ def ensure_payroll_payable(company: str) -> str | None:
     """
     current = frappe.db.get_value("Company", company, "default_payroll_payable_account")
     if current:
+        _make_payable(current)
         return current
     account = frappe.db.get_value("Account", {"company": company, "is_group": 0,
                                               "account_name": ["like", "Payroll Payable%"]}, "name")
@@ -62,8 +63,15 @@ def ensure_payroll_payable(company: str) -> str | None:
         account = frappe.get_doc({"doctype": "Account", "account_name": "Payroll Payable", "company": company,
                                   "parent_account": parent, "account_type": "Payable", "is_group": 0}
                                  ).insert(ignore_permissions=True).name
+    _make_payable(account)
     frappe.db.set_value("Company", company, "default_payroll_payable_account", account)
     return account
+
+
+def _make_payable(account: str) -> None:
+    """A payroll run refuses a payroll payable account whose type is not Payable."""
+    if frappe.db.get_value("Account", account, "account_type") != "Payable":
+        frappe.db.set_value("Account", account, "account_type", "Payable")
 
 
 @frappe.whitelist(methods=["POST"])
