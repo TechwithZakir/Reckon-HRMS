@@ -45,7 +45,9 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 		root.on("click", "a[data-doctype]", function (e) {
 			e.preventDefault();
 			const dt = this.dataset.doctype;
-			if (this.dataset.mode === "new") frappe.new_doc(dt); else frappe.set_route("List", dt);
+			// A slug route keeps the Reckon HRMS menu on screen; "List" or new_doc would switch to the HR menu.
+			const slug = frappe.router.slug(dt);
+			if (this.dataset.mode === "new") frappe.set_route(slug, "new"); else frappe.set_route(slug);
 		});
 		sections.forEach((sec) => {
 			const card = $(`<section class="rhh-card"><h2>${esc(sec.title)}</h2>${sec.note ? `<div class="rhh-muted" style="margin-bottom:6px">${esc(sec.note)}</div>` : ""}</section>`).appendTo(root);
