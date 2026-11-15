@@ -2,7 +2,7 @@
 // Served at /desk/reckon-hrms/reckon-hrms-hr-studio. "Your company" is the shared company stage.
 frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({ parent: wrapper, title: "HR Studio", single_column: true });
-	const STAGES = [["hiring", "Hiring"], ["company", "Company and employee setup"], ["employees", "Employee details"], ["onboarding", "Onboarding"],
+	const STAGES = [["hiring", "Hiring"], ["company", "Company and employee setup"], ["onboarding", "Onboarding"], ["employees", "Employee details"],
 		["attendance", "Time and attendance"], ["leave", "Leave and holidays"], ["exit", "Exit"]];
 	const shell = $(`<div class="rhs-shell" style="display:block"></div>`).appendTo(page.main);
 	const nav = $(`<nav class="rhs-stages" role="tablist" aria-label="HR Studio steps" style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border-color);margin:10px 0 14px"></nav>`).appendTo(shell);
@@ -41,12 +41,18 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 
 	function lists(parent, sections) {
 		const root = $(`<div class="rhh">${CARD}</div>`).appendTo(parent);
+		// Open lists and new forms through the desk router so the right page opens inside the desk.
+		root.on("click", "a[data-doctype]", function (e) {
+			e.preventDefault();
+			const dt = this.dataset.doctype;
+			if (this.dataset.mode === "new") frappe.new_doc(dt); else frappe.set_route("List", dt);
+		});
 		sections.forEach((sec) => {
 			const card = $(`<section class="rhh-card"><h2>${esc(sec.title)}</h2>${sec.note ? `<div class="rhh-muted" style="margin-bottom:6px">${esc(sec.note)}</div>` : ""}</section>`).appendTo(root);
 			sec.lists.forEach((l) => {
 				$(`<div class="rhh-row"><span>${esc(l.title)}</span>
-					<span class="rhh-acts"><a class="rhh-ico" href="${slug(l.doctype)}" title="Open the ${esc(l.title)} list" aria-label="Open the ${esc(l.title)} list">${icon("list")}</a>
-					<a class="rhh-ico" href="${slug(l.doctype)}/new" title="Add new" aria-label="Add new ${esc(l.title)}">${icon("add")}</a></span></div>`).appendTo(card);
+					<span class="rhh-acts"><a class="rhh-ico" data-doctype="${esc(l.doctype)}" data-mode="list" href="${slug(l.doctype)}" title="Open the ${esc(l.title)} list" aria-label="Open the ${esc(l.title)} list">${icon("list")}</a>
+					<a class="rhh-ico" data-doctype="${esc(l.doctype)}" data-mode="new" href="${slug(l.doctype)}/new" title="Add new" aria-label="Add new ${esc(l.title)}">${icon("add")}</a></span></div>`).appendTo(card);
 			});
 		});
 	}
@@ -55,7 +61,7 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 		const esc = (t) => frappe.utils.escape_html(t == null ? "" : String(t));
 		const PAGE = 24;
 		const state = { rows: [], view: "grid", page: 0, group: "", f: { q: "", status: "", missingOnly: false, branch: "", department: "" } };
-		const root = $(`<div class="hrs-emp">
+		const root = $(`<div class="hrs-emp">${CARD}<section class="rhh-card" style="margin-top:6px">
 			<style>
 			.hrs-emp .hrs-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 14px}
 			.hrs-emp .hrs-search{flex:1 1 260px;min-width:200px}
@@ -81,7 +87,7 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 			</div>
 			<div data-main></div>
 			<div class="hrs-pager"><span data-count></span><span><button type="button" class="btn btn-default btn-sm" data-prev>Previous</button> <button type="button" class="btn btn-default btn-sm" data-next>Next</button></span></div>
-		</div>`).appendTo(parent);
+		</section></div>`).appendTo(parent);
 
 		const missing = (r) => [!r.branch && "branch", !r.department && "department", !r.designation && "job title"].filter(Boolean);
 		const initials = (n) => (n || "?").split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();

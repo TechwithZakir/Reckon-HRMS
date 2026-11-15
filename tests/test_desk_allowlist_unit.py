@@ -33,3 +33,27 @@ class DeskAllowlistTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TenantScopingTests(unittest.TestCase):
+    """A doctype a tenant can open must be scoped to the tenant: no row of another company may show."""
+
+    def test_every_reachable_doctype_has_a_scoping_rule(self):
+        from reckon_hrms import hooks
+        from reckon_hrms.constants import EMPLOYEE_CHECKIN, HOLIDAY_ASSIGNMENT, SHARED_CATALOG_DOCTYPES
+
+        scoped = set(TENANT_OWNED_DOCTYPES) | set(SHARED_CATALOG_DOCTYPES) | {EMPLOYEE_CHECKIN, HOLIDAY_ASSIGNMENT}
+        self.assertEqual(sorted(set(DESK_DOCTYPES) - scoped), [])
+        for doctype in set(DESK_DOCTYPES):
+            self.assertIn(doctype, hooks.permission_query_conditions, doctype)
+            self.assertIn(doctype, hooks.has_permission, doctype)
+
+    def test_company_less_masters_get_a_company_field_and_stamping(self):
+        from reckon_hrms import hooks
+        from reckon_hrms.constants import SHARED_CATALOG_DOCTYPES
+
+        for doctype in SHARED_CATALOG_DOCTYPES:
+            self.assertEqual(hooks.permission_query_conditions[doctype], "reckon_saas_platform.tenant_security.get_tenant_shared_query")
+            self.assertIn("bind_catalog_company", hooks.doc_events[doctype]["before_validate"])
+        patch = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "patches.txt").read_text(encoding="utf-8")
+        self.assertIn("reckon_hrms.patches.company_on_shared_masters", patch)

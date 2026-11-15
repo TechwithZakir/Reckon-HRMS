@@ -18,9 +18,75 @@ def bind_company(doc, method=None, *args, **kwargs):
     bind_doc_to_tenant(doc, user=frappe.session.user)
 
 
+def bind_catalog_company(doc, method=None, *args, **kwargs):
+    """A tenant's own Leave Type, Designation and the like carry its company; the vendor's stay shared."""
+    from reckon_saas_platform.tenant_security import tenant_company_or_none
+
+    company = tenant_company_or_none(frappe.session.user)
+    if company and doc.is_new() and not doc.get("company"):
+        doc.company = company
+    elif company and doc.get("company") and doc.company != company:
+        frappe.throw(frappe._("This record belongs to another company."), frappe.PermissionError)
+
+
 def validate_company_immutable(doc, method=None, *args, **kwargs):
     validate_tenant_company_immutable(doc)
 
 
 def validate_owned(doc, method=None, *args, **kwargs):
     validate_tenant_owned_doc(doc, user=frappe.session.user)
+
+
+# ---------- rows reached through another record ----------
+
+def _tenant_company():
+    from reckon_saas_platform.tenant_security import TenantResolutionError, require_tenant, user_can_bypass_tenant
+
+    if user_can_bypass_tenant(frappe.session.user):
+        return None, True
+    try:
+        return require_tenant(user=frappe.session.user).company, False
+    except TenantResolutionError:
+        return None, False
+
+
+def holiday_assignment_query(user=None, doctype=None):
+    """Holiday List Assignment has no Company: it belongs to the company of the Holiday List it assigns."""
+    company, bypass = _tenant_company()
+    if bypass:
+        return ""
+    if not company:
+        return "1=0"
+    return (
+        "`tabHoliday List Assignment`.`holiday_list` in "
+        f"(select `name` from `tabHoliday List` where `company` = {frappe.db.escape(company)})"
+    )
+
+
+def holiday_assignment_permission(doc, user=None, permission_type=None):
+    company, bypass = _tenant_company()
+    if bypass:
+        return True
+    if not company:
+        return False
+    return bool(doc.get("holiday_list")) and frappe.db.get_value("Holiday List", doc.holiday_list, "company") == company
+
+
+def employee_linked_query(user=None, doctype=None):
+    """Employee Checkin (and other rows that only name an employee) belong to that employee's company."""
+    company, bypass = _tenant_company()
+    if bypass:
+        return ""
+    if not company:
+        return "1=0"
+    table = f"`tab{doctype or 'Employee Checkin'}`"
+    return f"{table}.`employee` in (select `name` from `tabEmployee` where `company` = {frappe.db.escape(company)})"
+
+
+def employee_linked_permission(doc, user=None, permission_type=None):
+    company, bypass = _tenant_company()
+    if bypass:
+        return True
+    if not company:
+        return False
+    return bool(doc.get("employee")) and frappe.db.get_value("Employee", doc.employee, "company") == company

@@ -20,3 +20,4 @@ reckon_hrms.patches.office_location_branch_index
 reckon_hrms.patches.menu_home_first_with_icons
 reckon_hrms.patches.menu_home_overview_page
 reckon_hrms.patches.menu_single_links_ungrouped
+reckon_hrms.patches.company_on_shared_masters

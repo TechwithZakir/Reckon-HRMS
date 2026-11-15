@@ -1,6 +1,17 @@
 window.ReckonSetupStages = window.ReckonSetupStages || {};
 
 (function () {
+// Studio links to lists and new forms open through the desk router, so the target page opens inside the desk
+// (a full page load of an /app address can land on the workspace instead).
+if (!window.__reckonStudioLinks) {
+	window.__reckonStudioLinks = true;
+	$(document).on("click", ".rhc a[href^='/app/'], .rhs-card a[href^='/app/'], .rhs-shell a[href^='/app/'], .rhh a[href^='/app/']", function (e) {
+		if (e.ctrlKey || e.metaKey || e.shiftKey || this.target) return;
+		e.preventDefault();
+		const parts = this.getAttribute("href").replace(/^\/app\//, "").split("?")[0].split("/").map(decodeURIComponent);
+		frappe.set_route(...parts);
+	});
+}
 // Page 1 (Your company): checklist and tap-to-add lists. Served at /desk/reckon-hrms/reckon-hrms-company.
 window.ReckonSetupStages.company = function (parent) {
 	const root = $(`<div class="rhc"></div>`).appendTo(parent);

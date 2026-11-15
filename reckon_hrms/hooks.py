@@ -1,4 +1,4 @@
-from reckon_hrms.constants import TENANT_OWNED_DOCTYPES
+from reckon_hrms.constants import SHARED_CATALOG_DOCTYPES, TENANT_OWNED_DOCTYPES
 
 app_name = "reckon_hrms"
 app_title = "Reckon HRMS"
@@ -38,6 +38,18 @@ has_permission = {
     doctype: "reckon_saas_platform.tenant_security.has_tenant_owned_permission"
     for doctype in TENANT_OWNED_DOCTYPES
 }
+# Reference masters: the vendor's seeded rows are a read-only catalog; a tenant's own rows are its alone.
+permission_query_conditions.update({
+    doctype: "reckon_saas_platform.tenant_security.get_tenant_shared_query" for doctype in SHARED_CATALOG_DOCTYPES
+})
+has_permission.update({
+    doctype: "reckon_saas_platform.tenant_security.has_tenant_shared_permission" for doctype in SHARED_CATALOG_DOCTYPES
+})
+# Rows that name another record are scoped through it.
+permission_query_conditions["Holiday List Assignment"] = "reckon_hrms.tenancy_hooks.holiday_assignment_query"
+has_permission["Holiday List Assignment"] = "reckon_hrms.tenancy_hooks.holiday_assignment_permission"
+permission_query_conditions["Employee Checkin"] = "reckon_hrms.tenancy_hooks.employee_linked_query"
+has_permission["Employee Checkin"] = "reckon_hrms.tenancy_hooks.employee_linked_permission"
 doc_events = {
     doctype: {
         "before_validate": "reckon_hrms.tenancy_hooks.bind_company",
@@ -48,6 +60,9 @@ doc_events = {
     }
     for doctype in TENANT_OWNED_DOCTYPES
 }
+# A tenant's own addition to a shared master is stamped with its company (vendor and seed writes stay unstamped).
+for _doctype in SHARED_CATALOG_DOCTYPES:
+    doc_events[_doctype] = {"before_validate": "reckon_hrms.tenancy_hooks.bind_catalog_company"}
 
 # Tenant User Assignment access is reconciled by the platform (reckon_saas_platform.team).
 

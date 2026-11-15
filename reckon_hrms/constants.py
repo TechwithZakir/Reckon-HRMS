@@ -31,6 +31,15 @@ TENANT_OWNED_DOCTYPES = (
     "Salary Slip",
     "Payroll Entry",
     "Expense Claim",
+    # Each of these has a Company field; before they were listed here a tenant saw every company's rows.
+    "Department",
+    "Additional Salary",
+    "Shift Assignment",
+    "Leave Allocation",
+    "Leave Ledger Entry",
+    "Leave Policy Assignment",
+    "Exit Interview",
+    "Employee Benefit Ledger",
     # Holiday lists get a Company field (patch), so each tenant has its own calendar.
     "Holiday List",
     # Office coordinates for the attendance geofence, one per company.
@@ -63,7 +72,28 @@ DESK_DOCTYPES = TENANT_OWNED_DOCTYPES + (
     "Expense Claim Type",
     "Department",
     "Designation",
+    "Employee Grade",
+    "Leave Ledger Entry",
+    "Exit Interview",
+    "Employee Benefit Ledger",
+    "Leave Policy Assignment",
 )
+
+# Reference masters with no Company of their own. A custom Company field is added to each: the vendor's seeded
+# rows (no Company) are a read-only catalog every tenant sees, and a tenant's own additions belong to it alone.
+SHARED_CATALOG_DOCTYPES = (
+    "Designation",
+    "Employee Grade",
+    "Expense Claim Type",
+    "Leave Type",
+    "Leave Policy",
+    "Salary Component",
+    "Shift Type",
+)
+
+# Rows reached through another record: scoped by that record's Company.
+HOLIDAY_ASSIGNMENT = "Holiday List Assignment"
+EMPLOYEE_CHECKIN = "Employee Checkin"
 DESK_WORKSPACES = ("Reckon HRMS",)
 
 # Custom Desk pages (the setup flow links between them) and the reports the menu lists.
