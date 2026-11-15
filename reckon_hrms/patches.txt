@@ -22,3 +22,4 @@ reckon_hrms.patches.menu_home_overview_page
 reckon_hrms.patches.menu_single_links_ungrouped
 reckon_hrms.patches.company_on_shared_masters
 reckon_hrms.patches.company_on_more_masters
+reckon_hrms.patches.menu_drop_india_reports

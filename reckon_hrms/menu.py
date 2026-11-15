@@ -60,7 +60,6 @@ MENU = (
         ("Report", "Employee Analytics"),
         ("Report", "Employee Birthday"),
         ("Report", "Employee Exits"),
-        ("Report", "Employee Advance Summary"),
         ("Report", "Monthly Attendance Sheet"),
         ("Report", "Shift Attendance"),
         ("Report", "Employees working on a holiday"),
@@ -79,7 +78,6 @@ MENU = (
         ("Report", "Income Tax Computation"),
         ("Report", "Income Tax Deductions"),
         ("Report", "Professional Tax Deductions"),
-        ("Report", "Provident Fund Deductions"),
     )),
 )
 
