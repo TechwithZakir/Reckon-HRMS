@@ -766,7 +766,10 @@ window.ReckonSetupStages.run = function (parent) {
 					$btn.prop("disabled", false);
 					if (s.state !== "done") { root.find("#err3").text("Could not finish making the slips. Try again."); return; }
 					root.find("#slipText").text(`${s.created} draft slips made.` + (s.missing ? ` ${s.missing} people did not get a slip.` : ""));
-					call("get_run", { name: state.run }).then((x) => showSteps(x.message));
+					call("get_run", { name: state.run }).then((x) => {
+						showSteps(x.message);
+						if (s.missing && x.message.error) root.find("#err3").text(x.message.error);  // say why, not just how many
+					});
 				}))
 				.catch((e) => { $btn.prop("disabled", false); root.find("#err3").text((e && e.message) || "Could not make the slips."); });
 		});

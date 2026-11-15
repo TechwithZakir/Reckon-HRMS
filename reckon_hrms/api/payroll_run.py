@@ -33,8 +33,9 @@ def _month_bounds(month: str):
 
 
 def _has_structure(employee: str, start, end) -> bool:
+    # HRMS makes a slip only for a structure that applies from the first day of the period or earlier.
     return bool(frappe.db.exists("Salary Structure Assignment", {
-        "employee": employee, "docstatus": 1, "from_date": ["<=", end]}))
+        "employee": employee, "docstatus": 1, "from_date": ["<=", start]}))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -110,6 +111,7 @@ def get_run(name: str) -> dict:
         "included": len(people), "no_structure": len(no_structure), "slips": slips,
         "filters": {f: doc.get(f) for f in FILTER_FIELDS},
         "locked": doc.docstatus != 0,
+        "error": frappe.utils.strip_html(doc.get("error_message") or "").split("Check Error Log")[0].strip(),
     }
 
 

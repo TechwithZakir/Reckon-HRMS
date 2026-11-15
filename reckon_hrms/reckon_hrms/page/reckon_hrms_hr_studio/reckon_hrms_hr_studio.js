@@ -147,7 +147,8 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 		});
 		root.find("[data-prev]").on("click", () => { state.page--; main(); });
 		root.find("[data-next]").on("click", () => { state.page++; main(); });
-		root.find("[data-create]").on("click", () => frappe.ui.form.make_quick_entry("Employee", () => load(), null, {}));
+		// A slug route opens the new Employee form and keeps the Reckon HRMS menu on screen.
+		root.find("[data-create]").on("click", () => frappe.set_route("employee", "new"));
 
 		function fill(field, values) {
 			root.find(`select[data-f="${field}"] option:not(:first-child)`).remove();
