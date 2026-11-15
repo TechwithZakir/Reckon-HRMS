@@ -29,6 +29,10 @@ MENU = (
         ("DocType", "Employee"),
         ("DocType", "Department"),
         ("DocType", "Designation"),
+        ("DocType", "Branch"),
+        ("DocType", "Employment Type"),
+        ("DocType", "Employee Grade"),
+        ("DocType", "Exit Interview"),
         ("DocType", "HRMS Office Location"),  # shown as Office Location
     )),
     ("Time & Attendance", (
@@ -44,6 +48,8 @@ MENU = (
         ("DocType", "Leave Application"),
         ("DocType", "Leave Type"),
         ("DocType", "Leave Allocation"),
+        ("DocType", "Leave Policy Assignment"),
+        ("DocType", "Leave Ledger Entry"),
         ("DocType", "Expense Claim"),
         ("DocType", "Expense Claim Type"),
     )),
@@ -54,6 +60,8 @@ MENU = (
         ("DocType", "Salary Structure Assignment"),
         ("DocType", "Salary Component"),
         ("DocType", "Additional Salary"),
+        ("DocType", "Income Tax Slab"),
+        ("DocType", "Employee Benefit Ledger"),
     )),
     ("HR Reports", (
         ("Report", "Employee Information"),
@@ -83,6 +91,14 @@ MENU = (
 
 # Lucide icon names for each left-nav item, keyed by its label.
 ICONS = {
+    "Branch": "git-branch",
+    "Employment Type": "briefcase",
+    "Employee Grade": "layers",
+    "Exit Interview": "door-open",
+    "Leave Policy Assignment": "clipboard-list",
+    "Leave Ledger Entry": "book-open",
+    "Income Tax Slab": "percent",
+    "Employee Benefit Ledger": "landmark",
     "HR Studio": "users",
     "Payroll Studio": "wallet",
     "Home": "house",
