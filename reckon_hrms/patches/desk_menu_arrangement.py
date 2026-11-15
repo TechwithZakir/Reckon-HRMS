@@ -131,7 +131,9 @@ def _sidebar_items() -> list[dict]:
     items = []
     seen = set()
     for group, entries in MENU:
-        items.append({"type": "Section Break", "label": group, "collapsible": 1})
+        # A group of one is just a link: no heading that repeats its only item (Home, HR Studio, Payroll Studio, Dashboard).
+        if len(entries) > 1:
+            items.append({"type": "Section Break", "label": group, "collapsible": 1})
         for entry in entries:
             if entry[0] == "URL":
                 if entry[2] in seen:
