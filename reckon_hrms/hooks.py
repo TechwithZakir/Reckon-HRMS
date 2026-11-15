@@ -67,6 +67,11 @@ doc_events = {
 for _doctype in SHARED_CATALOG_DOCTYPES:
     doc_events[_doctype] = {"before_validate": "reckon_hrms.tenancy_hooks.bind_catalog_company"}
 
+# A first slip gives its components the company's accounts, so submitting it and booking the run work.
+doc_events["Salary Slip"]["before_validate"] = [
+    doc_events["Salary Slip"]["before_validate"], "reckon_hrms.component_accounts.ensure_component_accounts",
+]
+
 # Tenant User Assignment access is reconciled by the platform (reckon_saas_platform.team).
 
 # Self-service scope: a self-service login sees only its own employee record.

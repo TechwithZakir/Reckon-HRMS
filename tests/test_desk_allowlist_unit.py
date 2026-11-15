@@ -58,3 +58,12 @@ class TenantScopingTests(unittest.TestCase):
             self.assertIn("bind_catalog_company", hooks.doc_events[doctype]["before_validate"])
         patch = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "patches.txt").read_text(encoding="utf-8")
         self.assertIn("reckon_hrms.patches.company_on_shared_masters", patch)
+
+
+class ComponentAccountsTests(unittest.TestCase):
+    def test_a_slip_validates_with_both_the_company_stamp_and_the_account_fill(self):
+        from reckon_hrms import hooks
+
+        hooked = hooks.doc_events["Salary Slip"]["before_validate"]
+        self.assertIn("reckon_hrms.tenancy_hooks.bind_company", hooked)
+        self.assertIn("reckon_hrms.component_accounts.ensure_component_accounts", hooked)
