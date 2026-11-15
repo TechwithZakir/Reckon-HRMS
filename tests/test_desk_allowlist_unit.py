@@ -64,6 +64,6 @@ class ComponentAccountsTests(unittest.TestCase):
     def test_a_slip_validates_with_both_the_company_stamp_and_the_account_fill(self):
         from reckon_hrms import hooks
 
-        hooked = hooks.doc_events["Salary Slip"]["before_validate"]
-        self.assertIn("reckon_hrms.tenancy_hooks.bind_company", hooked)
-        self.assertIn("reckon_hrms.component_accounts.ensure_component_accounts", hooked)
+        self.assertIn("reckon_hrms.tenancy_hooks.bind_company", hooks.doc_events["Salary Slip"]["before_validate"])
+        for event in ("validate", "before_submit"):
+            self.assertIn("reckon_hrms.component_accounts.ensure_component_accounts", hooks.doc_events["Salary Slip"][event])
