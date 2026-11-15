@@ -24,6 +24,7 @@ MODULE_FEATURES = {
 # tenant query, permission check and company binding apply to it.
 TENANT_OWNED_DOCTYPES = (
     "Employee",
+    "Income Tax Slab",
     "Attendance",
     "Leave Application",
     "Salary Structure",
@@ -58,6 +59,8 @@ def tenant_role(kind: str, company: str) -> str:
 # Desk reach for a tenant on the compact HRMS module: its four modules and their masters.
 DESK_GUARD = True
 DESK_DOCTYPES = TENANT_OWNED_DOCTYPES + (
+    "Branch",
+    "Employment Type",
     "Leave Type",
     "Leave Policy",
     "Holiday List",
@@ -82,6 +85,8 @@ DESK_DOCTYPES = TENANT_OWNED_DOCTYPES + (
 # Reference masters with no Company of their own. A custom Company field is added to each: the vendor's seeded
 # rows (no Company) are a read-only catalog every tenant sees, and a tenant's own additions belong to it alone.
 SHARED_CATALOG_DOCTYPES = (
+    "Branch",
+    "Employment Type",
     "Designation",
     "Employee Grade",
     "Expense Claim Type",
