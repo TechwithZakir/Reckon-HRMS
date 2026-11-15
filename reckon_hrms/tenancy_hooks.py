@@ -108,7 +108,11 @@ def ensure_holiday_assignment(doc, method=None, *args, **kwargs):
     A new employee gets one from their own holiday list, or the company's default, starting on the joining date,
     so leave and salary work from the first day without a separate setup step.
     """
-    holiday_list = doc.get("holiday_list") or frappe.db.get_value("Company", doc.get("company"), "default_holiday_list")
+    holiday_list = (
+        doc.get("holiday_list")
+        or frappe.db.get_value("Company", doc.get("company"), "default_holiday_list")
+        or frappe.db.get_value("Holiday List", {"company": doc.get("company")}, "name", order_by="creation asc")
+    )
     if not holiday_list or not doc.get("date_of_joining"):
         return
     if frappe.db.exists("Holiday List Assignment", {"applicable_for": "Employee", "assigned_to": doc.name, "docstatus": 1}):
