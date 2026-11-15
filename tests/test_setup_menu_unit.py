@@ -9,11 +9,11 @@ APP = Path(__file__).resolve().parents[1] / "reckon_hrms"
 
 
 class SetupMenuTests(unittest.TestCase):
-    def test_hr_studio_is_the_first_group(self):
-        self.assertEqual(MENU[0][0], "HR Studio")
+    def test_home_is_first_then_hr_studio(self):
+        self.assertEqual([MENU[0][0], MENU[1][0]], ["Home", "HR Studio"])
 
     def test_payroll_studio_links_the_payroll_page(self):
-        pages = [item for item in MENU[1][1] if item[0] == "Page"]
+        pages = [item for item in MENU[2][1] if item[0] == "Page"]
         self.assertEqual(pages, [("Page", "reckon-hrms-setup", "Payroll Studio")])
 
     def test_setup_page_folder_exists(self):

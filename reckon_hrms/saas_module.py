@@ -6,6 +6,7 @@ from reckon_hrms.constants import (
     ADMIN_ROLE,
     DESK_DOCTYPES,
     DESK_GUARD,
+    DESK_PAGES,
     DESK_WORKSPACES,
     HOME_ROUTE,
     MODULE_FEATURES,
@@ -15,6 +16,13 @@ from reckon_hrms.constants import (
     TENANT_OWNED_DOCTYPES,
     WORKSPACE,
 )
+
+
+def _menu_reports() -> list[str]:
+    """Every report the left menu lists, so a menu entry can never be one the guard refuses."""
+    from reckon_hrms.menu import MENU
+
+    return sorted({item[1] for _group, items in MENU for item in items if item[0] == "Report"})
 
 
 def get_module_definition() -> dict:
@@ -32,6 +40,8 @@ def get_module_definition() -> dict:
         "desk_guard": DESK_GUARD,
         "desk_doctypes": list(DESK_DOCTYPES),
         "desk_workspaces": list(DESK_WORKSPACES),
+        "desk_pages": list(DESK_PAGES),
+        "desk_reports": _menu_reports(),
         # The platform creates per-company roles and reconciles team access for these.
         "tenant_role_prefix": "Reckon HRMS",
         "tenant_doctypes": list(TENANT_OWNED_DOCTYPES),

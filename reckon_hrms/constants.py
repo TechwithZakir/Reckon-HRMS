@@ -30,6 +30,7 @@ TENANT_OWNED_DOCTYPES = (
     "Salary Structure Assignment",
     "Salary Slip",
     "Payroll Entry",
+    "Expense Claim",
     # Holiday lists get a Company field (patch), so each tenant has its own calendar.
     "Holiday List",
     # Office coordinates for the attendance geofence, one per company.
@@ -56,5 +57,25 @@ DESK_DOCTYPES = TENANT_OWNED_DOCTYPES + (
     "Salary Component",
     "Additional Salary",
     "Employee Checkin",
+    # Everything the left menu offers must be reachable, or the tenant meets "not available in your workspace".
+    "Holiday List Assignment",
+    "Leave Allocation",
+    "Expense Claim Type",
+    "Department",
+    "Designation",
 )
 DESK_WORKSPACES = ("Reckon HRMS",)
+
+# Custom Desk pages (the setup flow links between them) and the reports the menu lists.
+DESK_PAGES = (
+    "reckon-hrms-home",
+    "reckon-hrms-hr-studio",
+    "reckon-hrms-setup",
+    "reckon-hrms-checkin",
+    "reckon-hrms-company",
+    "reckon-hrms-salary",
+    "reckon-hrms-run",
+    "reckon-hrms-payout",
+    "query-report",
+    "print",
+)

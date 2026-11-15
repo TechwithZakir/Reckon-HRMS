@@ -13,14 +13,14 @@ DOCTYPE_LABELS = {"HRMS Office Location": "Office Location", "HRMS Attendance De
 # Employee Checkin is not in the menu: staff check in from Check in / out, which records it.
 # Each item appears once, so the left nav and the cards stay in step.
 MENU = (
+    ("Home", (
+        ("Page", "reckon-hrms-home", "Home"),
+    )),
     ("HR Studio", (
         ("Page", "reckon-hrms-hr-studio", "HR Studio"),
     )),
     ("Payroll Studio", (
         ("Page", "reckon-hrms-setup", "Payroll Studio"),
-    )),
-    ("Dashboard", (
-        ("Page", "reckon-hrms-home", "Dashboard"),
     )),
     ("People", (
         ("DocType", "Employee"),
@@ -84,7 +84,7 @@ MENU = (
 ICONS = {
     "HR Studio": "users",
     "Payroll Studio": "wallet",
-    "Dashboard": "gauge",
+    "Home": "house",
     "Check in / out": "log-in",
     "Employee": "users",
     "Department": "building-2",

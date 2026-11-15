@@ -171,11 +171,8 @@ def _rebuild_sidebar():
                                  "header_icon": "users"})
     for row in items:
         row["added"] = 1  # Frappe treats only added rows as items; other rows are references to base items
-        # Same shape as Reckon Accounts: a heading (Section Break, indent 1) and links marked as its children.
-        if row["type"] == "Link":
-            row["child"] = 1
-        else:
-            row["indent"] = 1
+        # Items nested under an indented heading draw no icon in Frappe 16, so headings are not indented and
+        # links are plain rows: each keeps its own icon, as in the Accounts menu.
         custom.append("sidebar_items", row)
     if existing:
         custom.save(ignore_permissions=True)

@@ -18,8 +18,8 @@ class MenuTests(unittest.TestCase):
         labels = _labels()
         self.assertEqual(len(labels), len(set(labels)), [l for l in labels if labels.count(l) > 1])
 
-    def test_studios_come_first(self):
-        self.assertEqual([MENU[0][0], MENU[1][0]], ["HR Studio", "Payroll Studio"])
+    def test_home_then_the_studios_come_first(self):
+        self.assertEqual([MENU[0][0], MENU[1][0], MENU[2][0]], ["Home", "HR Studio", "Payroll Studio"])
 
     def test_hr_and_payroll_reports_are_grouped(self):
         groups = {group: [i[1] for i in items] for group, items in MENU}
