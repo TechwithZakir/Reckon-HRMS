@@ -34,6 +34,8 @@ TENANT_OWNED_DOCTYPES = (
     "Holiday List",
     # Office coordinates for the attendance geofence, one per company.
     "HRMS Office Location",
+    # A company's ZKTeco / ZKBio Time device and its punch sync.
+    "HRMS Attendance Device",
 )
 
 

@@ -1,0 +1,17 @@
+{
+  "name": "Reckon HRMS",
+  "short_name": "Reckon HRMS",
+  "description": "Attendance, leave and payslips from your phone, with Reckon HRMS.",
+  "start_url": "/hrms",
+  "scope": "/assets/hrms/frontend/",
+  "display": "standalone",
+  "lang": "en",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {"src": "/assets/reckon_hrms/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/reckon_hrms/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "/assets/reckon_hrms/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/reckon_hrms/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

@@ -8,7 +8,7 @@ The old "Monthly payroll payout" page is not listed: Run salary does that job.
 """
 
 # Labels shown in the left nav for DocTypes whose record name is technical.
-DOCTYPE_LABELS = {"HRMS Office Location": "Office Location"}
+DOCTYPE_LABELS = {"HRMS Office Location": "Office Location", "HRMS Attendance Device": "Biometric Devices"}
 
 # Employee Checkin is not in the menu: staff check in from Check in / out, which records it.
 # Each item appears once, so the left nav and the cards stay in step.
@@ -31,6 +31,7 @@ MENU = (
     ("Time & Attendance", (
         ("Page", "reckon-hrms-checkin", "Check in / out"),
         ("DocType", "Attendance"),
+        ("DocType", "HRMS Attendance Device"),  # shown as Biometric Devices
         ("DocType", "Shift Type"),
         ("DocType", "Shift Assignment"),
         ("DocType", "Holiday List"),
@@ -89,6 +90,7 @@ ICONS = {
     "Department": "building-2",
     "Designation": "id-card",
     "Office Location": "map-pin",
+    "Biometric Devices": "fingerprint",
     "Attendance": "user-check",
     "Employee Checkin": "fingerprint",
     "Shift Type": "clock",

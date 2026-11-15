@@ -67,3 +67,14 @@ website_route_rules = [
     {"from_route": "/hrms-checkin", "to_route": "hrms_checkin"},
     {"from_route": "/hrms-home", "to_route": "hrms_home"},
 ]
+
+
+# Biometric devices: every minute, queue a punch sync for each enabled ZKTeco / ZKBio Time device that is due.
+scheduler_events = {
+    "cron": {
+        "* * * * *": ["reckon_hrms.reckon_hrms.doctype.hrms_attendance_device.hrms_attendance_device.run_due_devices"],
+    },
+}
+
+# The Frappe HR mobile app (the installable web app at /hrms) carries the Reckon HRMS name, icons and manifest.
+after_request = ["reckon_hrms.pwa.rebrand_response"]
