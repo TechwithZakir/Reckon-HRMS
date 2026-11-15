@@ -68,6 +68,7 @@ DESK_WORKSPACES = ("Reckon HRMS",)
 
 # Custom Desk pages (the setup flow links between them) and the reports the menu lists.
 DESK_PAGES = (
+    "reckon-hrms-overview",
     "reckon-hrms-home",
     "reckon-hrms-hr-studio",
     "reckon-hrms-setup",

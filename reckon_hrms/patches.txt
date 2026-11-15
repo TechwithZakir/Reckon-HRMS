@@ -18,3 +18,4 @@ reckon_hrms.patches.studios_menu
 reckon_hrms.patches.menu_labels_branch
 reckon_hrms.patches.office_location_branch_index
 reckon_hrms.patches.menu_home_first_with_icons
+reckon_hrms.patches.menu_home_overview_page
