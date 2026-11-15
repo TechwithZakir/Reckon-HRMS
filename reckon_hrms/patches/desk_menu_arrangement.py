@@ -34,6 +34,9 @@ def _exists(item) -> bool:
     return True
 
 
+GROUP_ICONS = {"People": "users", "Time & Attendance": "clock", "Leave & Expense": "calendar-days", "Payroll": "wallet",
+               "HR Reports": "bar-chart-3", "Payroll Reports": "banknote"}
+
 # Web pages reached from the sidebar through a desk Page that redirects to them (see page/ folders).
 PAGE_FOR_URL = {"/hrms-home": "reckon-hrms-home", "/hrms-checkin": "reckon-hrms-checkin"}
 
@@ -132,29 +135,31 @@ def _sidebar_items() -> list[dict]:
     seen = set()
     for group, entries in MENU:
         # A group of one is just a link: no heading that repeats its only item (Home, HR Studio, Payroll Studio, Dashboard).
-        if len(entries) > 1:
-            items.append({"type": "Section Break", "label": group, "collapsible": 1})
+        grouped = len(entries) > 1
+        if grouped:
+            items.append({"type": "Section Break", "label": group, "collapsible": 1, "icon": GROUP_ICONS.get(group, "folder"),
+                          "child": 0, "indent": 0, "keep_closed": 0, "show_arrow": 0})
         for entry in entries:
             if entry[0] == "URL":
                 if entry[2] in seen:
                     continue
                 seen.add(entry[2])
                 items.append({"type": "Link", "label": entry[2], "link_type": "URL", "url": entry[1],
-                              "icon": ICONS.get(entry[2], "circle")})
+                              "icon": ICONS.get(entry[2], "circle"), "child": int(grouped), "indent": 0})
                 continue
             if entry[0] == "Page":
                 if not _exists(entry) or entry[2] in seen:
                     continue
                 seen.add(entry[2])
                 items.append({"type": "Link", "label": entry[2], "link_type": "Page", "link_to": entry[1],
-                              "icon": ICONS.get(entry[2], "circle")})
+                              "icon": ICONS.get(entry[2], "circle"), "child": int(grouped), "indent": 0})
                 continue
             if not _exists(entry) or entry[1] in seen:
                 continue
             seen.add(entry[1])
             link_type = "DocType" if entry[0] == "DocType" else "Report"
             items.append({"type": "Link", "label": _item_label(entry), "link_type": link_type, "link_to": entry[1],
-                          "icon": ICONS.get(_item_label(entry), ICONS.get(entry[1], "circle"))})
+                          "icon": ICONS.get(_item_label(entry), ICONS.get(entry[1], "circle")), "child": int(grouped), "indent": 0})
     return items
 
 

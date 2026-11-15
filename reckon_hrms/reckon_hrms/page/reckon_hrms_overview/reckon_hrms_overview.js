@@ -51,7 +51,7 @@ frappe.pages["reckon-hrms-overview"].on_page_load = function (wrapper) {
 	function load() { frappe.call({ method: "reckon_hrms.api.overview.get_overview", type: "GET" }).then((r) => render(r.message || {})); }
 
 	$("<style>").text(`
-		.rhh-home { padding: 4px 0 32px; }
+		.rhh-home { padding: 8px 20px 32px; }
 		.rhh-hello h3 { margin: 0; font-size: 20px; }
 		.rhh-hello p { margin: 2px 0 16px; color: var(--text-muted); }
 		.rhh-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }

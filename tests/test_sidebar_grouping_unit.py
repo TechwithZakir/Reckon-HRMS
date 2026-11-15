@@ -29,6 +29,12 @@ class SidebarGroupingTests(unittest.TestCase):
         self.assertIn(("Section Break", "Leave & Expense"), order)
         self.assertIn(("Section Break", "Payroll"), order)
 
+    def test_group_items_are_children_of_their_heading_and_single_links_stand_alone(self):
+        by = {i["label"]: i for i in self.items}
+        self.assertEqual((by["People"]["child"], by["People"]["indent"], by["People"]["icon"]), (0, 0, "users"))
+        self.assertEqual((by["Employee"]["child"], by["Employee"]["indent"]), (1, 0))  # the Accounts menu shape
+        self.assertEqual((by["Home"]["child"], by["Home"]["indent"]), (0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()
