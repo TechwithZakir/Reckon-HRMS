@@ -269,7 +269,7 @@ window.ReckonSetupStages.salary = function (parent) {
 			<table class="rhs-table"><thead><tr><th>Name</th><th>Pay</th><th>Active</th><th>People</th></tr></thead><tbody id="structs"></tbody></table>
 			<div class="rhs-row"><a class="rhc-ico" href="/app/salary-structure/new" title="Add new" aria-label="Add new salary structure">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("add", "sm") : "+")}</a><a class="rhc-ico" href="/app/salary-structure" title="Open the list" aria-label="Open the salary structures list">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("list", "sm") : "≡")}</a></div></div>
 		<div class="rhs-card"><h2>Give a salary structure to everyone without one <span class="rhs-map">Salary Structure Assignment</span></h2>
-			<div class="rhs-muted">Each person without a structure gets the one you pick, from the date you choose. People who already have it are skipped.</div>
+			<div class="rhs-muted">Each person without a structure gets the one you pick, from the date you choose (the 1st of this month, so this month's salary can be run). People who already have it are skipped.</div>
 			<div class="rhs-row"><label>Salary structure <select id="bkStruct"></select></label>
 			<label>Base salary (৳) <input id="bkBase" type="number" min="1" step="500" value="60000"></label>
 			<label>From <input id="bkDate" type="date"></label></div>
@@ -278,7 +278,8 @@ window.ReckonSetupStages.salary = function (parent) {
 		<div class="rhs-card"><div class="rhs-row"><a class="rhs-btn rhs-pri" href="/desk/reckon-hrms/reckon-hrms-run">Continue to run salary</a></div></div>`);
 
 		// Bulk assign: starts a background job, then polls its progress every 3 seconds.
-		root.find("#bkDate").val(frappe.datetime.get_today());
+		// The 1st of this month, so this month's salary can be run: HRMS needs a structure from the first day of the period.
+		root.find("#bkDate").val(moment().startOf("month").format("YYYY-MM-DD"));
 		frappe.call({ method: "reckon_hrms.api.salary.list_structures", args: { company }, type: "GET" }).then((r) => {
 			root.find("#bkStruct").html(r.message.rows.map((x) => `<option value="${esc(x.name)}">${esc(x.name)}</option>`).join(""));
 		});
