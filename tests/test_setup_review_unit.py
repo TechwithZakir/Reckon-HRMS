@@ -99,3 +99,53 @@ class ReadBackTests(unittest.TestCase):
         self.assertEqual(a["shift"], {"name": "General", "start": "09:00:00", "end": "17:30:00", "grace": 10})
         self.assertEqual(a["leave"], {"Casual Leave": 10.0})
         self.assertEqual(a["structure"]["basic_pct"], 60.0)
+
+
+class PayrollGroupsTests(unittest.TestCase):
+    def facts(self, **over):
+        base = {"company": "Acme", "employees": 12, "holiday_list": "Holidays 2026 - Acme", "shifts": 1, "leave_policies": 1, "payable_account": "Payroll Payable - A",
+                "components": 9, "structures": 1, "active": 12, "assigned": 12, "rules": {"marks_per_day": 3, "divisor": 30, "cap": 0.0},
+                "last_run": {"name": "HR-PRUN-1", "status": "Paid"}}
+        base.update(over)
+        return base
+
+    def rows(self, **over):
+        groups = sr.payroll_groups(self.facts(**over))
+        return groups, {r["key"]: r for g in groups for r in g["rows"]}
+
+    def test_hr_owned_steps_are_shown_as_status_with_a_link_and_never_as_questions(self):
+        groups, rows = self.rows(employees=0, holiday_list="", shifts=0, leave_policies=0)
+        self.assertEqual(groups[0]["title"], "Already handled in HR Studio")
+        self.assertEqual([r["key"] for r in groups[0]["rows"]], ["employees", "holidays", "attendance", "leave"])
+        for key in ("employees", "holidays", "attendance", "leave"):
+            self.assertFalse(rows[key]["done"])
+            self.assertEqual(rows[key]["actions"][0]["kind"], "hr")
+        done_groups, done_rows = self.rows()
+        self.assertEqual(done_rows["holidays"]["actions"][0], {"kind": "open", "doctype": "Holiday List", "name": "Holidays 2026 - Acme", "label": "Review / edit"})
+
+    def test_the_payroll_steps_follow_the_order_hrms_needs(self):
+        groups, _rows = self.rows()
+        self.assertEqual([r["key"] for r in groups[1]["rows"]], ["payable", "components", "structure", "rules", "assignments", "run"])
+
+    def test_each_missing_payroll_step_offers_the_right_action(self):
+        _g, rows = self.rows(payable_account="", components=0, structures=0, assigned=3)
+        self.assertEqual(rows["payable"]["actions"][0]["kind"], "fix")
+        self.assertEqual(rows["components"]["actions"][0]["kind"], "hr")
+        self.assertEqual(rows["structure"]["actions"][0]["kind"], "agent")
+        self.assertEqual(rows["assignments"]["actions"][0], {"kind": "stage", "stage": "salary", "label": "Give structure to people"})
+        self.assertFalse(rows["assignments"]["done"])
+        self.assertEqual(rows["assignments"]["detail"], "3 of 12 active people have a structure")
+
+    def test_the_deduction_rule_is_always_editable_and_describes_the_values(self):
+        _g, rows = self.rows(rules={"marks_per_day": 4, "divisor": 26, "cap": 2000.0})
+        self.assertEqual(rows["rules"]["actions"][0]["kind"], "rules")
+        self.assertEqual(rows["rules"]["detail"], "Every 4 late or early marks = 1 day, pay / 26, cap 2000")
+        _g, rows = self.rows(rules={"marks_per_day": 3, "divisor": 30, "cap": 0.0})
+        self.assertTrue(rows["rules"]["detail"].endswith("no cap"))
+
+    def test_the_run_row_shows_the_latest_run_and_nothing_when_there_is_none(self):
+        _g, rows = self.rows(last_run=None)
+        self.assertEqual(rows["run"]["detail"], "No run yet")
+        self.assertFalse(rows["run"]["done"])
+        _g, rows = self.rows(last_run={"name": "HR-PRUN-2", "status": "Draft"})
+        self.assertEqual(rows["run"]["detail"], "Latest run HR-PRUN-2: Draft")

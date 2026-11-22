@@ -14,10 +14,10 @@ import re
 from reckon_hrms import setup_plan as sp
 
 STEPS = ["country", "language", "locations", "industry", "extra_departments", "extra_titles", "weekly_off", "holidays",
-         "shift", "leave", "structure"]
+         "shift", "leave"]
 TITLES = {"country": "Country", "language": "Language", "locations": "Locations", "industry": "Industry",
           "extra_departments": "Departments", "extra_titles": "Job titles", "weekly_off": "Weekly off", "holidays": "Public holidays",
-          "shift": "Working hours", "leave": "Leave days", "structure": "Salary structure"}
+          "shift": "Working hours", "leave": "Leave days", "structure": "Salary structure", "rules": "Late and early deduction rule"}
 # The answer keys each step owns: skipping or redoing a step clears them, so a half-answer never lingers in the plan.
 STEP_KEYS = {
     "country": ("country",), "language": ("language",), "locations": ("locations",), "industry": ("industry",),
@@ -25,6 +25,7 @@ STEP_KEYS = {
     "holidays": ("holidays", "holidays_country"), "shift": ("shift_name", "shift_start", "shift_end", "late_grace"),
     "leave": ("leave_casual", "leave_sick", "leave_earned", "leave_maternity"),
     "structure": ("structure_name", "basic_pct", "hra_pct", "medical_amount", "conveyance_amount"),
+    "rules": ("rule_marks", "rule_divisor", "rule_cap"),
 }
 # A plan step belongs to the question that fixes it.
 PLAN_STEP_TO_QUESTION = {"departments": "extra_departments", "titles": "extra_titles"}
@@ -33,6 +34,10 @@ PAGE_LINKS = (("holiday", "Holiday List"), ("employee", "Employee"), ("departmen
               ("leave", "Leave Type"), ("shift", "Shift Type"), ("salary structure", "Salary Structure"), ("payroll", "Payroll Studio"),
               ("hr studio", "HR Studio"))
 CHANGE_WORDS = re.compile(r"\b(change|edit|redo|fix|update|correct|go to|back to)\b", re.IGNORECASE)
+# The payroll flow asks only what belongs to payroll: HR Studio already owns people, places, holidays, hours and leave.
+PAYROLL_STEPS = ["structure", "rules"]
+PLAN_KEYS = {"hr": {"industry", "country", "language", "locations", "departments", "titles", "holidays", "shift", "leave"},
+             "payroll": {"structure", "rules"}}
 SKIP = {"skip", "none", "no", "nothing", "n/a", "na", "pass", "না", "skip this"}
 YES = {"yes", "y", "ok", "okay", "confirm", "go", "go ahead", "set up", "set everything up", "yes, set everything up", "do it", "হ্যাঁ", "yes please"}
 ALIASES = {"bd": "Bangladesh", "uk": "United Kingdom", "usa": "United States", "us": "United States", "uae": "United Arab Emirates"}
@@ -40,6 +45,23 @@ DAY_WORDS = {d.lower(): d for d in sp.WEEKDAYS}
 DAY_WORDS.update({d[:3].lower(): d for d in sp.WEEKDAYS})
 LEAVE_WORDS = (("leave_casual", r"casual"), ("leave_sick", r"sick"), ("leave_earned", r"earned|annual"), ("leave_maternity", r"maternity"))
 NUM = r"(\d+(?:\.\d+)?)"
+
+
+def _steps(env: dict) -> list[str]:
+    return env.get("steps") or STEPS
+
+
+def _parse_rules(text: str):
+    low = text.casefold()
+    marks = re.search(r"(\d+)\s*(?:late|early|marks?)", low) or re.search(r"every\s*(\d+)", low)
+    divisor = re.search(r"(?:divid\w*\s*by|divisor|pay\s*/|/)\s*(\d+)", low) or re.search(r"(\d+)\s*days?", low)
+    cap = re.search(r"cap\w*\s*(?:of|at|:)?\s*" + NUM, low)
+    if not (marks and divisor):
+        return None, "Give both numbers, for example: every 3 marks = 1 day, divided by 30, no cap. Or choose the standard rule."
+    out = {"rule_marks": marks.group(1), "rule_divisor": divisor.group(1), "rule_cap": cap.group(1) if cap and "no cap" not in low else "0"}
+    if not 1 <= int(out["rule_marks"]) <= 31 or not 1 <= int(out["rule_divisor"]) <= 31:
+        return None, "Those numbers must be between 1 and 31."
+    return out, None
 
 
 def _clean_state(state) -> dict:
@@ -52,7 +74,7 @@ def _clean_state(state) -> dict:
     idx = state.get("idx") if isinstance(state.get("idx"), int) else 0
     phase = state.get("phase") if state.get("phase") in ("ask", "review", "done") else "ask"
     return {"idx": max(0, min(idx, len(STEPS))), "answers": keep, "phase": phase, "started": bool(state.get("started")),
-            "fixing": bool(state.get("fixing"))}
+            "fixing": bool(state.get("fixing")), "flow": "payroll" if state.get("flow") == "payroll" else ""}
 
 
 def _pick_country(text: str, countries: list[str]):
@@ -92,6 +114,8 @@ def intent(question: str, route: str) -> str | None:
     text = (question or "")[:600]
     if not SETUP_INTENT.search(text):
         return None
+    if "hrms-setup" in (route or "").casefold() or "payroll" in (route or "").casefold():
+        return "start payroll"
     return "start industry" if re.search(r"industry|what does my company do", text, re.IGNORECASE) else "start"
 
 
@@ -184,6 +208,8 @@ def _now(key: str, env: dict, answers: dict) -> str:
         text = sp.LANGUAGES.get(cur["language"], cur["language"])
     elif key in ("locations", "extra_departments", "extra_titles") and cur.get(key):
         text = cur[key] if len(cur[key]) < 200 else cur[key][:200] + "..."
+    elif key == "rules" and cur.get("rule_marks"):
+        text = f"every {cur['rule_marks']} marks = 1 day, pay / {cur.get('rule_divisor')}" + (f", cap {cur['rule_cap']}" if cur.get("rule_cap") not in (None, "", "0") else ", no cap")
     elif key == "weekly_off" and cur.get("weekly_off"):
         text = " and ".join(cur["weekly_off"])
     elif key == "holidays" and (cur.get("holidays_country") or cur.get("holidays")):
@@ -213,6 +239,8 @@ def _choices(key: str, env: dict, answers: dict):
         cur = {**env.get("current", {}), **answers}
         usual = set(cur.get("weekly_off") or sp.suggest_weekly_off(cur.get("country")))
         return {"type": "multi", "options": [{"label": d, "value": d, "checked": d in usual} for d in sp.WEEKDAYS]}
+    if key == "rules":
+        return {"type": "single", "options": [{"label": "Standard: every 3 marks = 1 day, pay / 30, no cap", "value": "every 3 marks, divided by 30, no cap"}]}
     if key == "holidays":
         country, count = answers.get("country"), None
         if country and env.get("country_holiday_count"):
@@ -226,12 +254,12 @@ def _choices(key: str, env: dict, answers: dict):
 def _question(i: int, env, answers: dict) -> tuple[str, list[str]]:
     """The question with what the company already has: ``Now: ...`` and the page to edit it."""
     text, replies = _question_text(i, env, answers)
-    return text + _now(STEPS[i], env, answers), replies
+    return text + _now(_steps(env)[i], env, answers), replies
 
 
 def _question_text(i: int, env, answers: dict) -> tuple[str, list[str]]:
-    key = STEPS[i]
-    head = f"**{i + 1} of {len(STEPS)}. "
+    key = _steps(env)[i]
+    head = f"**{i + 1} of {len(_steps(env))}. "
     if key == "country":
         now = env["current_country"]
         return head + "Which country is your company in?**", ([now] if now else [])
@@ -260,6 +288,8 @@ def _question_text(i: int, env, answers: dict) -> tuple[str, list[str]]:
         return head + "What are your working hours?** Give a shift name, start and end time.\nFor example: General Shift 09:00 to 17:30, grace 10 minutes.", ["skip"]
     if key == "leave":
         return head + "How many leave days per year for each type, by your policy?**\nFor example: casual 10, sick 14, earned 18, maternity 112. Leave out any type you do not want.", ["skip"]
+    if key == "rules":
+        return head + "How should late entry and early exit be deducted?**\nEvery this many marks equal one day, a day's pay is base salary divided by a number, and an optional monthly cap.\nFor example: every 3 marks = 1 day, divided by 30, no cap.", ["skip"]
     return head + "How should the salary structure be built?**\nBasic and house rent as a percent of the gross, medical and conveyance as fixed monthly amounts.\nFor example: basic 60, house rent 20, medical 1500, conveyance 1000.", ["skip"]
 
 
@@ -276,6 +306,9 @@ def _echo(key: str, value: dict, env: dict) -> str:
     if key == "leave":
         names = {k: label for k, label in sp.LEAVE_QUESTIONS}
         return ", ".join(f"{names[k].replace(' Leave', '')} {v}" for k, v in value.items())
+    if key == "rules":
+        cap = value.get("rule_cap")
+        return f"every {value['rule_marks']} marks = 1 day, pay / {value['rule_divisor']}" + (f", cap {cap}" if cap not in (None, "", "0") else ", no cap")
     if key == "structure":
         parts = [f"basic {value['basic_pct']}%"]
         if value.get("hra_pct"):
@@ -287,9 +320,11 @@ def _echo(key: str, value: dict, env: dict) -> str:
     return ", ".join(f"{v}" if not isinstance(v, list) else " and ".join(v) for v in value.values())
 
 
-def _summary(plan: dict) -> str:
+def _summary(plan: dict, flow: str = "hr") -> str:
     rows = []
     for step in plan["steps"]:
+        if step["key"] not in PLAN_KEYS[flow]:
+            continue
         mark = {"ready": "✓", "attention": "!", "skipped": "–"}.get(step["status"], "–")
         if step["status"] == "skipped":
             items = step["note"] if step["note"].startswith("Already") else "skipped"
@@ -307,6 +342,8 @@ def _confirmed(text: str) -> bool:
 def turn(message: str, state, env: dict) -> dict:
     """One chat turn. ``env`` keys: countries, industries, year, current_country, build_plan(answers), apply(answers), ai_holidays(text)."""
     st = _clean_state(state)
+    env = {**env, "steps": PAYROLL_STEPS if st["flow"] == "payroll" else None}
+    flow_name = lambda: "payroll" if st.get("flow") == "payroll" else "hr"  # noqa: E731
     text = sp.clean_text(message, 4000)
     low = text.casefold().strip()
     answers = st["answers"]
@@ -320,8 +357,8 @@ def turn(message: str, state, env: dict) -> dict:
                 choices = {"type": "single", "options": [{"label": "Yes, set everything up", "value": "Yes, set everything up"},
                                                          {"label": "Change an answer", "value": "Change an answer"}]}
                 replies = ()
-            elif st["idx"] < len(STEPS):
-                choices = _choices(STEPS[st["idx"]], env, answers)
+            elif st["idx"] < len(_steps(env)):
+                choices = _choices(_steps(env)[st["idx"]], env, answers)
                 if choices:
                     replies = [r for r in replies if r.casefold() == "skip"]
             else:
@@ -338,20 +375,20 @@ def turn(message: str, state, env: dict) -> dict:
         return None
 
     def ask_next():
-        if st["idx"] >= len(STEPS):
+        if st["idx"] >= len(_steps(env)):
             plan = env["build_plan"](answers)
-            bad = [s for s in plan["steps"] if s["status"] == "attention"]
+            bad = [s for s in plan["steps"] if s["status"] == "attention" and s["key"] in PLAN_KEYS[flow_name()]]
             if bad:
                 # Fix what cannot run first, right here, instead of asking the person to name a step.
                 question_key = PLAN_STEP_TO_QUESTION.get(bad[0]["key"], bad[0]["key"])
-                if question_key in STEPS:
-                    st["idx"], st["phase"], st["fixing"] = STEPS.index(question_key), "ask", True
+                if question_key in _steps(env):
+                    st["idx"], st["phase"], st["fixing"] = _steps(env).index(question_key), "ask", True
                     for k in STEP_KEYS.get(question_key, ()):
                         answers.pop(k, None)
                     question, replies = _question(st["idx"], env, answers)
                     return out(f"One thing needs fixing before I can set this up: {bad[0]['note'] or bad[0]['title']}\n\n" + question, replies)
             st["phase"], st["fixing"] = "review", False
-            reply = "Here is your setup plan. Nothing has been created yet.\n\n" + _summary(plan)
+            reply = "Here is your setup plan. Nothing has been created yet.\n\n" + _summary(plan, flow_name())
             return out(reply + "\n\nReply **yes** to set everything up, or say which step to change.", ["Yes, set everything up", "Change an answer"])
         question, replies = _question(st["idx"], env, answers)
         return out(question, replies)
@@ -359,11 +396,17 @@ def turn(message: str, state, env: dict) -> dict:
     begin = re.fullmatch(r"(?:start|restart|begin)(?: at| with)?(?: ([a-z_ ]+))?", low)
     if not st["started"] or begin:
         wanted = (begin.group(1) or "").strip().replace(" ", "_") if begin else ""
-        first = STEPS.index(wanted) if wanted in STEPS else 0
-        st = {"idx": first, "answers": {}, "phase": "ask", "started": True, "fixing": False}
+        payroll = wanted.startswith("payroll") or wanted == "rules" or st.get("flow") == "payroll" and wanted in PAYROLL_STEPS
+        env = {**env, "steps": PAYROLL_STEPS if payroll else None}
+        steps_now = _steps(env)
+        first = steps_now.index(wanted) if wanted in steps_now else 0
+        st = {"idx": first, "answers": {}, "phase": "ask", "started": True, "fixing": False, "flow": "payroll" if payroll else ""}
         answers = st["answers"]
         question, replies = _question(first, env, answers)
-        return out(f"I will set up HR and payroll for **{env['company']}** by asking a few questions, then do the setup for you. "
+        what = ("payroll for **%s** by asking two questions, the salary structure and the late and early deduction rule. "
+                "People, places, holidays, hours and leave are set in HR Studio, so I will not ask about them again" % env["company"]
+                if payroll else "HR and payroll for **%s** by asking a few questions" % env["company"])
+        return out(f"I will set up {what}, then do the setup for you. "
                    "Answer in your own words, say `skip` to skip a question or `back` to go back. Nothing is created until you confirm at the end.\n\n" + question, replies)
     if low in ("cancel", "stop", "quit", "exit"):
         return out("Stopped. Nothing was changed. Start again any time from the Ask AI button.", done=True)
@@ -376,7 +419,7 @@ def turn(message: str, state, env: dict) -> dict:
             return out(head + "\n\n" + "\n".join(lines) + "\n\nReview or edit any step here: Holiday List, Branch, Department, Designation, Shift Type, Salary Structure. "
                        "The Guided setup tab in HR Studio and Payroll Studio now shows each step with its own link. Next you can add your employees and give them the salary structure.", done=True)
         # Only a clear change request, or a step name on its own, reopens a step. A question or a request for a page does not.
-        for i, key in enumerate(STEPS):
+        for i, key in enumerate(_steps(env)):
             named = TITLES[key].casefold() == low or key.replace("_", " ") == low or (CHANGE_WORDS.search(text) and (TITLES[key].casefold() in low or key.replace("_", " ") in low))
             if named:
                 st["idx"], st["phase"], st["fixing"] = i, "ask", True
@@ -389,7 +432,7 @@ def turn(message: str, state, env: dict) -> dict:
             return out(f"You can open {link} any time. I am still waiting on the plan above: reply **yes** to set everything up, or say which step to change.",
                        ["Yes, set everything up", "Change an answer"])
         if low in ("change an answer", "change", "edit"):
-            return out("Which step do you want to change? Pick one:", choices={"type": "single", "options": [{"label": TITLES[k], "value": TITLES[k]} for k in STEPS]})
+            return out("Which step do you want to change? Pick one:", choices={"type": "single", "options": [{"label": TITLES[k], "value": TITLES[k]} for k in _steps(env)]})
         return out("I am waiting for your go-ahead on the plan above. Reply **yes** to set everything up, or say which step to change, or `cancel` to stop.",
                    ["Yes, set everything up", "Change an answer"])
 
@@ -398,7 +441,7 @@ def turn(message: str, state, env: dict) -> dict:
         st["idx"] = max(0, st["idx"] - 1)
         question, replies = _question(st["idx"], env, answers)
         return out(question, replies)
-    key = STEPS[st["idx"]]
+    key = _steps(env)[st["idx"]]
     link = page_link(text)
     if link:
         question, replies = _question(st["idx"], env, answers)
@@ -408,7 +451,7 @@ def turn(message: str, state, env: dict) -> dict:
             answers.pop(k, None)
         if key == "weekly_off":
             answers["weekly_off"] = sp.suggest_weekly_off(answers.get("country"))  # the plan shows the days it will use
-        st["idx"] = len(STEPS) if st.get("fixing") else st["idx"] + 1
+        st["idx"] = len(_steps(env)) if st.get("fixing") else st["idx"] + 1
         return ask_next()
 
     value, error = None, None
@@ -455,13 +498,15 @@ def turn(message: str, state, env: dict) -> dict:
         value, error = _parse_shift(text)
     elif key == "leave":
         value, error = _parse_leave(text)
+    elif key == "rules":
+        value, error = _parse_rules(text)
     elif key == "structure":
         value, error = _parse_structure(text, env.get("current", {}).get("structure_name", ""))
     if error or not value:
         question, replies = _question(st["idx"], env, answers)
         return out(f"{error or 'I could not read that.'}\n\n{question}", replies)
     answers.update(value)
-    st["idx"] = len(STEPS) if st.get("fixing") else st["idx"] + 1
+    st["idx"] = len(_steps(env)) if st.get("fixing") else st["idx"] + 1
     shown = _echo(key, value, env)
     nxt = ask_next()
     nxt["reply"] = f"✓ {TITLES[key]}: {shown[:160]}\n\n" + nxt["reply"]

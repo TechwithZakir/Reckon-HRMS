@@ -176,6 +176,7 @@
 			frappe.call({ method: "reckon_hrms.api.ai_setup.current_answers", type: "GET" }),
 		]).then(([r, c]) => {
 			Q = r.message;
+			Q.questions = Q.questions.filter((x) => x.studio !== "payroll");  // the salary structure is asked in Payroll Studio
 			const have = (c.message && c.message.answers) || {};
 			LINKS = (c.message && c.message.links) || {};
 			// What the company already has fills the answers; only what was typed this session overrides it.
@@ -186,8 +187,68 @@
 		}).catch(() => $step.html(`<div class="rgs-muted">The interview needs the HR Manager role.</div>`));
 	}
 
+	// ---- Payroll Studio: the salary process in the order HRMS needs it. What HR Studio owns is shown as a status with a link.
+	function payrollPanel(parent) {
+		const root = $(`<div class="rgs">${STYLE}
+			<div class="rgs-card"><h2><span class="rgs-spark">✦</span> Guided payroll setup</h2>
+				<div class="rgs-muted">The salary process in the order ReckonERP HRMS needs it. People, places, holidays, working hours and leave are set in HR Studio, so they are only shown here and never asked again. Ask AI sets up the salary structure and the late and early deduction rule for you; nothing is created until you confirm.</div>
+				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-ask>✦ Ask AI to set up payroll</button>
+					<button type="button" class="btn btn-default btn-sm" data-refresh>Refresh</button></div></div>
+			<div data-groups></div></div>`).appendTo(parent);
+		const $groups = root.find("[data-groups]");
+		let data = null;
+		const slug = (dt) => frappe.router.slug(dt);
+
+		function draw() {
+			$groups.html(data.groups.map((g) => `<div class="rgs-card"><h2>${esc(g.title)}</h2>
+				${g.rows.map((r) => `<div class="rgs-rev"><div><span class="rgs-tick ${r.done ? "on" : ""}">${r.done ? "✓" : "–"}</span><b>${esc(r.label)}</b>
+					<div class="rgs-d" style="margin-left:30px">${esc(r.detail)}</div>
+					${r.key === "rules" ? `<div data-rules hidden style="margin:8px 0 0 30px" class="rgs-grid">
+						<label class="rgs-f"><span>Marks that equal one day</span><input class="form-control input-sm" data-r="marks" value="${esc(data.rules.marks_per_day)}" inputmode="numeric"></label>
+						<label class="rgs-f"><span>Day's pay = base / this</span><input class="form-control input-sm" data-r="divisor" value="${esc(data.rules.divisor)}" inputmode="numeric"></label>
+						<label class="rgs-f"><span>Monthly cap (0 = none)</span><input class="form-control input-sm" data-r="cap" value="${esc(data.rules.cap)}" inputmode="decimal"></label>
+						<div style="align-self:end"><button type="button" class="btn btn-primary btn-xs" data-save-rules>Save</button> <span class="rgs-muted" data-rmsg></span></div></div>` : ""}
+					</div><span>${r.actions.map((a, i) => `<button type="button" class="btn ${a.kind === "agent" || a.kind === "fix" ? "btn-primary" : "btn-default"} btn-xs" data-act="${esc(r.key)}:${i}">${esc(a.label)}</button>`).join(" ")}</span></div>`).join("")}</div>`).join(""));
+		}
+
+		function load() {
+			frappe.call({ method: "reckon_hrms.api.ai_setup.payroll_readiness", type: "GET" }).then((r) => { data = r.message; draw(); })
+				.catch(() => $groups.html(`<div class="rgs-card rgs-muted">Payroll setup needs the HR Manager or Payroll Manager role.</div>`));
+		}
+		load();
+		root.on("click", "[data-refresh]", load);
+		root.on("click", "[data-ask]", () => window.ReckonStudioAsk("payroll"));
+		root.on("click", "[data-act]", function () {
+			const [key, i] = this.dataset.act.split(":");
+			const action = data.groups.flatMap((g) => g.rows).find((r) => r.key === key).actions[Number(i)];
+			if (action.kind === "open") {
+				const dt = frappe.router.slug(action.doctype);
+				if (action.name) frappe.set_route(dt, action.name); else frappe.set_route(dt);
+			} else if (action.kind === "hr") {
+				frappe.route_options = { stage: action.stage };
+				frappe.set_route("reckon-hrms-hr-studio");
+			} else if (action.kind === "stage") {
+				$(`.rhs-stages [data-stage="${action.stage}"]`).trigger("click");
+			} else if (action.kind === "agent") {
+				if (window.aura && window.aura.start_agent) window.aura.start_agent("hrms_setup", "start payroll");
+			} else if (action.kind === "rules") {
+				root.find("[data-rules]").prop("hidden", (_i, v) => !v);
+			} else if (action.kind === "fix") {
+				frappe.call({ method: "reckon_hrms.api.ai_setup.ensure_payroll_account" }).then(() => { frappe.show_alert({ message: "Payroll payable account is set up.", indicator: "green" }); load(); })
+					.catch((e) => frappe.show_alert({ message: (e && e.message) || "Could not set it up.", indicator: "orange" }));
+			}
+		});
+		root.on("click", "[data-save-rules]", function () {
+			const v = (k) => root.find(`[data-r="${k}"]`).val();
+			frappe.call({ method: "reckon_hrms.api.ai_setup.save_payroll_rules", args: { marks_per_day: v("marks"), divisor: v("divisor"), cap: v("cap") || 0 } })
+				.then(() => { root.find("[data-rmsg]").text("Saved."); load(); })
+				.catch((e) => root.find("[data-rmsg]").text((e && e.message) || "Could not save."));
+		});
+	}
+
 	window.ReckonGuidedSetup = function (parent, studio) {
 		studio = studio === "payroll" ? "payroll" : "hr";
+		if (studio === "payroll") { payrollPanel(parent); return; }
 		const root = $(`<div class="rgs">${STYLE}
 			<div class="rgs-card"><h2><span class="rgs-spark">✦</span> Guided setup with Ask AI</h2>
 				<div class="rgs-muted">${studio === "payroll"

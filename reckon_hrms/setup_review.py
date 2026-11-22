@@ -53,6 +53,45 @@ def rows(facts: dict, studio: str = "hr") -> list[dict]:
     return payroll if studio == "payroll" else hr
 
 
+def payroll_groups(f: dict) -> list[dict]:
+    """The salary process in the order Frappe HRMS needs it. What belongs to HR Studio is shown as a status with a link, never asked again.
+
+    ``f``: employees, holiday_list, shifts, leave_policies, payable_account, components, structures, active, assigned,
+    rules (marks_per_day, divisor, cap), last_run (name, status) or None.
+    """
+    def row(key, label, done, detail, actions):
+        return {"key": key, "label": label, "done": bool(done), "detail": detail, "actions": actions}
+
+    hr = [
+        row("employees", "Employees", f["employees"] > 0, _count(f["employees"], "employee", "employees"),
+            [{"kind": "hr", "stage": "company", "label": "Add in HR Studio"}] if f["employees"] == 0 else [{"kind": "open", "doctype": "Employee", "label": "Review / edit"}]),
+        row("holidays", "Holiday calendar", bool(f.get("holiday_list")), "Set" if f.get("holiday_list") else "Not set",
+            [{"kind": "hr", "stage": "guided", "label": "Set up in HR Studio"}] if not f.get("holiday_list") else [{"kind": "open", "doctype": "Holiday List", "name": f["holiday_list"], "label": "Review / edit"}]),
+        row("attendance", "Attendance and working hours", f["shifts"] > 0, _count(f["shifts"], "shift", "shifts"),
+            [{"kind": "hr", "stage": "attendance", "label": "Set up in HR Studio"}] if f["shifts"] == 0 else [{"kind": "open", "doctype": "Shift Type", "label": "Review / edit"}]),
+        row("leave", "Leave policy", f["leave_policies"] > 0, _count(f["leave_policies"], "leave policy", "leave policies"),
+            [{"kind": "hr", "stage": "guided", "label": "Set up in HR Studio"}] if f["leave_policies"] == 0 else [{"kind": "open", "doctype": "Leave Policy", "label": "Review / edit"}]),
+    ]
+    rules = f.get("rules") or {}
+    rule_text = (f"Every {rules['marks_per_day']} late or early marks = 1 day, pay / {rules['divisor']}, " + (f"cap {rules['cap']:g}" if rules.get("cap") else "no cap")) if rules.get("marks_per_day") else "Standard: every 3 marks = 1 day, pay / 30, no cap"
+    last = f.get("last_run")
+    pay = [
+        row("payable", "Payroll payable account", bool(f.get("payable_account")), f["payable_account"] if f.get("payable_account") else "Not set: a salary run cannot be created without it",
+            [{"kind": "fix", "label": "Set it up"}] if not f.get("payable_account") else [{"kind": "open", "doctype": "Company", "name": f.get("company"), "label": "Review / edit"}]),
+        row("components", "Pay items", f["components"] > 0, _count(f["components"], "pay item", "pay items"),
+            [{"kind": "hr", "stage": "guided", "label": "Load from your industry"}] if f["components"] == 0 else [{"kind": "open", "doctype": "Salary Component", "label": "Review / edit"}]),
+        row("structure", "Salary structure", f["structures"] > 0, _count(f["structures"], "salary structure", "salary structures"),
+            [{"kind": "agent", "label": "✦ Set up with Ask AI"}] if f["structures"] == 0 else [{"kind": "open", "doctype": "Salary Structure", "label": "Review / edit"}]),
+        row("rules", "Late and early deduction rule", True, rule_text, [{"kind": "rules", "label": "Edit"}]),
+        row("assignments", "Structure given to people", f["active"] > 0 and f["assigned"] >= f["active"],
+            f"{f['assigned']} of {f['active']} active people have a structure",
+            [{"kind": "stage", "stage": "salary", "label": "Give structure to people"}] if f["active"] and f["assigned"] < f["active"] else [{"kind": "open", "doctype": "Salary Structure Assignment", "label": "Review / edit"}]),
+        row("run", "Run salary", bool(last and last.get("status") == "Paid"), (f"Latest run {last['name']}: {last['status']}" if last else "No run yet"),
+            [{"kind": "stage", "stage": "run", "label": "Open Run salary"}]),
+    ]
+    return [{"title": "Already handled in HR Studio", "rows": hr}, {"title": "Payroll, in the order HRMS needs it", "rows": pay}]
+
+
 LEAVE_FIELDS = {"Casual Leave": "leave_casual", "Sick Leave": "leave_sick", "Earned Leave": "leave_earned", "Maternity Leave": "leave_maternity"}
 _FORMULA = re.compile(r"^\s*base\s*\*\s*([0-9]+(?:\.[0-9]+)?)\s*$")
 

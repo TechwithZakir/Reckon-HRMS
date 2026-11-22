@@ -66,8 +66,7 @@ class ChatTests(unittest.TestCase):
     def run_all(self, env):
         r = say("start", None, env)
         for reply in ("India", "english", "Main Office", "1", "Legal", "Intern", "friday and saturday", "2026-03-26 Independence Day",
-                      "General Shift 09:00 to 17:30, grace 10 minutes", "casual 10, sick 14, earned 18, maternity 112",
-                      "basic 60, house rent 20, medical 1500, conveyance 1000"):
+                      "General Shift 09:00 to 17:30, grace 10 minutes", "casual 10, sick 14, earned 18, maternity 112"):
             r = say(reply, r["state"], env)
         return r
 
@@ -82,7 +81,7 @@ class ChatTests(unittest.TestCase):
         a = r["state"]["answers"]
         self.assertEqual((a["shift_start"], a["shift_end"], a["late_grace"]), ("09:00", "17:30", "10"))
         self.assertEqual((a["leave_casual"], a["leave_maternity"]), ("10", "112"))
-        self.assertEqual((a["basic_pct"], a["hra_pct"], a["medical_amount"], a["conveyance_amount"]), ("60", "20", "1500", "1000"))
+        self.assertNotIn("structure_name", a)  # the salary structure is a payroll question, not an HR one
         self.assertEqual(a["weekly_off"], ["Friday", "Saturday"])
 
     def test_yes_applies_once_and_ends_the_chat(self):
@@ -168,13 +167,13 @@ class LoopTests(unittest.TestCase):
 
     def test_skipping_a_step_clears_its_answers_so_no_half_answer_stays_in_the_plan(self):
         env = make_env()
-        r = say("start", None, env)
+        r = say("start payroll", None, env)
         r["state"]["answers"].update(structure_name="Std")
-        r["state"]["idx"] = sc.STEPS.index("structure")
+        r["state"]["idx"] = sc.PAYROLL_STEPS.index("structure")
         r = say("skip", r["state"], env)
         self.assertNotIn("structure_name", r["state"]["answers"])
-        self.assertEqual(r["state"]["phase"], "review")
-        self.assertNotIn("needs fixing", r["reply"])
+        self.assertEqual(r["state"]["phase"], "ask")  # on to the next payroll question
+        self.assertIn("late entry and early exit", r["reply"])
 
     def test_a_problem_in_the_plan_asks_for_that_step_at_once(self):
         env = make_env()
@@ -283,12 +282,71 @@ class ChoiceTests(unittest.TestCase):
         self.assertEqual(r["choices"]["type"], "single")
 
 
+class PayrollFlowTests(unittest.TestCase):
+    """Payroll asks only payroll questions: what HR Studio owns is never asked again."""
+
+    def env(self, applied=None):
+        env = make_env(applied)
+        env["current"] = {}
+        return env
+
+    def start(self, env):
+        return say("start payroll", None, env)
+
+    def test_it_asks_only_the_salary_structure_and_the_deduction_rule(self):
+        r = self.start(self.env())
+        self.assertIn("2 questions", r["reply"].replace("two questions", "2 questions"))
+        self.assertIn("1 of 2", r["reply"])
+        self.assertIn("salary structure", r["reply"].lower())
+        for hr_question in ("country", "language", "departments", "holidays", "working hours", "leave days", "Where do you work"):
+            self.assertNotIn(hr_question, r["reply"].split("**1 of 2")[1], hr_question)
+        self.assertEqual(r["state"]["flow"], "payroll")
+
+    def test_the_plan_lists_only_payroll_steps_and_applying_changes_nothing_else(self):
+        applied, env = [], self.env([])
+        env = self.env(applied)
+        r = self.start(env)
+        r = say("Standard, basic 60, house rent 20, medical 1500, conveyance 1000", r["state"], env)
+        self.assertIn("1500", r["reply"])
+        self.assertIn("2 of 2", r["reply"])
+        r = say("every 3 marks = 1 day, divided by 30, no cap", r["state"], env)
+        self.assertEqual(r["state"]["phase"], "review")
+        self.assertIn("Salary structure", r["reply"])
+        self.assertIn("Late and early deduction rule", r["reply"])
+        for hr_step in ("Industry", "Country", "Locations", "Holiday calendar", "Working hours", "Leave policy"):
+            self.assertNotIn(hr_step, r["reply"], hr_step)
+        done = say("Yes, set everything up", r["state"], env)
+        self.assertTrue(done["done"])
+        a = applied[0]
+        self.assertEqual((a["structure_name"], a["basic_pct"], a["rule_marks"], a["rule_divisor"], a["rule_cap"]), ("Standard", "60", "3", "30", "0"))
+        for hr_key in ("country", "industry", "locations", "weekly_off", "holidays", "shift_name", "leave_casual"):
+            self.assertNotIn(hr_key, a, hr_key)
+
+    def test_the_standard_rule_is_one_tap_and_the_numbers_are_checked(self):
+        env = self.env()
+        r = self.start(env)
+        r["state"]["idx"] = 1
+        self.assertEqual([o["value"] for o in sc.turn("back", {**r["state"], "idx": 2}, env)["choices"]["options"]], ["every 3 marks, divided by 30, no cap"])
+        bad = say("every 99 marks, divided by 30", r["state"], env)
+        self.assertIn("between 1 and 31", bad["reply"])
+        vague = say("deduct something", r["state"], env)
+        self.assertIn("Give both numbers", vague["reply"])
+        capped = sc._parse_rules("every 4 marks = 1 day, divided by 26, cap 2000")[0]
+        self.assertEqual(capped, {"rule_marks": "4", "rule_divisor": "26", "rule_cap": "2000"})
+
+    def test_an_hr_chat_never_reaches_payroll_questions(self):
+        self.assertNotIn("structure", sc.STEPS)
+        self.assertNotIn("rules", sc.STEPS)
+        r = say("start", None, make_env())
+        self.assertEqual(r["state"]["flow"], "")
+
+
 class IntentTests(unittest.TestCase):
     def test_a_setup_question_on_an_hr_page_starts_the_agent_instead_of_a_text_answer(self):
         q = "Which industry should I choose for my company, and what will it pre-load? Ask me what my company does if you need to."
         self.assertEqual(sc.intent(q, "reckon-hrms/reckon-hrms-hr-studio"), "start industry")
-        self.assertEqual(sc.intent("Guide me through setting up HR Studio step by step for my company.", "reckon-hrms/reckon-hrms-setup"), "start")
-        self.assertEqual(sc.intent("Help me set up payroll", "reckon-hrms/reckon-hrms-hr-studio"), "start")
+        self.assertEqual(sc.intent("Guide me through setting up payroll step by step for my company.", "reckon-hrms/reckon-hrms-setup"), "start payroll")
+        self.assertEqual(sc.intent("Help me set up HR", "reckon-hrms/reckon-hrms-hr-studio"), "start")
 
     def test_other_questions_and_other_pages_are_left_to_the_normal_answer(self):
         self.assertIsNone(sc.intent("Why can't I create a leave application?", "reckon-hrms/reckon-hrms-hr-studio"))
@@ -335,7 +393,7 @@ class NowTests(unittest.TestCase):
         self.assertIn("Now: Head Office, Dhaka Factory. Skip to keep it, or edit it in Branch.", self.ask("locations")["reply"])
         self.assertIn("edit it in Shift Type", self.ask("shift")["reply"])
         self.assertIn("Now: Casual 10, Sick 14", self.ask("leave")["reply"])
-        self.assertIn("edit it in Salary Structure", self.ask("structure")["reply"])
+        self.assertIn("edit it in Salary Structure", say("start payroll", None, self.env())["reply"])
         self.assertIn("Now: Friday", self.ask("weekly_off")["reply"])
 
     def test_nothing_is_shown_when_nothing_exists_yet(self):
@@ -363,6 +421,6 @@ class StructureNameTests(unittest.TestCase):
     def test_the_existing_name_matches_an_existing_structure_in_the_plan(self):
         env = make_env()
         env["current"] = {"structure_name": "Standard"}
-        r = sc.turn("start structure", None, env)
+        r = sc.turn("start payroll", None, env)
         r = sc.turn("basic 50, house rent 10", r["state"], env)
         self.assertEqual(r["state"]["answers"]["structure_name"], "Standard")

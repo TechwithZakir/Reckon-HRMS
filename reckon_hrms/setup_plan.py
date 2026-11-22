@@ -49,7 +49,7 @@ QUESTIONS = [
      "help": "Give the shift a name and its start and end time. Leave the name empty to skip."},
     {"key": "leave_casual", "studio": "both", "kind": "leave", "label": "Leave days per year",
      "help": "Days per year for each type, from your own policy. Leave a type empty to skip it. Nothing is given to employees yet."},
-    {"key": "structure_name", "studio": "both", "kind": "structure", "label": "Salary structure",
+    {"key": "structure_name", "studio": "payroll", "kind": "structure", "label": "Salary structure",
      "help": "Basic and house rent as a percent of the gross salary, medical and conveyance as fixed monthly amounts. "
              "Leave the name empty to skip. Amounts per person are set when you give the structure to people."},
 ]
@@ -167,13 +167,18 @@ def normalize_answers(raw, year: int | None = None) -> dict:
         "locations": split_names(raw.get("locations")),
         "extra_departments": split_names(raw.get("extra_departments")),
         "extra_titles": split_names(raw.get("extra_titles")),
-        "weekly_off": days or ["Friday"] if "weekly_off" not in raw else days,
+        "weekly_off": days if "weekly_off" in raw else [],
+        "weekly_asked": "weekly_off" in raw,
         "holidays": holidays, "holidays_unread": unread, "year": year,
         "holidays_country": str(raw.get("holidays_country") or "").strip().casefold() in ("1", "true", "yes", "on"),
         "shift": None,
         "leave": {},
         "structure": None,
+        "rules": None,
     }
+    marks, divisor = _number(raw.get("rule_marks"), 1, 31), _number(raw.get("rule_divisor"), 1, 31)
+    if marks or divisor:
+        out["rules"] = {"marks_per_day": int(marks or 0), "divisor": int(divisor or 0), "cap": _number(raw.get("rule_cap"), 0, 10_000_000) or 0}
     name = clean_text(raw.get("shift_name"), 60)
     start, end = _time(raw.get("shift_start")), _time(raw.get("shift_end"))
     if name and start and end:
@@ -201,6 +206,11 @@ def structure_problem(structure: dict | None) -> str | None:
     if structure["basic_pct"] + structure["hra_pct"] > 100:
         return "Basic and house rent together are more than 100% of the gross salary."
     return None
+
+
+def _rules_line(rules: dict) -> str:
+    cap = f"capped at {rules['cap']:g} a month" if rules["cap"] else "no monthly cap"
+    return f"Every {rules['marks_per_day']} late or early marks = 1 day; a day's pay is base salary / {rules['divisor']}; {cap}"
 
 
 def _there(wanted: list[str], new: list[str]) -> list[str]:
@@ -248,20 +258,25 @@ def build_plan(answers: dict, segment: dict | None, company: str, existing: dict
     step("titles", "Job titles", [*new_titles, *_there(answers["extra_titles"], new_titles)] or ["Nothing to add"],
          "ready" if new_titles else "skipped", "" if new_titles or not answers["extra_titles"] else "Already set up. Edit them in Designation.")
 
-    holiday_items = [f"Weekly off: {', '.join(answers['weekly_off']) or 'none'}"]
+    if not answers["weekly_asked"] and not answers["holidays"] and not answers["holidays_country"] and not answers["holidays_unread"]:
+        step("holidays", f"Holiday calendar {answers['year']}", ["Nothing to add"], "skipped")
+        holiday_items = None
+    else:
+        holiday_items = [f"Weekly off: {', '.join(answers['weekly_off']) or 'none'}"]
     count = existing.get("country_holidays")
-    note = ""
-    if answers["holidays_country"] and answers["country"]:
-        if count:
-            holiday_items.append(f"The {count} public holidays of {answers['country']} from the ReckonERP holiday calendar")
-        else:
-            holiday_items.append(f"Public holidays of {answers['country']} from the ReckonERP holiday calendar")
-            note = f"ReckonERP has no holiday calendar for {answers['country']}. Add the holidays by hand instead." if count == 0 else ""
-    holiday_items += [f"{h['date']}  {h['name']}" for h in answers["holidays"]]
-    if answers["holidays_unread"]:
-        note = "These lines could not be read (use date first, in this year): " + "; ".join(answers["holidays_unread"])
-    step("holidays", f"Holiday calendar {answers['year']}", holiday_items,
-         "attention" if answers["holidays_unread"] else "ready", note)
+    if holiday_items is not None:
+        note = ""
+        if answers["holidays_country"] and answers["country"]:
+            if count:
+                holiday_items.append(f"The {count} public holidays of {answers['country']} from the ReckonERP holiday calendar")
+            else:
+                holiday_items.append(f"Public holidays of {answers['country']} from the ReckonERP holiday calendar")
+                note = f"ReckonERP has no holiday calendar for {answers['country']}. Add the holidays by hand instead." if count == 0 else ""
+        holiday_items += [f"{h['date']}  {h['name']}" for h in answers["holidays"]]
+        if answers["holidays_unread"]:
+            note = "These lines could not be read (use date first, in this year): " + "; ".join(answers["holidays_unread"])
+        step("holidays", f"Holiday calendar {answers['year']}", holiday_items,
+             "attention" if answers["holidays_unread"] else "ready", note)
     if answers["shift"]:
         s = answers["shift"]
         line = f"{s['name']}: {s['start'][:5]} to {s['end'][:5]}" + (f", late entry after {s['grace']} min" if s["grace"] else "")
@@ -305,6 +320,16 @@ def build_plan(answers: dict, segment: dict | None, company: str, existing: dict
         step("structure", "Salary structure", [], "attention", problem)
     else:
         step("structure", "Salary structure", ["Nothing to add"], "skipped")
+    rules = answers["rules"]
+    if rules:
+        if not (rules["marks_per_day"] and rules["divisor"]):
+            step("rules", "Attendance deduction rule", [], "attention", "Give both: how many late or early marks equal one day, and the divisor for a day's pay (for example 30).")
+        elif existing.get("rules") and existing["rules"] == {"marks_per_day": rules["marks_per_day"], "divisor": rules["divisor"], "cap": float(rules["cap"])}:
+            step("rules", "Attendance deduction rule", [_rules_line(rules)], "skipped", "Already set up with these values. Edit them in Payroll Studio > Guided setup.")
+        else:
+            step("rules", "Attendance deduction rule", [_rules_line(rules)], "ready", "Used when HR approves late and early deductions for a run. Nothing is deducted by saving this.")
+    else:
+        step("rules", "Attendance deduction rule", ["Nothing to add"], "skipped")
     return {"company": company, "steps": steps,
             "ready": sum(1 for s in steps if s["status"] == "ready"),
             "attention": sum(1 for s in steps if s["status"] == "attention")}

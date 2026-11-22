@@ -57,6 +57,7 @@ def _existing(company: str, country: str = "", year: int | None = None) -> dict:
         "shifts": [{"name": r.name, "start": str(r.start_time), "end": str(r.end_time)}
                    for r in frappe.get_all("Shift Type", filters={"company": company}, fields=["name", "start_time", "end_time"])],
         "leave_policy": frappe.db.get_value("Leave Policy", {"company": company, "docstatus": 1}, "name") or "",
+        "rules": _rules_now(company),
         "structures": [r.rsplit(" - " + company, 1)[0] if r.endswith(" - " + company) else r
                        for r in frappe.get_all("Salary Structure", filters={"company": company, "docstatus": 1}, pluck="name")],
     }
@@ -141,8 +142,73 @@ def read_current(company: str) -> dict:
                                   fields=["salary_component", "amount", "amount_based_on_formula", "formula"], limit_page_length=0)
         answers.update(setup_review.structure_answers(structure, company, earnings))
         links["structure"] = structure
+    rules = _rules_now(company)
+    answers.update(rule_marks=str(rules["marks_per_day"]), rule_divisor=str(rules["divisor"]), rule_cap=f"{rules['cap']:g}")
     links.update({"company": company, "user": frappe.session.user, "holiday_list": holiday_list})
     return {"answers": answers, "industry": industry, "links": links, "designations_visible": len(frappe.get_all("Designation", filters={"company": mine}, pluck="name"))}
+
+
+def _rules_now(company: str) -> dict:
+    from reckon_hrms.api.deductions import _policy
+
+    marks, divisor, cap = _policy(company)
+    return {"marks_per_day": marks, "divisor": divisor, "cap": float(cap)}
+
+
+@frappe.whitelist(methods=["GET"])
+def payroll_readiness() -> dict:
+    """The salary process step by step with its status: what HR Studio already did is only linked, never asked again. Read only."""
+    frappe.only_for(ADMIN_ROLES + ["Payroll Manager"])
+    from reckon_hrms import setup_review
+
+    company = _company()
+    mine = ["in", [company, "", None]]
+    active = frappe.db.count("Employee", {"company": company, "status": "Active"})
+    assigned = frappe.db.sql(
+        "SELECT COUNT(DISTINCT ssa.employee) FROM `tabSalary Structure Assignment` ssa JOIN `tabEmployee` e ON e.name = ssa.employee "
+        "WHERE ssa.docstatus = 1 AND e.status = 'Active' AND e.company = %s", (company,))[0][0]
+    payable = frappe.db.get_value("Company", company, "default_payroll_payable_account") or ""
+    run = frappe.db.get_value("Payroll Entry", {"company": company}, ["name", "docstatus", "creation"], as_dict=True, order_by="creation desc")
+    last = None
+    if run:
+        paid = frappe.db.exists("Salary Slip", {"payroll_entry": run.name, "docstatus": 1, "reckon_payment_entry": ["is", "set"]})
+        last = {"name": run.name, "status": "Paid" if paid else ("Draft" if run.docstatus == 0 else "Submitted")}
+    facts = {
+        "company": company, "employees": frappe.db.count("Employee", {"company": company}),
+        "holiday_list": frappe.db.get_value("Holiday List", {"company": company}, "name") or "",
+        "shifts": frappe.db.count("Shift Type", {"company": company}),
+        "leave_policies": frappe.db.count("Leave Policy", {"company": company}),
+        "payable_account": payable,
+        "components": len(frappe.get_all("Salary Component", filters={"company": mine}, pluck="name")),
+        "structures": frappe.db.count("Salary Structure", {"company": company, "docstatus": 1}),
+        "active": active, "assigned": int(assigned or 0), "rules": _rules_now(company), "last_run": last,
+    }
+    groups = setup_review.payroll_groups(facts)
+    return {"company": company, "groups": groups, "rules": facts["rules"],
+            "ready": all(r["done"] for g in groups for r in g["rows"] if r["key"] in ("payable", "components", "structure", "assignments"))}
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_payroll_account() -> dict:
+    """Give the company the payroll payable account a salary run needs. Safe to repeat."""
+    frappe.only_for(ADMIN_ROLES + ["Payroll Manager"])
+    from reckon_hrms.payroll import ensure_payroll_payable
+
+    account = ensure_payroll_payable(_company())
+    if not account:
+        frappe.throw(_("The company has no liabilities account to put it under. Add one in the chart of accounts first."))
+    frappe.db.commit()
+    return {"account": account}
+
+
+@frappe.whitelist(methods=["POST"])
+def save_payroll_rules(marks_per_day, divisor, cap=0) -> dict:
+    """Save the company's late and early deduction rule. Nothing is deducted by saving it."""
+    frappe.only_for(ADMIN_ROLES + ["Payroll Manager"])
+    clean = setup_plan.normalize_answers({"rule_marks": marks_per_day, "rule_divisor": divisor, "rule_cap": cap})["rules"]
+    if not clean or not (clean["marks_per_day"] and clean["divisor"]):
+        frappe.throw(_("Give both numbers: marks that equal one day (1 to 31) and the divisor for a day's pay (1 to 31)."))
+    return {"saved": _rules(_company(), clean)}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -368,9 +434,19 @@ def run_setup(answers) -> dict:
     run("shift", "Working hours", lambda: _shift(company, clean["shift"]))
     run("leave", "Leave policy", lambda: _leave_policy(company, clean["leave"]))
     run("structure", "Salary structure", lambda: _structure(company, clean["structure"]))
+    run("rules", "Attendance deduction rule", lambda: _rules(company, clean["rules"]))
     frappe.db.commit()
     return {"company": company, "results": results, "done": sum(r["result"] == "done" for r in results),
             "failed": sum(r["result"] == "failed" for r in results)}
+
+
+def _rules(company: str, rules: dict) -> str:
+    meta = frappe.get_meta("Company")
+    if not meta.has_field("reckon_marks_per_day"):
+        frappe.throw(_("The attendance deduction fields are not installed on this site yet."))
+    frappe.db.set_value("Company", company, {"reckon_marks_per_day": rules["marks_per_day"], "reckon_deduction_divisor": rules["divisor"],
+                                             "reckon_deduction_cap": rules["cap"]})
+    return "Saved"
 
 
 def _country(company: str, country: str) -> str:

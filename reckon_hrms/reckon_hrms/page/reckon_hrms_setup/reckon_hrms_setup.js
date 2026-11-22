@@ -30,7 +30,8 @@ frappe.pages["reckon-hrms-setup"].on_page_load = function (wrapper) {
 	page.set_secondary_action(__("Ask AI"), () => window.ReckonStudioAsk("payroll"), "es-line-add");
 	if (fromRoute || fromHash) go(fromRoute || fromHash);
 	else {
-		frappe.call({ method: "reckon_hrms.api.industry.current_segment", type: "GET" })
-			.then((r) => go(r.message && r.message.segment ? "salary" : "guided")).catch(() => go("salary"));
+		// Payroll that is not ready yet opens on the guided setup; a ready one on the salary rules.
+		frappe.call({ method: "reckon_hrms.api.ai_setup.payroll_readiness", type: "GET" })
+			.then((r) => go(r.message && r.message.ready ? "salary" : "guided")).catch(() => go("salary"));
 	}
 };

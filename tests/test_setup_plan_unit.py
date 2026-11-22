@@ -29,8 +29,10 @@ class ParseTests(unittest.TestCase):
         self.assertIsNone(a["shift"])
         self.assertIn("start and an end", a["shift_problem"])
 
-    def test_weekly_off_defaults_to_friday_but_can_be_none(self):
-        self.assertEqual(sp.normalize_answers({})["weekly_off"], ["Friday"])
+    def test_weekly_off_is_only_planned_when_it_was_asked(self):
+        self.assertEqual(sp.normalize_answers({})["weekly_off"], [])
+        self.assertFalse(sp.normalize_answers({})["weekly_asked"])
+        self.assertTrue(sp.normalize_answers({"weekly_off": []})["weekly_asked"])
         self.assertEqual(sp.normalize_answers({"weekly_off": ["Friday", "Saturday", "Funday"]})["weekly_off"], ["Friday", "Saturday"])
         self.assertEqual(sp.normalize_answers({"weekly_off": []})["weekly_off"], [])
 
@@ -47,18 +49,17 @@ class PlanTests(unittest.TestCase):
     def steps(self, plan):
         return {s["key"]: s for s in plan["steps"]}
 
-    def test_an_empty_interview_only_loads_the_industry_and_the_weekly_off(self):
+    def test_an_empty_interview_only_loads_the_industry(self):
         steps = self.steps(self.plan({}))
         self.assertEqual(steps["industry"]["status"], "ready")
-        self.assertEqual(steps["holidays"]["status"], "ready")
-        for key in ("country", "language", "locations", "departments", "titles", "shift", "leave", "structure"):
+        for key in ("country", "language", "locations", "departments", "titles", "holidays", "shift", "leave", "structure", "rules"):
             self.assertEqual(steps[key]["status"], "skipped", key)
 
     def test_a_full_interview_plans_every_step(self):
         plan = self.plan({"country": "Bangladesh", "language": "bn", "locations": "Head Office, Dhaka Factory", "extra_departments": "Legal", "extra_titles": "Intern", "holidays": "2026-03-26 Independence Day",
                           "shift_name": "General", "shift_start": "09:00", "shift_end": "17:30", "late_grace": "10",
                           "leave_casual": "10", "leave_sick": "14", "structure_name": "Standard", "basic_pct": "60", "hra_pct": "20",
-                          "medical_amount": "1500", "conveyance_amount": "1000"})
+                          "medical_amount": "1500", "conveyance_amount": "1000", "rule_marks": "3", "rule_divisor": "30"})
         steps = self.steps(plan)
         self.assertEqual([k for k, s in steps.items() if s["status"] != "ready"], [])
         self.assertIn("Basic Salary: 60% of gross", steps["structure"]["items"])
@@ -72,7 +73,8 @@ class PlanTests(unittest.TestCase):
         keys = [q["key"] for q in sp.QUESTIONS]
         self.assertEqual(keys[:4], ["country", "language", "locations", "extra_departments"])
         self.assertEqual(keys[-1], "structure_name")
-        self.assertTrue(all(q["studio"] == "both" for q in sp.QUESTIONS))
+        # Payroll has its own studio: the salary structure is not an HR question.
+        self.assertEqual([q["key"] for q in sp.QUESTIONS if q["studio"] == "payroll"], ["structure_name"])
 
     def test_weekly_off_is_suggested_by_country_and_never_applied_silently(self):
         self.assertEqual(sp.suggest_weekly_off("Bangladesh"), ["Friday"])
@@ -194,3 +196,35 @@ class SameDepartmentTests(unittest.TestCase):
         step = next(s for s in sp.build_plan(a, SEG, "Acme", {"departments": set()})["steps"] if s["key"] == "departments")
         self.assertEqual(step["items"][0], "Accounts and Finance")
         self.assertIn("Finance Dept (same as Accounts and Finance, not added)", step["items"])
+
+
+class DeductionRuleTests(unittest.TestCase):
+    def plan(self, raw, existing=None):
+        return sp.build_plan(sp.normalize_answers(raw, 2026), SEG, "Acme", existing)
+
+    def step(self, plan, key):
+        return next(s for s in plan["steps"] if s["key"] == key)
+
+    def test_a_rule_is_planned_with_its_numbers_in_words(self):
+        step = self.step(self.plan({"rule_marks": "3", "rule_divisor": "30", "rule_cap": "2000"}), "rules")
+        self.assertEqual(step["status"], "ready")
+        self.assertEqual(step["items"], ["Every 3 late or early marks = 1 day; a day's pay is base salary / 30; capped at 2000 a month"])
+        self.assertIn("Nothing is deducted by saving", step["note"])
+
+    def test_the_same_rule_that_exists_is_not_saved_again(self):
+        existing = {"rules": {"marks_per_day": 3, "divisor": 30, "cap": 0.0}}
+        step = self.step(self.plan({"rule_marks": "3", "rule_divisor": "30"}, existing), "rules")
+        self.assertEqual(step["status"], "skipped")
+        self.assertIn("Already set up", step["note"])
+        changed = self.step(self.plan({"rule_marks": "4", "rule_divisor": "30"}, existing), "rules")
+        self.assertEqual(changed["status"], "ready")
+
+    def test_half_a_rule_asks_for_attention_and_numbers_out_of_range_are_dropped(self):
+        half = self.step(self.plan({"rule_marks": "3"}), "rules")
+        self.assertEqual(half["status"], "attention")
+        self.assertIsNone(sp.normalize_answers({"rule_marks": "99", "rule_divisor": "99"})["rules"])
+        self.assertEqual(self.step(self.plan({}), "rules")["status"], "skipped")
+
+    def test_no_weekly_off_is_planned_unless_it_was_asked(self):
+        self.assertEqual(self.step(self.plan({"rule_marks": "3", "rule_divisor": "30"}), "holidays")["status"], "skipped")
+        self.assertEqual(self.step(self.plan({"weekly_off": ["Friday"]}), "holidays")["status"], "ready")
