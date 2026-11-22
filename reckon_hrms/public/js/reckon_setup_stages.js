@@ -77,13 +77,18 @@ window.ReckonSetupStages.company = function (parent) {
 
 	function loadChips(list, box) {
 		const args = { doctype: list.doctype, start: 0, page_length: 100 };
-		if (list.doctype === "Department" && company) args.company = company;
 		return frappe.call({ method: "reckon_hrms.api.setup.list_items", args, type: "GET" }).then((r) => {
 			const wrap = box.find(".rhc-chips").empty();
 			if (!r.message.rows.length) wrap.append(`<span class="rhc-muted">Nothing added yet.</span>`);
+			// What is already there is not offered again as a suggestion.
+			const have = new Set(r.message.rows.map((row) => String(row.label || row.name).replace(/\s+/g, " ").trim().toLowerCase()));
+			box.find("[data-suggest] .rhc-suggest").each(function () {
+				const name = this.textContent.replace(/^\+\s*/, "").replace(/\s+/g, " ").trim().toLowerCase();
+				$(this).toggle(!have.has(name));
+			});
 			r.message.rows.forEach((row) => {
-				const chip = $(`<span class="rhc-chip">${esc(row.name)} <span class="rhc-n">${row.employees} people</span>
-					<button type="button" aria-label="Remove ${esc(row.name)}">×</button></span>`);
+				const chip = $(`<span class="rhc-chip">${esc(row.label || row.name)} <span class="rhc-n">${row.employees} ${row.employees === 1 ? "person" : "people"}</span>
+					<button type="button" aria-label="Remove ${esc(row.label || row.name)}">×</button></span>`);
 				chip.find("button").on("click", () => removeItem(list, row.name, box));
 				wrap.append(chip);
 			});
@@ -125,8 +130,8 @@ window.ReckonSetupStages.company = function (parent) {
 			<button class="rhc-btn" id="pickBtn" type="button">Upload CSV file</button></div>
 			<div id="impOut" class="rhc-muted" style="margin-top:10px"></div></div>
 		<div class="rhc-card"><h2>Next</h2>
-			<p class="rhc-muted">Holidays and leave, and attendance settings come next. Until then use the standard
-			<a href="/app/employee">Employee list</a>.</p>
+			<p class="rhc-muted">To review holidays, leave, working hours or the salary structure, open <a href="/desk/reckon-hrms/reckon-hrms-hr-studio#guided">Guided setup</a>,
+			where every step has its own link. Salary comes next.</p>
 			<div class="rhc-row"><a class="rhc-btn rhc-pri" href="/desk/reckon-hrms/reckon-hrms-salary">Continue to salary rules</a></div></div>`);
 
 	// Add your people: template, upload, dry-run check, then a background import with progress.
