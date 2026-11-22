@@ -80,6 +80,13 @@ window.ReckonSetupStages.company = function (parent) {
 		return frappe.call({ method: "reckon_hrms.api.setup.list_items", args, type: "GET" }).then((r) => {
 			const wrap = box.find(".rhc-chips").empty();
 			if (!r.message.rows.length) wrap.append(`<span class="rhc-muted">Nothing added yet.</span>`);
+			// The server knows the industry: its suggestions replace the fixed ones (None means keep the fixed list).
+			if (Array.isArray(r.message.suggest)) {
+				const holder = box.find("[data-suggest]").empty();
+				r.message.suggest.forEach((name) => {
+					$(`<button type="button" class="rhc-suggest">+ ${esc(name)}</button>`).on("click", () => addItem(list, name, box)).appendTo(holder);
+				});
+			}
 			// What is already there is not offered again as a suggestion.
 			const have = new Set(r.message.rows.map((row) => String(row.label || row.name).replace(/\s+/g, " ").trim().toLowerCase()));
 			box.find("[data-suggest] .rhc-suggest").each(function () {

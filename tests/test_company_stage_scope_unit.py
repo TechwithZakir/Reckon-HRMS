@@ -67,3 +67,13 @@ class SalaryScopeTests(unittest.TestCase):
 
     def test_the_component_total_is_what_the_person_may_see(self):
         self.assertNotIn('frappe.db.count("Salary Component")', SALARY)
+
+
+class SuggestionTests(unittest.TestCase):
+    def test_department_and_job_title_suggestions_come_from_the_industry_and_skip_what_exists(self):
+        body = API[API.index("def _suggestions"): API.index("def create_item") if "def create_item" in API[API.index("def _suggestions"):] else len(API)]
+        self.assertIn("reckon_industry", body)
+        self.assertIn("similar_department(n, have)", body)
+
+    def test_the_screen_uses_the_servers_suggestions_when_it_sends_them(self):
+        self.assertIn("Array.isArray(r.message.suggest)", JS)

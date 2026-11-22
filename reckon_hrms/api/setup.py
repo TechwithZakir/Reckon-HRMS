@@ -83,7 +83,24 @@ def list_items(doctype: str, start=0, page_length=DEFAULT_PAGE, company: str | N
         "page_length": length_i,
         "add_new": route(doctype, "new"),
         "list": route(doctype, "list"),
+        "suggest": _suggestions(doctype, mine, [r.get(name_field) or r.name for r in rows]),
     }
+
+
+def _suggestions(doctype: str, company: str, have: list[str]):
+    """Departments and job titles worth adding: the chosen industry's, else the standard ones, minus what exists (also in other words)."""
+    if doctype not in ("Department", "Designation"):
+        return None
+    from reckon_hrms import defaults, salary_suggest
+    from reckon_hrms.setup_plan import same, similar_department
+
+    key = frappe.db.get_value("Company", company, "reckon_industry") or ""
+    seg = salary_suggest.load_benchmark()["segments"].get(key)
+    if doctype == "Department":
+        names = list(seg["departments"]) if seg else list(defaults.DEPARTMENTS)
+        return [n for n in names if not similar_department(n, have)]
+    names = [r["role"] for r in seg["roles"]] if seg else []
+    return [n for n in names if not any(same(n, h) for h in have)]
 
 
 @frappe.whitelist(methods=["POST"])

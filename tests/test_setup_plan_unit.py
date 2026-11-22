@@ -155,3 +155,42 @@ class NoDuplicateTests(unittest.TestCase):
         added = self.steps(self.plan(raw, {"structures": ["Reckon BD SME"]}))["structure"]
         self.assertEqual(added["status"], "ready")
         self.assertIn("You already have: Reckon BD SME", added["note"])
+
+
+class SameDepartmentTests(unittest.TestCase):
+    """A department that means the same as an existing one is not added again, whatever its spelling."""
+
+    HAVE = ["Customer Service", "Dispatch", "Finance", "Legal", "Management", "Marketing", "Operations", "Production", "Purchase",
+            "Quality Management", "Research & Development", "Sales & Marketing", "Software", "Support"]
+
+    def test_the_cases_from_the_screen(self):
+        for wanted, twin in (("Sales", "Sales & Marketing"), ("Quality", "Quality Management"), ("Accounts and Finance", "Finance"),
+                             ("Finance Department", "Finance"), ("Customer  service", "Customer Service"), ("R&D", None)):
+            found = sp.similar_department(wanted, self.HAVE)
+            self.assertEqual(found, twin, wanted)
+
+    def test_departments_that_differ_are_kept_apart(self):
+        for name in ("Engineering", "Product", "Merchandising", "Store", "Maintenance", "Security", "Accounts", "HR & Admin", "IT"):
+            self.assertIsNone(sp.similar_department(name, self.HAVE), name)
+
+    def test_hr_means_human_resources(self):
+        self.assertEqual(sp.similar_department("HR", ["Human Resources"]), "Human Resources")
+        self.assertEqual(sp.similar_department("Human Resources", ["HR"]), "HR")
+
+    def test_a_long_name_with_more_words_is_a_different_department(self):
+        self.assertIsNone(sp.similar_department("Sales", ["Sales Operations and Strategy Planning"]))
+
+    def test_the_plan_adds_only_what_has_no_twin_and_says_why(self):
+        a = sp.normalize_answers({"extra_departments": "Sales, Engineering, quality"}, 2026)
+        plan = sp.build_plan(a, SEG, "Acme", {"departments": set(self.HAVE)})
+        step = next(s for s in plan["steps"] if s["key"] == "departments")
+        self.assertEqual(step["status"], "ready")
+        self.assertEqual(step["items"][0], "Engineering")
+        self.assertIn("Sales (same as Sales & Marketing, not added)", step["items"])
+        self.assertIn("quality (same as Quality Management, not added)", step["items"])
+
+    def test_two_new_names_that_mean_the_same_are_added_once(self):
+        a = sp.normalize_answers({"extra_departments": "Accounts and Finance, Finance Dept"}, 2026)
+        step = next(s for s in sp.build_plan(a, SEG, "Acme", {"departments": set()})["steps"] if s["key"] == "departments")
+        self.assertEqual(step["items"][0], "Accounts and Finance")
+        self.assertIn("Finance Dept (same as Accounts and Finance, not added)", step["items"])

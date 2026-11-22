@@ -12,6 +12,7 @@ from __future__ import annotations
 import frappe
 
 from reckon_hrms import salary_suggest
+from reckon_hrms.setup_plan import similar_department as salary_suggest_similar
 
 # Component names are shared with the existing starter set so they are reused, not duplicated.
 COMPONENT_ABBR = {
@@ -114,6 +115,9 @@ def _designation(name: str) -> str:
 def _department(company: str, name: str) -> str:
     if frappe.db.exists("Department", {"department_name": name, "company": company}):
         return "exists"
+    have = frappe.get_all("Department", filters={"company": company, "is_group": 0}, pluck="department_name")
+    if salary_suggest_similar(name, have):  # "Sales" when "Sales & Marketing" exists is the same department
+        return "exists"
     frappe.get_doc({"doctype": "Department", "department_name": name, "company": company}).insert(
         ignore_permissions=True)
     return "created"
@@ -160,9 +164,10 @@ def preview_segment(company: str, segment: str, data: dict | None = None) -> dic
     component_names = seg["components"] + seg["recovery_deductions"]
     code_taken = {n for n in component_names if not frappe.db.exists("Salary Component", n)
                   and frappe.db.exists("Salary Component", {"salary_component_abbr": COMPONENT_ABBR[n]})}
+    company_departments = frappe.get_all("Department", filters={"company": company, "is_group": 0}, pluck="department_name")
     existing = {
         "designations": {r for r in (x["role"] for x in seg["roles"]) if frappe.db.exists("Designation", r)},
-        "departments": {n for n in seg["departments"] if frappe.db.exists("Department", {"department_name": n, "company": company})},
+        "departments": {n for n in seg["departments"] if salary_suggest_similar(n, company_departments)},
         "leave_types": {n for n in seg["leave_types"] if frappe.db.exists("Leave Type", n)},
         "components": {n for n in component_names if frappe.db.exists("Salary Component", n)},
         "code_taken": code_taken,

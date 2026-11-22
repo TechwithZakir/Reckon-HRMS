@@ -70,6 +70,32 @@ def missing(names: list[str], have) -> list[str]:
     return [n for n in names if re.sub(r"\s+", " ", n).strip().casefold() not in keys]
 
 
+_DEPT_NOISE = {"and", "department", "departments", "dept", "team", "division", "the", "of"}
+_DEPT_SYNONYMS = {"hr": ("human", "resources")}
+
+
+def _dept_tokens(name: str) -> frozenset:
+    words = re.sub(r"[^a-z0-9 ]+", " ", str(name).casefold().replace("&", " and ")).split()
+    out = []
+    for w in words:
+        out.extend(_DEPT_SYNONYMS.get(w, (w,)))
+    return frozenset(w for w in out if w not in _DEPT_NOISE)
+
+
+def similar_department(name: str, have) -> str | None:
+    """The existing department that means the same as ``name`` ("Sales" and "Sales & Marketing", "Finance" and
+    "Accounts and Finance"), else None. Words are compared, not spelling: the shorter name's words must all be in the longer."""
+    mine = _dept_tokens(name)
+    if not mine:
+        return None
+    for other in have:
+        theirs = _dept_tokens(other)
+        small, big = sorted((mine, theirs), key=len)
+        if small and small <= big and len(big) <= 3:
+            return str(other)
+    return None
+
+
 def split_names(text, limit: int = MAX_LIST) -> list[str]:
     """Names separated by commas, semicolons or new lines: trimmed, no repeats, in the order given."""
     seen, out = set(), []
@@ -207,8 +233,15 @@ def build_plan(answers: dict, segment: dict | None, company: str, existing: dict
     step("locations", "Locations (branches)", [*new_locations, *_there(answers["locations"], new_locations)] or ["Nothing to add"],
          "ready" if new_locations else "skipped", "" if new_locations or not answers["locations"] else "Already set up. Edit them in Branch.")
     have = existing.get("departments", set())
-    new_departments = missing(answers["extra_departments"], have)
-    step("departments", "Departments", [*new_departments, *_there(answers["extra_departments"], new_departments)] or ["Nothing to add"],
+    new_departments, lines, seen = [], [], []
+    for d in answers["extra_departments"]:
+        twin = similar_department(d, [*have, *seen])
+        if twin:
+            lines.append(f"{d} (already there)" if same(d, twin) else f"{d} (same as {twin}, not added)")
+        else:
+            new_departments.append(d)
+            seen.append(d)
+    step("departments", "Departments", [*new_departments, *lines] or ["Nothing to add"],
          "ready" if new_departments else "skipped", "" if new_departments or not answers["extra_departments"] else "Already set up. Edit them in Department.")
     have = existing.get("designations", set())
     new_titles = missing(answers["extra_titles"], have)
