@@ -116,10 +116,8 @@ window.ReckonSetupStages.company = function (parent) {
 			<div class="rhc-bar"><b id="bar" style="width:0%"></b></div>
 			<ul class="rhc-checks" id="checks"></ul></div>
 		<div class="rhc-card"><h2>Your industry <span class="rhc-map">Company · reckon_industry</span></h2>
-			<div class="rhc-muted" id="indNow">Not chosen yet.</div>
-			<div class="rhc-row"><select id="indSel" aria-label="Industry" class="form-control" style="flex:1 1 260px"><option value="">Choose an industry</option></select>
-			<button class="rhc-btn rhc-pri" id="indBtn" type="button">Set up for this industry</button></div>
-			<div class="rhc-muted" id="indMsg" style="margin-top:8px">Adds starter job titles, departments, salary components and leave types for your industry. Nothing is paid, and salary amounts stay for you to set.</div></div>
+			<div class="rhc-muted" id="indNow">Loading…</div>
+			<div class="rhc-row"><a class="rhc-btn rhc-pri" id="indGo" href="/desk/reckon-hrms/reckon-hrms-hr-studio#guided">Review or change it in Guided setup</a></div></div>
 		<div id="lists"></div>
 		<div class="rhc-card"><h2>Add your people <span class="rhc-map">Employee · Data Import</span></h2>
 			<div class="rhc-muted">Download the template, fill it in, then upload it. We check the file first; nothing is saved until you press Add.</div>
@@ -183,36 +181,12 @@ window.ReckonSetupStages.company = function (parent) {
 		lists.append(box);
 		return { list, box };
 	});
-	// Industry: the admin picks a segment, and its starter masters are added to this company.
-		const indSel = root.find("#indSel");
-		const indMsg = (text) => root.find("#indMsg").text(text);
-		frappe.call({ method: "reckon_hrms.api.industry.list_segments", type: "GET" }).then((r) => {
-			indSel.append(r.message.map((s) => `<option value="${esc(s.key)}">${esc(s.label)} (${s.role_count} roles)</option>`).join(""));
-		}).catch(() => indMsg("Choosing an industry needs the HR Manager role."));
-		if (company) {
-			frappe.call({ method: "frappe.client.get_value", args: { doctype: "Company", filters: { name: company }, fieldname: "reckon_industry" } })
-				.then((r) => {
-					const seg = r.message && r.message.reckon_industry;
-					const found = seg && indSel.find(`option[value="${seg}"]`).text();
-					if (found) root.find("#indNow").text(`Current industry: ${found}`);
-				});
-		}
-		root.find("#indBtn").on("click", () => {
-			const seg = indSel.val();
-			if (!seg) return indMsg("Choose an industry first.");
-			const label = indSel.find("option:selected").text();
-			frappe.confirm(`Set up ${company || "your company"} for ${label}? This adds starter job titles, departments, salary components and leave types. Nothing is paid.`, () => {
-				indMsg("Setting up…");
-				frappe.call({ method: "reckon_hrms.api.industry.choose_segment", args: { segment: seg } }).then((r) => {
-					const c = r.message.created;
-					indMsg(`Added ${c.designations} job titles, ${c.departments} departments, ${c.components} salary components and ${c.leave_types} leave types.`
-						+ (r.message.skipped_components.length ? ` Not added (code already used): ${r.message.skipped_components.join(", ")}.` : ""));
-					root.find("#indNow").text(`Current industry: ${label}`);
-					boxes.forEach((b) => loadChips(b.list, b.box));
-					loadState();
-				}).catch((e) => indMsg((e && e.message) || "Could not set up this industry."));
-			});
-		});
+	// Industry: chosen, previewed and set up in one place (Guided setup); this tab only shows it.
+		frappe.call({ method: "reckon_hrms.api.industry.current_segment", type: "GET" }).then((r) => {
+			const c = r.message || {};
+			root.find("#indNow").text(c.label ? `Current industry: ${c.label}` : "Not chosen yet. Choose it in Guided setup to see what it pre-loads.");
+		}).catch(() => root.find("#indNow").text("Choosing an industry needs the HR Manager role."));
+		root.find("#indGo").on("click", (e) => { e.preventDefault(); frappe.route_options = { stage: "guided" }; frappe.set_route("reckon-hrms-hr-studio"); });
 		loadState().catch(() => root.find("#checks").html(`<li class="rhc-err">Could not load the checklist.</li>`));
 	boxes.forEach((b) => loadChips(b.list, b.box).catch(() => showErr(b.box, "Could not load this list.")));
 };

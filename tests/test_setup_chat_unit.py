@@ -314,3 +314,38 @@ class IntentTests(unittest.TestCase):
         r3 = sc.turn("start industry", None, env)
         r3 = sc.turn("we do many things", r3["state"], env)
         self.assertNotIn("industry", r3["state"]["answers"])
+
+
+class NowTests(unittest.TestCase):
+    """Each question shows what the company already has and the page that edits it."""
+
+    def env(self):
+        env = make_env()
+        env["current"] = {"country": "Bangladesh", "language": "bn", "locations": "Head Office, Dhaka Factory", "weekly_off": ["Friday"],
+                          "shift_name": "General", "shift_start": "09:00", "shift_end": "17:30", "leave_casual": "10", "leave_sick": "14",
+                          "structure_name": "Standard Structure", "basic_pct": "60"}
+        env["current_industry"] = "healthcare"
+        return env
+
+    def ask(self, key):
+        r = say("start " + key, None, self.env())
+        return r
+
+    def test_existing_data_is_shown_with_its_edit_page(self):
+        self.assertIn("Now: Head Office, Dhaka Factory. Skip to keep it, or edit it in Branch.", self.ask("locations")["reply"])
+        self.assertIn("edit it in Shift Type", self.ask("shift")["reply"])
+        self.assertIn("Now: Casual 10, Sick 14", self.ask("leave")["reply"])
+        self.assertIn("edit it in Salary Structure", self.ask("structure")["reply"])
+        self.assertIn("Now: Friday", self.ask("weekly_off")["reply"])
+
+    def test_nothing_is_shown_when_nothing_exists_yet(self):
+        r = say("start locations", None, make_env())
+        self.assertNotIn("Now:", r["reply"])
+
+    def test_radio_buttons_and_checkboxes_open_with_the_current_choice(self):
+        lang = self.ask("language")["choices"]["options"]
+        self.assertEqual([o["checked"] for o in lang], [False, True])
+        ind = self.ask("industry")["choices"]["options"]
+        self.assertEqual([o["label"] for o in ind if o["checked"]], ["Healthcare"])
+        days = self.ask("weekly_off")["choices"]["options"]
+        self.assertEqual([o["value"] for o in days if o["checked"]], ["Friday"])

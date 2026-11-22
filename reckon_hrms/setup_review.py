@@ -6,6 +6,8 @@ offers "Set up now", which starts that step of the setup chat; a finished step o
 
 from __future__ import annotations
 
+import re
+
 
 def _count(n: int, one: str, many: str) -> str:
     return f"{n} {one if n == 1 else many}"
@@ -49,6 +51,60 @@ def rows(facts: dict, studio: str = "hr") -> list[dict]:
          "detail": _count(facts.get("assignments", 0), "assignment", "assignments"), "doctype": "Salary Structure Assignment", "name": None, "chat": None},
     ]
     return payroll if studio == "payroll" else hr
+
+
+LEAVE_FIELDS = {"Casual Leave": "leave_casual", "Sick Leave": "leave_sick", "Earned Leave": "leave_earned", "Maternity Leave": "leave_maternity"}
+_FORMULA = re.compile(r"^\s*base\s*\*\s*([0-9]+(?:\.[0-9]+)?)\s*$")
+
+
+def _g(value) -> str:
+    return f"{float(value):g}"
+
+
+def strip_suffix(name: str, suffix: str) -> str:
+    """"Standard Structure - Acme Ltd." with suffix "Acme Ltd." -> "Standard Structure"."""
+    tail = f" - {suffix}"
+    return name[: -len(tail)] if suffix and name.endswith(tail) else name
+
+
+def shift_answers(name: str, start, end, grace, abbr: str = "") -> dict:
+    """The company's shift as interview answers (times as HH:MM)."""
+    out = {"shift_name": strip_suffix(name, abbr), "shift_start": str(start)[:5].rjust(5, "0"), "shift_end": str(end)[:5].rjust(5, "0")}
+    if grace:
+        out["late_grace"] = str(int(grace))
+    return out
+
+
+def leave_answers(details: list[dict]) -> dict:
+    """A Leave Policy's rows as interview answers: ``[{"leave_type": ..., "annual_allocation": ...}]``."""
+    return {LEAVE_FIELDS[d["leave_type"]]: _g(d["annual_allocation"]) for d in details if d.get("leave_type") in LEAVE_FIELDS and d.get("annual_allocation")}
+
+
+def structure_answers(name: str, company: str, earnings: list[dict]) -> dict:
+    """A Salary Structure as interview answers. A percent is only read back when the formula is a plain percent of the gross."""
+    out = {"structure_name": strip_suffix(name, company)}
+    for row in earnings:
+        component, formula = row.get("salary_component"), row.get("formula") or ""
+        match = _FORMULA.match(formula) if row.get("amount_based_on_formula") else None
+        if component == "Basic Salary" and match:
+            out["basic_pct"] = _g(float(match.group(1)) * 100)
+        elif component == "House Rent Allowance" and match:
+            out["hra_pct"] = _g(float(match.group(1)) * 100)
+        elif component == "Medical Allowance" and not formula and row.get("amount"):
+            out["medical_amount"] = _g(row["amount"])
+        elif component == "Conveyance Allowance" and not formula and row.get("amount"):
+            out["conveyance_amount"] = _g(row["amount"])
+    return out
+
+
+def holiday_answers(country_set: bool, weekly: list[str], named: list[dict]) -> dict:
+    """The holiday list as interview answers: the weekly off days, and either "from the calendar" or the named holidays."""
+    out = {"weekly_off": list(weekly)}
+    if country_set:
+        out["holidays_country"] = "1"
+    elif named:
+        out["holidays"] = "\n".join(f"{h['date']} {h['name']}" for h in named)
+    return out
 
 
 def finished(rows_: list[dict]) -> bool:

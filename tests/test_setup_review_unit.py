@@ -57,3 +57,45 @@ class ReviewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReadBackTests(unittest.TestCase):
+    """What the company already has comes back as interview answers, so the questions open pre-filled."""
+
+    def test_a_shift_comes_back_without_the_company_suffix_and_with_hh_mm_times(self):
+        self.assertEqual(sr.shift_answers("General Shift - ACME", "09:00:00", "17:30:00", 10, "ACME"),
+                         {"shift_name": "General Shift", "shift_start": "09:00", "shift_end": "17:30", "late_grace": "10"})
+        self.assertNotIn("late_grace", sr.shift_answers("Day", "9:00:00", "17:00:00", 0))
+
+    def test_a_leave_policy_comes_back_as_days_per_type(self):
+        rows = [{"leave_type": "Casual Leave", "annual_allocation": 10.0}, {"leave_type": "Sick Leave", "annual_allocation": 14.0},
+                {"leave_type": "Compensatory Off", "annual_allocation": 3.0}, {"leave_type": "Earned Leave", "annual_allocation": 0}]
+        self.assertEqual(sr.leave_answers(rows), {"leave_casual": "10", "leave_sick": "14"})
+
+    def test_a_structure_gives_back_percents_only_when_they_are_plain_percents_of_the_gross(self):
+        earnings = [
+            {"salary_component": "Basic Salary", "amount_based_on_formula": 1, "formula": "base * 0.6", "amount": 0},
+            {"salary_component": "House Rent Allowance", "amount_based_on_formula": 1, "formula": "BASIC * 0.5", "amount": 0},
+            {"salary_component": "Medical Allowance", "amount_based_on_formula": 0, "formula": "", "amount": 1500.0},
+            {"salary_component": "Conveyance Allowance", "amount_based_on_formula": 0, "formula": "", "amount": 1000.0},
+        ]
+        out = sr.structure_answers("Standard Structure - Acme", "Acme", earnings)
+        self.assertEqual(out, {"structure_name": "Standard Structure", "basic_pct": "60", "medical_amount": "1500", "conveyance_amount": "1000"})
+        self.assertNotIn("hra_pct", out)  # "50% of Basic" is not a percent of the gross: shown on the page, not guessed here
+
+    def test_holidays_come_back_as_the_calendar_flag_or_the_named_list(self):
+        named = [{"date": "2026-03-26", "name": "Independence Day"}]
+        self.assertEqual(sr.holiday_answers(True, ["Friday"], named), {"weekly_off": ["Friday"], "holidays_country": "1"})
+        self.assertEqual(sr.holiday_answers(False, ["Friday", "Saturday"], named),
+                         {"weekly_off": ["Friday", "Saturday"], "holidays": "2026-03-26 Independence Day"})
+        self.assertEqual(sr.holiday_answers(False, [], []), {"weekly_off": []})
+
+    def test_what_is_read_back_goes_through_the_same_clean_up_as_typed_answers(self):
+        from reckon_hrms import setup_plan as sp
+
+        raw = {**sr.shift_answers("General", "09:00:00", "17:30:00", 10), **sr.leave_answers([{"leave_type": "Casual Leave", "annual_allocation": 10}]),
+               **sr.structure_answers("Std - Acme", "Acme", [{"salary_component": "Basic Salary", "amount_based_on_formula": 1, "formula": "base * 0.6"}])}
+        a = sp.normalize_answers(raw, 2026)
+        self.assertEqual(a["shift"], {"name": "General", "start": "09:00:00", "end": "17:30:00", "grace": 10})
+        self.assertEqual(a["leave"], {"Casual Leave": 10.0})
+        self.assertEqual(a["structure"]["basic_pct"], 60.0)

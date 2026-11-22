@@ -27,6 +27,7 @@ def _env(company: str) -> dict:
             "Return only the array. Never invent a holiday that is not in the text.", text)
         return setup_plan.parse_ai_holidays(rows, setup_plan.normalize_answers({})["year"])
 
+    cur = ai_setup.read_current(company)
     return {
         "company": company,
         "countries": frappe.get_all("Country", pluck="name", order_by="name asc", limit_page_length=0),
@@ -34,6 +35,7 @@ def _env(company: str) -> dict:
         "year": setup_plan.normalize_answers({})["year"],
         "current_country": frappe.db.get_value("Company", company, "country") or "",
         "country_holiday_count": lambda country: ai_setup.country_holiday_count(country, setup_plan.normalize_answers({})["year"]),
+        **{"current": cur["answers"], "current_industry": cur["industry"]},
         "build_plan": build_plan,
         "apply": ai_setup.run_setup,
         "ai_holidays": ai_holidays,

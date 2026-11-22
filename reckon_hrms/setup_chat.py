@@ -165,14 +165,49 @@ def _parse_structure(text: str):
     return out, None
 
 
+# The page that lists or edits each question's data; Aura turns the name into a link.
+EDIT_PAGE = {"locations": "Branch", "extra_departments": "Department", "extra_titles": "Designation", "weekly_off": "Holiday List",
+             "holidays": "Holiday List", "shift": "Shift Type", "leave": "Leave Policy", "structure": "Salary Structure"}
+
+
+def _now(key: str, env: dict, answers: dict) -> str:
+    """"Currently: ..." for a question whose data already exists, with the page to edit it. Empty when nothing is there yet."""
+    cur = {**env.get("current", {}), **answers}
+    text = ""
+    if key == "country" and cur.get("country"):
+        text = cur["country"]
+    elif key == "language" and cur.get("language"):
+        text = sp.LANGUAGES.get(cur["language"], cur["language"])
+    elif key in ("locations", "extra_departments", "extra_titles") and cur.get(key):
+        text = cur[key] if len(cur[key]) < 200 else cur[key][:200] + "..."
+    elif key == "weekly_off" and cur.get("weekly_off"):
+        text = " and ".join(cur["weekly_off"])
+    elif key == "holidays" and (cur.get("holidays_country") or cur.get("holidays")):
+        text = "the public holidays of your country" if cur.get("holidays_country") else "your own list"
+    elif key == "shift" and cur.get("shift_name"):
+        text = f"{cur['shift_name']}, {cur.get('shift_start', '')} to {cur.get('shift_end', '')}"
+    elif key == "leave" and any(k in cur for k, _ in sp.LEAVE_QUESTIONS):
+        text = ", ".join(f"{label.replace(' Leave', '')} {cur[k]}" for k, label in sp.LEAVE_QUESTIONS if cur.get(k))
+    elif key == "structure" and cur.get("structure_name"):
+        text = f"{cur['structure_name']} (basic {cur.get('basic_pct', '?')}%)"
+    if not text:
+        return ""
+    page = EDIT_PAGE.get(key)
+    return f"\nNow: {text}. Skip to keep it" + (f", or edit it in {page}." if page else ".")
+
+
 def _choices(key: str, env: dict, answers: dict):
     """Radio buttons for a single answer, checkboxes for several: what the chat draws under the question."""
     if key == "language":
-        return {"type": "single", "options": [{"label": "English", "value": "English"}, {"label": sp.LANGUAGES["bn"], "value": "Bangla"}]}
+        now = {**env.get("current", {}), **answers}.get("language")
+        return {"type": "single", "options": [{"label": "English", "value": "English", "checked": now == "en"},
+                                              {"label": sp.LANGUAGES["bn"], "value": "Bangla", "checked": now == "bn"}]}
     if key == "industry":
-        return {"type": "single", "options": [{"label": i["label"], "value": i["label"]} for i in env["industries"]]}
+        now = {**env.get("current", {}), **answers}.get("industry") or env.get("current_industry")
+        return {"type": "single", "options": [{"label": i["label"], "value": i["label"], "checked": i["key"] == now} for i in env["industries"]]}
     if key == "weekly_off":
-        usual = set(answers.get("weekly_off") or sp.suggest_weekly_off(answers.get("country")))
+        cur = {**env.get("current", {}), **answers}
+        usual = set(cur.get("weekly_off") or sp.suggest_weekly_off(cur.get("country")))
         return {"type": "multi", "options": [{"label": d, "value": d, "checked": d in usual} for d in sp.WEEKDAYS]}
     if key == "holidays":
         country, count = answers.get("country"), None
@@ -185,11 +220,17 @@ def _choices(key: str, env: dict, answers: dict):
 
 
 def _question(i: int, env, answers: dict) -> tuple[str, list[str]]:
+    """The question with what the company already has: ``Now: ...`` and the page to edit it."""
+    text, replies = _question_text(i, env, answers)
+    return text + _now(STEPS[i], env, answers), replies
+
+
+def _question_text(i: int, env, answers: dict) -> tuple[str, list[str]]:
     key = STEPS[i]
     head = f"**{i + 1} of {len(STEPS)}. "
     if key == "country":
         now = env["current_country"]
-        return head + "Which country is your company in?**" + (f"\nYour company is saved as {now}. Reply with the same, or a different country." if now else ""), ([now] if now else [])
+        return head + "Which country is your company in?**", ([now] if now else [])
     if key == "language":
         return head + "Which language do you want to work in?** Choose one.", ["skip"]
     if key == "locations":

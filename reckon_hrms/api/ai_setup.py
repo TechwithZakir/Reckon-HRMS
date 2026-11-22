@@ -93,6 +93,60 @@ def review_state(studio: str = "hr") -> dict:
     return {"company": company, "rows": rows_, "finished": setup_review.finished(rows_)}
 
 
+def read_current(company: str) -> dict:
+    """What the company already has, as interview answers, plus the page that edits each one. Read only."""
+    from reckon_hrms import setup_review
+
+    mine = ["in", [company, "", None]]
+    answers, links = {}, {}
+    country = frappe.db.get_value("Company", company, "country") or ""
+    if country:
+        answers["country"] = country
+    language = frappe.db.get_value("User", frappe.session.user, "language") or ""
+    if language in setup_plan.LANGUAGES:
+        answers["language"] = language
+    branches = frappe.get_all("Branch", filters={"company": company}, pluck="name", order_by="name asc")
+    if branches:
+        answers["locations"] = ", ".join(branches)
+    departments = frappe.get_all("Department", filters={"company": company, "is_group": 0}, pluck="department_name", order_by="department_name asc")
+    if departments:
+        answers["extra_departments"] = ", ".join(departments)
+    titles = frappe.get_all("Designation", filters={"company": company}, pluck="designation_name", order_by="designation_name asc")
+    if titles:
+        answers["extra_titles"] = ", ".join(titles)
+    industry = frappe.db.get_value("Company", company, "reckon_industry") or ""
+    holiday_list = frappe.db.get_value("Holiday List", {"company": company}, "name", order_by="to_date desc") or ""
+    if holiday_list:
+        hl = frappe.db.get_value("Holiday List", holiday_list, ["country"], as_dict=True)
+        rows = frappe.get_all("Holiday", filters={"parent": holiday_list}, fields=["weekly_off", "description", "holiday_date"], order_by="holiday_date asc", limit_page_length=0)
+        weekly = sorted({r.description for r in rows if r.weekly_off and r.description in setup_plan.WEEKDAYS}, key=setup_plan.WEEKDAYS.index)
+        named = [{"date": str(r.holiday_date), "name": r.description} for r in rows if not r.weekly_off]
+        answers.update(setup_review.holiday_answers(bool(hl and hl.country), weekly, named))
+    abbr = frappe.db.get_value("Company", company, "abbr") or ""
+    shift = frappe.db.get_value("Shift Type", {"company": company}, ["name", "start_time", "end_time", "late_entry_grace_period"], as_dict=True)
+    if shift:
+        answers.update(setup_review.shift_answers(shift.name, shift.start_time, shift.end_time, shift.late_entry_grace_period, abbr))
+    policy = frappe.db.get_value("Leave Policy", {"company": company, "docstatus": 1}, "name")
+    if policy:
+        details = frappe.get_all("Leave Policy Detail", filters={"parent": policy}, fields=["leave_type", "annual_allocation"], limit_page_length=0)
+        answers.update(setup_review.leave_answers(details))
+    structure = frappe.db.get_value("Salary Structure", {"company": company, "docstatus": 1}, "name", order_by="creation desc")
+    if structure:
+        earnings = frappe.get_all("Salary Detail", filters={"parent": structure, "parentfield": "earnings"},
+                                  fields=["salary_component", "amount", "amount_based_on_formula", "formula"], limit_page_length=0)
+        answers.update(setup_review.structure_answers(structure, company, earnings))
+        links["structure"] = structure
+    links.update({"company": company, "user": frappe.session.user, "holiday_list": holiday_list})
+    return {"answers": answers, "industry": industry, "links": links, "designations_visible": len(frappe.get_all("Designation", filters={"company": mine}, pluck="name"))}
+
+
+@frappe.whitelist(methods=["GET"])
+def current_answers() -> dict:
+    """The setup interview pre-filled with what the company already has, and where to edit each part."""
+    frappe.only_for(ADMIN_ROLES + ["Payroll Manager"])
+    return read_current(_company())
+
+
 @frappe.whitelist(methods=["GET"])
 def questions() -> dict:
     """The interview: every question, the industries to choose from, and the year the holidays are for."""
