@@ -103,3 +103,6 @@ scheduler_events = {
 
 # The Frappe HR mobile app (the installable web app at /hrms) carries the Reckon HRMS name, icons and manifest.
 after_request = ["reckon_hrms.pwa.rebrand_response"]
+
+# Ask Aura AI agents: a chat that asks questions and then does the work, by name.
+aura_agents = {"hrms_setup": "reckon_hrms.ai_agent.chat"}

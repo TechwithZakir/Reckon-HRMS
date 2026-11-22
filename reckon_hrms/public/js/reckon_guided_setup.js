@@ -30,7 +30,11 @@
 		hr: "Guide me through setting up HR Studio step by step for my company.",
 		payroll: "Guide me through setting up Payroll Studio step by step for my company.",
 	};
-	window.ReckonStudioAsk = function (studio) { askAi(STUDIO_ASK[studio] || STUDIO_ASK.hr); };
+	// "Ask AI" starts the setup agent in the chat: it asks the questions there and sets everything up itself.
+	window.ReckonStudioAsk = function (studio) {
+		if (window.aura && window.aura.start_agent) window.aura.start_agent("hrms_setup");
+		else askAi(STUDIO_ASK[studio] || STUDIO_ASK.hr);
+	};
 
 	const STYLE = `<style>
 	.rgs{max-width:900px;padding:8px 0 40px}
@@ -174,9 +178,9 @@
 		const root = $(`<div class="rgs">${STYLE}
 			<div class="rgs-card"><h2><span class="rgs-spark">✦</span> Guided setup with Ask AI</h2>
 				<div class="rgs-muted">${studio === "payroll"
-					? "Set up pay items and salary one step at a time. Ask AI knows your industry and explains each step in plain words. It never invents amounts."
-					: "Set up your company one step at a time. Ask AI knows your industry and answers from the HR guide. Nothing changes until you press a button."}</div>
-				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-ask-main>✦ Ask AI to guide me</button></div></div>
+					? "Ask AI asks you the questions in the chat, one at a time, and then sets up your pay items and salary structure for you. It never invents amounts."
+					: "Ask AI asks you the questions in the chat, one at a time (country, language, locations, departments and more), and then sets everything up for you. Nothing is created until you confirm."} You can also answer the same questions below.</div>
+				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-ask-main>✦ Ask AI to set it up for me</button></div></div>
 			<div class="rgs-card"><h2>Your industry</h2>
 				<div class="rgs-muted" data-now>Loading…</div>
 				<div class="rgs-row"><select class="form-control" data-sel aria-label="Industry" style="flex:1 1 260px;max-width:420px"><option value="">Choose an industry</option></select>

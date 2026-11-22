@@ -87,6 +87,10 @@ def _ai_json(prompt: str, user: str, max_tokens: int = 700):
 def prepare(answers) -> dict:
     """Read the answers, let Ask AI read any holiday text it can, and return the plan to review. Changes nothing."""
     frappe.only_for(ADMIN_ROLES)
+    return build_reviewed_plan(answers)
+
+
+def build_reviewed_plan(answers) -> dict:
     company = _company()
     clean = _answers(answers)
     ai_used = False
@@ -205,6 +209,10 @@ def _structure(company: str, spec: dict) -> str:
 def apply(answers) -> dict:
     """Run the plan the person reviewed. Rebuilt from the answers here, so only the fixed steps above can run."""
     frappe.only_for(ADMIN_ROLES)
+    return run_setup(answers)
+
+
+def run_setup(answers) -> dict:
     if not frappe.has_permission("Company", "write"):
         frappe.throw(_("You do not have permission to change this company's setup."), frappe.PermissionError)
     company = _company()
