@@ -81,7 +81,7 @@ def list_structures(company: str | None = None, start=0, page_length=DEFAULT_PAG
 def list_tax_slabs(company: str | None = None, start=0, page_length=DEFAULT_PAGE) -> dict:
     _gate("Income Tax Slab")
     start_i, length_i = page_bounds(start, page_length)
-    filters = {"company": company} if company else {}
+    filters = {"company": _mine()}  # a company sent by the page is ignored
     rows = frappe.get_list(
         "Income Tax Slab", filters=filters,
         fields=["name", "effective_from", "company", "docstatus"],

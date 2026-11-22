@@ -16,6 +16,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from reckon_hrms.api.scope import own_doc, own_employee
+
 REQUEST_ROLES = ["HR Manager", "Payroll Manager", "System Manager"]
 # Older requests that add to pay rather than replace it.
 ADDITIVE = {"Run Adjustment Earning", "Run Adjustment Deduction"}
@@ -23,7 +25,7 @@ APPROVE_ROLES = ["Payroll Manager", "System Manager"]
 
 
 def _run(name: str):
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     if doc.docstatus != 0:
         frappe.throw(_("This run is no longer a draft."))
     return doc
@@ -40,6 +42,7 @@ def request_change(name: str, employee: str, component: str, amount: float, reas
     if not reason:
         frappe.throw(_("Give a reason for the change."))
     doc = _run(name)
+    own_employee(employee)
     if frappe.db.exists("Salary Slip", {"payroll_entry": name, "docstatus": ["!=", 2]}):
         frappe.throw(_("Salary slips already exist. Ask for the change before slips are created."))
     if employee not in [r.employee for r in doc.employees]:
@@ -70,7 +73,7 @@ def request_change(name: str, employee: str, component: str, amount: float, reas
 def pending_requests(name: str) -> list[dict]:
     """Changes for this run waiting for approval."""
     frappe.only_for(REQUEST_ROLES)
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     people = [r.employee for r in doc.employees]
     if not people:
         return []
@@ -88,7 +91,7 @@ def pending_requests(name: str) -> list[dict]:
 def approve_request(request: str) -> dict:
     """A Payroll Manager approves a change: the earlier approved value is cancelled and this one submitted."""
     frappe.only_for(APPROVE_ROLES)
-    doc = frappe.get_doc("Additional Salary", request)
+    doc = own_doc("Additional Salary", request)
     if doc.docstatus != 0:
         frappe.throw(_("This request is already decided."))
     if doc.owner == frappe.session.user:
@@ -109,7 +112,7 @@ def approve_request(request: str) -> dict:
 def reject_request(request: str, reason: str | None = None) -> dict:
     """A Payroll Manager rejects a change. The waiting request is removed."""
     frappe.only_for(APPROVE_ROLES)
-    doc = frappe.get_doc("Additional Salary", request)
+    doc = own_doc("Additional Salary", request)
     if doc.docstatus != 0:
         frappe.throw(_("This request is already decided."))
     if doc.owner == frappe.session.user:

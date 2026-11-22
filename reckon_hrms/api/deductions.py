@@ -11,6 +11,7 @@ from frappe import _
 from frappe.utils import flt
 
 from reckon_hrms import industry_seed
+from reckon_hrms.api.scope import own_doc
 from reckon_hrms.attendance_deduction import (
     DEFAULT_CAP,
     DEFAULT_DIVISOR,
@@ -37,7 +38,7 @@ def _policy(company: str) -> tuple[int, int, float]:
 
 
 def _rows(name: str) -> tuple[object, list[dict]]:
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     people = [r.employee for r in doc.employees]
     per_day, divisor, cap = _policy(doc.company)
     attendance: dict[str, list] = {}

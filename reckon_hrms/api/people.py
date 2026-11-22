@@ -13,6 +13,7 @@ from frappe.utils import getdate
 
 from reckon_hrms import importer
 from reckon_hrms.api.home import _company
+from reckon_hrms.api.scope import shared_or_own
 
 IMPORT_BATCH = 200
 HR_ROLES = ["HR Manager", "HR User", "System Manager"]
@@ -49,7 +50,7 @@ def _known(company: str) -> dict[str, set[str]]:
     """Names the file may use. Departments are matched by department name within this company."""
     known = {}
     for field, (doctype, name_field) in MASTERS.items():
-        known[field] = set(frappe.get_all(doctype, pluck=name_field, limit_page_length=0))
+        known[field] = set(frappe.get_all(doctype, filters=shared_or_own(doctype), pluck=name_field, limit_page_length=0))
     known["department"] = set(frappe.get_all(
         "Department", filters={"company": company}, pluck="department_name", limit_page_length=0))
     return known

@@ -12,6 +12,7 @@ from frappe import _
 from frappe.utils import flt
 
 from reckon_hrms.api.attendance import _my_employee
+from reckon_hrms.api.scope import own_doc
 
 DECIDABLE = ("Leave Application", "Expense Claim")
 
@@ -60,7 +61,7 @@ def decide(doctype: str, name: str, decision: str, amount: float | None = None, 
     if decision not in ("Approve", "Reject"):
         frappe.throw(_("Choose Approve or Reject."))
 
-    doc = frappe.get_doc(doctype, name)
+    doc = own_doc(doctype, name)
     if not frappe.has_permission(doctype, "submit", doc):
         frappe.throw(_("You are not allowed to decide this request."), frappe.PermissionError)
     if doc.docstatus != 0:

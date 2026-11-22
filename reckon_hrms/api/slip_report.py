@@ -13,11 +13,13 @@ from frappe import _
 from frappe.utils import flt
 
 from reckon_hrms.api.payroll_run import _gate
+from reckon_hrms.api.scope import own_doc
 from reckon_hrms.slip_codes import short_codes
 
 
 def _table(name: str) -> dict:
     _gate("Payroll Entry", "read")
+    own_doc("Payroll Entry", name)
     slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": ["!=", 2]},
                            fields=["name", "employee", "employee_name", "docstatus", "gross_pay",
                                    "total_deduction", "net_pay", "reckon_payment_entry", "reckon_payment_hold"],

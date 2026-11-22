@@ -11,6 +11,7 @@ from frappe import _
 from frappe.utils import add_months, flt, get_first_day, get_last_day, getdate
 
 from reckon_hrms.api.home import _company
+from reckon_hrms.api.scope import own_doc
 from reckon_hrms.paging import DEFAULT_PAGE, page_bounds
 
 RUN_ROLES = ["HR Manager", "Payroll Manager", "System Manager"]
@@ -70,13 +71,13 @@ def start_run(month: str, pay_date: str, branch: str | None = None, department: 
 def fetch_employees(name: str) -> dict:
     """Step 2: fill the people list (Get Employees), then report what was found."""
     _gate("Payroll Entry", "write")
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     if doc.docstatus != 0:
         frappe.throw(_("This run is no longer a draft."))
     try:
         # HRMS fills doc.employees itself and returns the people with unmarked attendance (warnings).
         unmarked = doc.fill_employee_details() or []
-    except frappe.ValidationError as exc:
+    except frappe.ValidationError:
         frappe.throw(_("No people match these choices. Change the office, department, job title or level."))
     doc.save()
     frappe.db.commit()
@@ -88,7 +89,7 @@ def fetch_employees(name: str) -> dict:
 @frappe.whitelist(methods=["GET"])
 def get_run(name: str) -> dict:
     _gate("Payroll Entry", "read")
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     people = [r.employee for r in doc.employees]
     start, end = doc.start_date, doc.end_date
     no_structure = [p for p in people if not _has_structure(p, start, end)]
@@ -120,7 +121,7 @@ def list_people(name: str, filter: str = "all", search: str | None = None, start
                 page_length=DEFAULT_PAGE) -> dict:
     """The people table: paged, filtered on the server. Included means "in this run's list"."""
     _gate("Payroll Entry", "read")
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     start_i, length_i = page_bounds(start, page_length)
     rows = []
     for r in doc.employees:
@@ -161,7 +162,7 @@ def exclude_people(name: str, employees: list | str) -> dict:
     _gate("Payroll Entry", "write")
     if isinstance(employees, str):
         employees = frappe.parse_json(employees)
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     if doc.docstatus != 0:
         frappe.throw(_("This run is no longer a draft."))
     before = len(doc.employees)
@@ -183,7 +184,7 @@ def include_people(name: str, employees: list | str) -> dict:
     _gate("Payroll Entry", "write")
     if isinstance(employees, str):
         employees = frappe.parse_json(employees)
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     if doc.docstatus != 0:
         frappe.throw(_("This run is no longer a draft."))
     present = {r.employee for r in doc.employees}
@@ -224,7 +225,7 @@ def create_slips(name: str, include_overtime: int = 0, include_festival: int = 0
     include_festival: add a festival bonus (Additional Salary) for each person on this run first.
     """
     _gate("Payroll Entry", "write")
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     if doc.docstatus != 0:
         frappe.throw(_("This run is no longer a draft."))
     if not doc.employees:
@@ -238,10 +239,12 @@ def create_slips(name: str, include_overtime: int = 0, include_festival: int = 0
 
 
 def run_create_slips(name, job, include_overtime=0, include_festival=0):
-    from hrms.payroll.doctype.payroll_entry.payroll_entry import create_salary_slips_for_employees
+    from hrms.payroll.doctype.payroll_entry.payroll_entry import (
+        create_salary_slips_for_employees,
+    )
 
     key = f"reckon_slips:{job}"
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     people = [r.employee for r in doc.employees]
     if include_festival:
         from reckon_hrms.payroll import create_festival_bonus
@@ -281,7 +284,7 @@ def get_slip_progress(job: str) -> dict:
 def review_totals(name: str) -> dict:
     """Step 4: totals over the draft slips, aggregated in SQL, and last month's submitted net for comparison."""
     _gate("Payroll Entry", "read")
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     row = frappe.db.sql(
         "SELECT COUNT(name), COALESCE(SUM(gross_pay),0), COALESCE(SUM(total_deduction),0), COALESCE(SUM(net_pay),0) "
         "FROM `tabSalary Slip` WHERE payroll_entry = %(p)s AND docstatus = 0", {"p": name})[0]
@@ -300,7 +303,7 @@ def review_totals(name: str) -> dict:
 def approve_slips(name: str) -> dict:
     """Step 4: submit every draft slip in background batches."""
     _gate("Payroll Entry", "submit")
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     if doc.docstatus != 0:
         frappe.throw(_("This run is no longer a draft."))
     missing = missing_pay_item_accounts(name)
@@ -314,11 +317,13 @@ def approve_slips(name: str) -> dict:
 
 
 def run_approve(name, job):
-    from hrms.payroll.doctype.payroll_entry.payroll_entry import submit_salary_slips_for_employees
+    from hrms.payroll.doctype.payroll_entry.payroll_entry import (
+        submit_salary_slips_for_employees,
+    )
 
     key = f"reckon_submit:{job}"
     # Overtime slips first, so their amounts are on the salary slips when those are submitted.
-    frappe.get_doc("Payroll Entry", name).submit_overtime_slips()
+    own_doc("Payroll Entry", name).submit_overtime_slips()
     frappe.db.commit()
     slips = frappe.get_all("Salary Slip", filters={"payroll_entry": name, "docstatus": 0},
                            fields=["name", "employee"], limit_page_length=0)
@@ -326,7 +331,7 @@ def run_approve(name, job):
     for i in range(0, len(slips), SLIP_BATCH):
         batch = slips[i:i + SLIP_BATCH]
         try:
-            submit_salary_slips_for_employees(frappe.get_doc("Payroll Entry", name), [(s.name,) for s in batch], publish_progress=False)
+            submit_salary_slips_for_employees(own_doc("Payroll Entry", name), [(s.name,) for s in batch], publish_progress=False)
         except Exception as exc:
             state["failed"].append({"batch_start": i, "reason": str(exc)[:160]})
         # HRMS logs per-slip failures instead of raising, so count what actually submitted.
@@ -385,7 +390,7 @@ def set_payment_hold(name: str, employees: list | str, hold: int = 1, reason: st
     for slip in slips:
         frappe.db.set_value("Salary Slip", slip, {"reckon_payment_hold": 1 if hold else 0,
                                                   "reckon_hold_reason": (reason or "") if hold else None})
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     doc.add_comment("Comment", "{0} {1} payment for {2} {3} at {4}. Reason: {5}".format(
         frappe.session.user, "held" if hold else "released", len(slips),
         "slip" if len(slips) == 1 else "slips", frappe.utils.now(), reason or "not given"))
@@ -424,7 +429,7 @@ def payment_files(name: str, download: int = 0) -> dict:
         elif cell.get(s.employee):
             wallet.append([s.employee, s.employee_name, cell.get(s.employee), f"{flt(s.net_pay):.2f}"])
     if int(download or 0):
-        frappe.get_doc("Payroll Entry", name).add_comment("Comment", "{0} downloaded the payment files at {1}.".format(
+        own_doc("Payroll Entry", name).add_comment("Comment", "{0} downloaded the payment files at {1}.".format(
             frappe.session.user, frappe.utils.now()))
     return {
         "bank_csv": _csv_text(["Employee", "Name", "Bank", "Account", "Net Pay"], bank),
@@ -458,7 +463,7 @@ def record_payment(name: str, bank_account: str, reference: str, reference_date:
         frappe.throw(_("Only accounts users can record payments."), frappe.PermissionError)
     if _is_paid(name):
         frappe.throw(_("This run is already paid."))
-    doc = frappe.get_doc("Payroll Entry", name)
+    doc = own_doc("Payroll Entry", name)
     if doc.docstatus != 1 and not frappe.db.exists("Salary Slip", {"payroll_entry": name, "docstatus": 1}):
         frappe.throw(_("Approve the salary slips before recording payment."))
     if not frappe.db.get_value("Account", {"name": bank_account, "company": doc.company}):

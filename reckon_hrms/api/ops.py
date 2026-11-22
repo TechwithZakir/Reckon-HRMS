@@ -6,8 +6,6 @@ Provider credentials for SMS/WhatsApp come from site config (hrms_sms_url, hrms_
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 import frappe
 from frappe import _
 from frappe.utils import flt, getdate, nowdate
@@ -15,6 +13,7 @@ from frappe.utils import flt, getdate, nowdate
 from reckon_hrms import anomaly, bio, messaging, statutory
 from reckon_hrms import bd_payroll as bd
 from reckon_hrms.api.home import _company
+from reckon_hrms.api.scope import mine, own_doc, own_employee, shared_or_own
 from reckon_hrms.payroll import PRINT_FORMAT
 
 HR_ROLES = ["HR Manager", "Payroll Manager", "System Manager"]
@@ -27,6 +26,7 @@ def _require_hr():
 def _slips(payroll_entry: str) -> list[dict]:
     if not frappe.has_permission("Payroll Entry", "read", payroll_entry):
         frappe.throw(_("Not permitted to view this payroll run."), frappe.PermissionError)
+    own_doc("Payroll Entry", payroll_entry)
     return frappe.get_all(
         "Salary Slip", filters={"payroll_entry": payroll_entry, "docstatus": 1},
         fields=["name", "employee", "employee_name", "net_pay", "gross_pay", "bank_ac_no", "start_date",
@@ -71,7 +71,7 @@ def setup_status() -> dict:
         ("Holiday calendar", frappe.db.exists("Holiday List", {"company": company})),
         ("Holiday assignment", frappe.db.exists("Holiday List Assignment", {"assigned_to": company, "docstatus": 1})),
         ("Office location", frappe.db.exists("HRMS Office Location", {"company": company})),
-        ("Leave types", frappe.db.count("Leave Type") > 0),
+        ("Leave types", frappe.db.count("Leave Type", shared_or_own("Leave Type")) > 0),
         ("Salary components", frappe.db.exists("Salary Component", "Basic Salary")),
         ("Bangladesh payroll structure", frappe.db.exists("Salary Structure", f"Reckon BD SME - {company}")),
         ("Payslip format", frappe.db.exists("Print Format", "Reckon Payslip (Bilingual)")),
@@ -88,6 +88,7 @@ def setup_status() -> dict:
 def gratuity_estimate(employee: str, last_basic: float) -> dict:
     if not frappe.has_permission("Employee", "read", employee):
         frappe.throw(_("Not permitted."), frappe.PermissionError)
+    own_employee(employee)
     joined = frappe.db.get_value("Employee", employee, "date_of_joining")
     if not joined:
         frappe.throw(_("Employee has no joining date."))
@@ -114,7 +115,7 @@ def import_biometric(csv_text: str) -> dict:
     punches = bio.infer_directions(punches)
     created, duplicates, unknown = 0, 0, set()
     for p in punches:
-        employee = frappe.db.get_value("Employee", {"attendance_device_id": p["employee_code"]}, "name")
+        employee = frappe.db.get_value("Employee", {"attendance_device_id": p["employee_code"], "company": mine()}, "name")
         if not employee:
             unknown.add(p["employee_code"])
             continue

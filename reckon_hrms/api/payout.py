@@ -12,6 +12,7 @@ from frappe import _
 from frappe.utils import add_months, flt, get_first_day, getdate
 
 from reckon_hrms.api.home import _company
+from reckon_hrms.api.scope import shared_or_own
 
 PAYROLL_ROLES = ["HR Manager", "Payroll Manager", "System Manager"]
 
@@ -113,7 +114,7 @@ def payout_sheet(month: str, company: str | None = None) -> dict:
         "company": company, "month": month, "rows": rows,
         "earning_names": earning_names, "deduction_names": deduction_names,
         "totals": totals,
-        "components": frappe.get_all("Salary Component", fields=["name", "type"], order_by="name asc", limit_page_length=0),
+        "components": frappe.get_all("Salary Component", filters=shared_or_own("Salary Component"), fields=["name", "type"], order_by="name asc", limit_page_length=0),
     }
 
 
