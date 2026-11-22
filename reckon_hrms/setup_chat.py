@@ -146,7 +146,7 @@ def _parse_leave(text: str):
     return (out, None) if out else (None, "Give the days per year for each leave type, for example: casual 10, sick 14, earned 18, maternity 112. Use your own policy.")
 
 
-def _parse_structure(text: str):
+def _parse_structure(text: str, default_name: str = ""):
     def grab(pattern):
         match = re.search(pattern + r"\D{0,14}" + NUM, text, re.IGNORECASE)
         return match.group(1) if match else None
@@ -154,7 +154,11 @@ def _parse_structure(text: str):
     basic = grab(r"basic")
     if not basic:
         return None, "Tell me Basic as a percent of the gross salary, for example: basic 60, house rent 20, medical 1500, conveyance 1000."
-    out = {"structure_name": "Standard Structure", "basic_pct": basic}
+    out = {"structure_name": default_name or "Standard Structure", "basic_pct": basic}
+    # A name written first ("Standard, basic 60 ...") is the structure's name.
+    lead = re.split(r"(?:,|\s)\s*(?=basic)", text, maxsplit=1, flags=re.IGNORECASE)[0].strip(" ,:-")
+    if lead and 2 <= len(lead) <= 40 and re.fullmatch(r"[A-Za-z][\w .&'-]*", lead):
+        out["structure_name"] = lead
     for key, pattern in (("hra_pct", r"(?:hra|house\s*rent)"), ("medical_amount", r"medical"), ("conveyance_amount", r"(?:conveyance|transport)")):
         value = grab(pattern)
         if value:
@@ -452,7 +456,7 @@ def turn(message: str, state, env: dict) -> dict:
     elif key == "leave":
         value, error = _parse_leave(text)
     elif key == "structure":
-        value, error = _parse_structure(text)
+        value, error = _parse_structure(text, env.get("current", {}).get("structure_name", ""))
     if error or not value:
         question, replies = _question(st["idx"], env, answers)
         return out(f"{error or 'I could not read that.'}\n\n{question}", replies)

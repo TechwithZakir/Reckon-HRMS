@@ -349,3 +349,20 @@ class NowTests(unittest.TestCase):
         self.assertEqual([o["label"] for o in ind if o["checked"]], ["Healthcare"])
         days = self.ask("weekly_off")["choices"]["options"]
         self.assertEqual([o["value"] for o in days if o["checked"]], ["Friday"])
+
+
+class StructureNameTests(unittest.TestCase):
+    def test_a_name_written_first_is_the_structure_name(self):
+        self.assertEqual(sc._parse_structure("Standard, basic 50, house rent 10")[0]["structure_name"], "Standard")
+        self.assertEqual(sc._parse_structure("Office Staff basic 60")[0]["structure_name"], "Office Staff")
+
+    def test_without_a_name_the_existing_structure_name_is_kept_so_it_is_not_added_twice(self):
+        self.assertEqual(sc._parse_structure("basic 50", "Standard")[0]["structure_name"], "Standard")
+        self.assertEqual(sc._parse_structure("basic 50")[0]["structure_name"], "Standard Structure")
+
+    def test_the_existing_name_matches_an_existing_structure_in_the_plan(self):
+        env = make_env()
+        env["current"] = {"structure_name": "Standard"}
+        r = sc.turn("start structure", None, env)
+        r = sc.turn("basic 50, house rent 10", r["state"], env)
+        self.assertEqual(r["state"]["answers"]["structure_name"], "Standard")
