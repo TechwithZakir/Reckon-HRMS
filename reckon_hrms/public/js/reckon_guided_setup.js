@@ -55,6 +55,12 @@
 	.rgs-steps li:last-child{border-bottom:0}
 	.rgs-steps li span::before{content:counter(s);display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--control-bg);margin-right:10px;font-size:12px;font-weight:600}
 	.rgs-ask{display:inline-flex;gap:6px;align-items:center}
+	.rgs-sum{cursor:pointer;color:var(--text-muted);font-size:13px;margin-top:14px;padding:6px 0}
+	.rgs-rev{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px dotted var(--border-color)}
+	.rgs-rev:last-child{border-bottom:0}
+	.rgs-rev .rgs-d{color:var(--text-muted);font-size:13px}
+	.rgs-tick{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;margin-right:10px;font-size:12px;font-weight:700;background:var(--control-bg);color:var(--text-muted)}
+	.rgs-tick.on{background:var(--green-100,#e4f5e9);color:var(--green-700,#1e6b3a)}
 	.rgs-spark{color:var(--primary)}
 	</style>`;
 
@@ -142,6 +148,7 @@
 							try { sessionStorage.removeItem(KEY); } catch (e) { /* ignore */ }
 							frappe.show_alert({ message: res.failed ? "Some steps failed. See the list." : "Setup finished.", indicator: res.failed ? "orange" : "green" });
 							$sel.trigger("change");
+							root.trigger("rgs:refresh");
 						}).catch((e) => { $a.prop("disabled", false); $plan.find("[data-result]").html(`<div class="rgs-muted">${esc((e && e.message) || "Could not run the setup.")}</div>`); });
 					});
 				});
@@ -187,6 +194,8 @@
 					? "Ask AI asks you the questions in the chat, one at a time, and then sets up your pay items and salary structure for you. It never invents amounts."
 					: "Ask AI asks you the questions in the chat, one at a time (country, language, locations, departments and more), and then sets everything up for you. Nothing is created until you confirm."} You can also answer the same questions below.</div>
 				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-ask-main>✦ Ask AI to set it up for me</button></div></div>
+			<div data-review></div>
+			<details data-more open class="rgs-more"><summary class="rgs-sum">Choose or change your industry, or answer the setup questions</summary>
 			<div class="rgs-card"><h2>Your industry</h2>
 				<div class="rgs-muted" data-now>Loading…</div>
 				<div class="rgs-row"><select class="form-control" data-sel aria-label="Industry" style="flex:1 1 260px;max-width:420px"><option value="">Choose an industry</option></select>
@@ -195,7 +204,7 @@
 			<div class="rgs-card" data-interview><h2>Setup interview</h2>
 				<div class="rgs-muted">Ask AI asks one question at a time, from your country to your salary structure. Answer what you know, skip the rest, then review one plan before anything is created. Ask AI never makes up amounts, dates or leave days.</div>
 				<div data-stepper></div>
-				<div data-plan></div></div></div>`).appendTo(parent);
+				<div data-plan></div></div></div></details></div>`).appendTo(parent);
 
 		const $now = root.find("[data-now]");
 		const $sel = root.find("[data-sel]");
@@ -207,6 +216,35 @@
 			if (window.aura && window.aura.start_agent) window.aura.start_agent("hrms_setup", "start industry");
 			else askAi("Which industry should I choose for my company, and what will it pre-load?");
 		});
+		const $review = root.find("[data-review]");
+		function review() {
+			frappe.call({ method: "reckon_hrms.api.ai_setup.review_state", args: { studio }, type: "GET" }).then((r) => {
+				const d = r.message;
+				if (!d || !d.rows) return;
+				root.find("[data-more]").prop("open", !d.finished);
+				if (!d.finished) { $review.empty(); return; }
+				$review.html(`<div class="rgs-card"><h2>Your setup for ${esc(d.company)}</h2>
+					<div class="rgs-muted">Setup is done. Open any step to review or edit it. Anything still empty can be set up with Ask AI.</div>
+					${d.rows.map((x, i) => `<div class="rgs-rev"><div><span class="rgs-tick ${x.done ? "on" : ""}">${x.done ? "✓" : "–"}</span><b>${esc(x.label)}</b>
+						<div class="rgs-d" style="margin-left:30px">${esc(x.detail)}</div></div>
+						<span>${x.done || !x.chat ? `<button type="button" class="btn btn-default btn-xs" data-open="${i}">Review / edit</button>` : `<button type="button" class="btn btn-primary btn-xs" data-fill="${i}">✦ Set up now</button> <button type="button" class="btn btn-default btn-xs" data-open="${i}">Open</button>`}</span></div>`).join("")}
+					<div class="rgs-row"><button type="button" class="btn btn-default btn-sm" data-ask-review>✦ Ask AI to review my setup</button></div></div>`);
+				$review.off("click").on("click", "[data-open]", function () {
+					const x = d.rows[Number(this.dataset.open)];
+					const slug = frappe.router.slug(x.doctype);
+					if (x.name) frappe.set_route(slug, x.name); else frappe.set_route(slug);
+				});
+				$review.on("click", "[data-fill]", function () {
+					const x = d.rows[Number(this.dataset.fill)];
+					if (window.aura && window.aura.start_agent) window.aura.start_agent("hrms_setup", `start ${x.chat}`);
+				});
+				$review.on("click", "[data-ask-review]", () => askAi("Review my setup and tell me what is missing or odd for my industry. My setup: " +
+					d.rows.map((x) => `${x.label}: ${x.detail}`).join("; ").slice(0, 1200)));
+			});
+		}
+		review();
+		root.on("rgs:refresh", review);
+
 		function showNow(label) {
 			current.label = label || "";
 			$now.html(label ? `Current industry: <b>${esc(label)}</b>` : "Not chosen yet. Choose one below to see what it pre-loads.");

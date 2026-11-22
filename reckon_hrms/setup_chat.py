@@ -325,7 +325,8 @@ def turn(message: str, state, env: dict) -> dict:
             result = env["apply"](answers)
             lines = [f"{'✓' if r['result'] == 'done' else '!' if r['result'] == 'failed' else '–'} **{r['label']}**: {r['message'] or r['result']}" for r in result["results"]]
             head = f"Done: {result['done']} steps set up" + (f", {result['failed']} failed" if result["failed"] else "") + "."
-            return out(head + "\n\n" + "\n".join(lines) + "\n\nOpen HR Studio and Payroll Studio to see everything. Next you can add your employees and give them the salary structure.", done=True)
+            return out(head + "\n\n" + "\n".join(lines) + "\n\nReview or edit any step here: Holiday List, Branch, Department, Designation, Shift Type, Salary Structure. "
+                       "The Guided setup tab in HR Studio and Payroll Studio now shows each step with its own link. Next you can add your employees and give them the salary structure.", done=True)
         # Only a clear change request, or a step name on its own, reopens a step. A question or a request for a page does not.
         for i, key in enumerate(STEPS):
             named = TITLES[key].casefold() == low or key.replace("_", " ") == low or (CHANGE_WORDS.search(text) and (TITLES[key].casefold() in low or key.replace("_", " ") in low))

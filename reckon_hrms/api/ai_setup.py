@@ -58,6 +58,42 @@ def _existing(company: str, country: str = "", year: int | None = None) -> dict:
 
 
 @frappe.whitelist(methods=["GET"])
+def review_state(studio: str = "hr") -> dict:
+    """What the company's setup holds, step by step, with the page to review or edit each one. Read only."""
+    frappe.only_for(ADMIN_ROLES + ["Payroll Manager"])
+    from reckon_hrms import setup_review
+
+    company = _company()
+    mine = ["in", [company, "", None]]
+    key = frappe.db.get_value("Company", company, "reckon_industry") or ""
+    label = next((s["label"] for s in salary_suggest.segments() if s["key"] == key), "")
+    language = frappe.db.get_value("User", frappe.session.user, "language") or ""
+    holiday_list = frappe.db.get_value("Holiday List", {"company": company}, "name", order_by="to_date desc") or ""
+    weekly, named = [], 0
+    if holiday_list:
+        rows = frappe.get_all("Holiday", filters={"parent": holiday_list}, fields=["weekly_off", "description"], limit_page_length=0)
+        weekly = sorted({r.description for r in rows if r.weekly_off and r.description in setup_plan.WEEKDAYS}, key=setup_plan.WEEKDAYS.index)
+        named = sum(1 for r in rows if not r.weekly_off)
+    facts = {
+        "company": company, "user": frappe.session.user,
+        "country": frappe.db.get_value("Company", company, "country") or "",
+        "language": setup_plan.LANGUAGES.get(language, language),
+        "industry_label": label,
+        "branches": frappe.db.count("Branch", {"company": company}),
+        "departments": frappe.db.count("Department", {"company": company}),
+        "designations": len(frappe.get_all("Designation", filters={"company": mine}, pluck="name")),
+        "holiday_list": holiday_list, "weekly_off": weekly, "named_holidays": named,
+        "shifts": frappe.db.count("Shift Type", {"company": company}),
+        "leave_policies": frappe.db.count("Leave Policy", {"company": company}),
+        "structures": frappe.db.count("Salary Structure", {"company": company, "docstatus": 1}),
+        "assignments": frappe.db.count("Salary Structure Assignment", {"company": company, "docstatus": 1}),
+        "components": len(frappe.get_all("Salary Component", filters={"company": mine}, pluck="name")),
+    }
+    rows_ = setup_review.rows(facts, studio if studio == "payroll" else "hr")
+    return {"company": company, "rows": rows_, "finished": setup_review.finished(rows_)}
+
+
+@frappe.whitelist(methods=["GET"])
 def questions() -> dict:
     """The interview: every question, the industries to choose from, and the year the holidays are for."""
     frappe.only_for(ADMIN_ROLES + ["Payroll Manager"])
