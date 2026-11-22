@@ -37,6 +37,7 @@ def _existing(company: str) -> dict:
     return {
         "departments": set(frappe.get_all("Department", filters={"company": company}, pluck="department_name")),
         "designations": set(frappe.get_all("Designation", pluck="designation_name")),
+        "branches": set(frappe.get_all("Branch", filters={"company": ["in", [company, "", None]]}, pluck="name")),
     }
 
 
@@ -44,9 +45,15 @@ def _existing(company: str) -> dict:
 def questions() -> dict:
     """The interview: every question, the industries to choose from, and the year the holidays are for."""
     frappe.only_for(ADMIN_ROLES + ["Payroll Manager"])
+    company = _company()
     return {"questions": setup_plan.QUESTIONS, "industries": salary_suggest.segments(), "weekdays": list(setup_plan.WEEKDAYS),
+            "countries": frappe.get_all("Country", pluck="name", order_by="name asc", limit_page_length=0),
+            "languages": setup_plan.LANGUAGES, "weekly_off_by_country": setup_plan.WEEKLY_OFF_BY_COUNTRY,
+            "default_weekly_off": setup_plan.DEFAULT_WEEKLY_OFF,
+            "current_country": frappe.db.get_value("Company", company, "country") or "",
+            "current_language": frappe.db.get_value("User", frappe.session.user, "language") or "",
             "leave_types": [label for _key, label in setup_plan.LEAVE_QUESTIONS], "year": setup_plan.normalize_answers({})["year"],
-            "company": _company()}
+            "company": company}
 
 
 def _ai_ready():
@@ -220,6 +227,9 @@ def apply(answers) -> dict:
             frappe.log_error(frappe.get_traceback(), f"Setup interview {key}")
             results.append({"key": key, "label": label, "result": "failed", "message": str(exc)[:200]})
 
+    run("country", "Country", lambda: _country(company, clean["country"]))
+    run("language", "Language", lambda: _language(clean["language"]))
+    run("locations", "Locations", lambda: _locations(clean["locations"]))
     run("industry", "Industry starter items", lambda: _fmt_industry(industry_seed.apply_segment(company, clean["industry"])))
     run("departments", "Departments", lambda: f"{sum(industry_seed._department(company, n) == 'created' for n in clean['extra_departments'])} added")
     run("titles", "Job titles", lambda: f"{sum(industry_seed._designation(n) == 'created' for n in clean['extra_titles'])} added")
@@ -230,6 +240,33 @@ def apply(answers) -> dict:
     frappe.db.commit()
     return {"company": company, "results": results, "done": sum(r["result"] == "done" for r in results),
             "failed": sum(r["result"] == "failed" for r in results)}
+
+
+def _country(company: str, country: str) -> str:
+    if not frappe.db.exists("Country", country):
+        frappe.throw(_("Unknown country: {0}").format(country))
+    if frappe.db.get_value("Company", company, "country"):
+        return "The company already has a country, so it was left as it is"
+    frappe.db.set_value("Company", company, "country", country)
+    return f"Company country set to {country}"
+
+
+def _language(language: str) -> str:
+    if frappe.session.user in ("Administrator", "Guest"):
+        return "Skipped for this account"
+    frappe.db.set_value("User", frappe.session.user, "language", language)
+    return f"Your language is now {setup_plan.LANGUAGES[language]}. It applies after you reload the page"
+
+
+def _locations(names: list[str]) -> str:
+    made, taken = 0, []
+    for name in names:
+        if frappe.db.exists("Branch", name):
+            taken.append(name)
+            continue
+        frappe.get_doc({"doctype": "Branch", "branch": name}).insert(ignore_permissions=True)
+        made += 1
+    return f"{made} added" + (f"; already there: {', '.join(taken)}" if taken else "")
 
 
 def _fmt_industry(result: dict) -> str:

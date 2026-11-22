@@ -51,11 +51,11 @@ class PlanTests(unittest.TestCase):
         steps = self.steps(self.plan({}))
         self.assertEqual(steps["industry"]["status"], "ready")
         self.assertEqual(steps["holidays"]["status"], "ready")
-        for key in ("departments", "titles", "shift", "leave", "structure"):
+        for key in ("country", "language", "locations", "departments", "titles", "shift", "leave", "structure"):
             self.assertEqual(steps[key]["status"], "skipped", key)
 
     def test_a_full_interview_plans_every_step(self):
-        plan = self.plan({"extra_departments": "Legal", "extra_titles": "Intern", "holidays": "2026-03-26 Independence Day",
+        plan = self.plan({"country": "Bangladesh", "language": "bn", "locations": "Head Office, Dhaka Factory", "extra_departments": "Legal", "extra_titles": "Intern", "holidays": "2026-03-26 Independence Day",
                           "shift_name": "General", "shift_start": "09:00", "shift_end": "17:30", "late_grace": "10",
                           "leave_casual": "10", "leave_sick": "14", "structure_name": "Standard", "basic_pct": "60", "hra_pct": "20",
                           "medical_amount": "1500", "conveyance_amount": "1000"})
@@ -65,6 +65,21 @@ class PlanTests(unittest.TestCase):
         self.assertIn("20% of the gross has no pay item yet", steps["structure"]["note"])
         self.assertIn("late entry after 10 min", steps["shift"]["items"][0])
         self.assertEqual(plan["attention"], 0)
+        self.assertEqual(steps["locations"]["items"], ["Head Office", "Dhaka Factory"])
+        self.assertEqual(steps["language"]["items"], ["বাংলা (Bangla)"])
+
+    def test_the_interview_opens_with_country_language_and_locations_then_departments(self):
+        keys = [q["key"] for q in sp.QUESTIONS]
+        self.assertEqual(keys[:4], ["country", "language", "locations", "extra_departments"])
+        self.assertEqual(keys[-1], "structure_name")
+        self.assertTrue(all(q["studio"] == "both" for q in sp.QUESTIONS))
+
+    def test_weekly_off_is_suggested_by_country_and_never_applied_silently(self):
+        self.assertEqual(sp.suggest_weekly_off("Bangladesh"), ["Friday"])
+        self.assertEqual(sp.suggest_weekly_off("India"), ["Sunday"])
+        self.assertEqual(sp.suggest_weekly_off("Germany"), ["Saturday", "Sunday"])
+        self.assertEqual(sp.suggest_weekly_off(None), ["Saturday", "Sunday"])
+        self.assertEqual(sp.normalize_answers({"country": "India", "language": "xx"})["language"], "")
 
     def test_what_the_company_already_has_is_not_added_again(self):
         plan = self.plan({"extra_departments": "Sales, Legal"}, existing={"departments": {"Sales"}})

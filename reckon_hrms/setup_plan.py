@@ -16,23 +16,40 @@ MAX_HOLIDAYS = 60
 LEAVE_QUESTIONS = (("leave_casual", "Casual Leave"), ("leave_sick", "Sick Leave"), ("leave_earned", "Earned Leave"),
                    ("leave_maternity", "Maternity Leave"))
 
-# key, studio, kind, label, help. The page draws these; the plan below reads the same keys.
+LANGUAGES = {"en": "English", "bn": "বাংলা (Bangla)"}
+# The usual weekly off in a country, offered as a starting tick the person confirms. Never applied silently.
+WEEKLY_OFF_BY_COUNTRY = {
+    "Bangladesh": ["Friday"], "India": ["Sunday"], "Pakistan": ["Sunday"],
+    "Saudi Arabia": ["Friday", "Saturday"], "Qatar": ["Friday", "Saturday"], "Kuwait": ["Friday", "Saturday"],
+}
+DEFAULT_WEEKLY_OFF = ["Saturday", "Sunday"]
+
+
+def suggest_weekly_off(country) -> list[str]:
+    return list(WEEKLY_OFF_BY_COUNTRY.get(clean_text(country, 60), DEFAULT_WEEKLY_OFF))
+
+
+# key, studio, kind, label, help. The page asks these in order, one at a time; the plan below reads the same keys.
 QUESTIONS = [
-    {"key": "industry", "studio": "hr", "kind": "industry", "label": "What does your company do?",
-     "help": "Choose the closest industry. It loads starter job titles, departments, pay items and leave types."},
-    {"key": "extra_departments", "studio": "hr", "kind": "list", "label": "Other departments you have",
+    {"key": "country", "studio": "both", "kind": "country", "label": "Which country is your company in?",
+     "help": "Used for the usual weekly off and as context for Ask AI. It is saved on the company only if the company has none yet."},
+    {"key": "language", "studio": "both", "kind": "language", "label": "Which language do you want to work in?",
+     "help": "Ask AI answers in this language and your screens use it. This is your own setting."},
+    {"key": "locations", "studio": "both", "kind": "list", "label": "Where do you work? Offices, factories or sites",
+     "help": "One name each, for example Head Office, Dhaka Factory. They become your Branch list. Leave empty to skip."},
+    {"key": "extra_departments", "studio": "both", "kind": "list", "label": "Which departments do you have?",
+     "help": "Separate with commas or new lines. Your industry's starter departments are added too; leave empty to keep only those."},
+    {"key": "extra_titles", "studio": "both", "kind": "list", "label": "Which job titles do you have?",
      "help": "Separate with commas or new lines. Leave empty to keep only the starter ones."},
-    {"key": "extra_titles", "studio": "hr", "kind": "list", "label": "Other job titles you have",
-     "help": "Separate with commas or new lines. Leave empty to keep only the starter ones."},
-    {"key": "weekly_off", "studio": "hr", "kind": "days", "label": "Weekly off days",
-     "help": "Which days are the weekly off? Fridays are chosen by default."},
-    {"key": "holidays", "studio": "hr", "kind": "text", "label": "Public holidays this year",
+    {"key": "weekly_off", "studio": "both", "kind": "days", "label": "Weekly off days",
+     "help": "Which days are the weekly off? The usual days for your country are ticked first; change them if yours differ."},
+    {"key": "holidays", "studio": "both", "kind": "text", "label": "Public holidays this year",
      "help": "One per line, date first, for example: 2026-03-26 Independence Day. Leave empty to add none."},
-    {"key": "shift_name", "studio": "hr", "kind": "shift", "label": "Working hours",
+    {"key": "shift_name", "studio": "both", "kind": "shift", "label": "Working hours",
      "help": "Give the shift a name and its start and end time. Leave the name empty to skip."},
-    {"key": "leave_casual", "studio": "hr", "kind": "leave", "label": "Leave days per year",
+    {"key": "leave_casual", "studio": "both", "kind": "leave", "label": "Leave days per year",
      "help": "Days per year for each type, from your own policy. Leave a type empty to skip it. Nothing is given to employees yet."},
-    {"key": "structure_name", "studio": "payroll", "kind": "structure", "label": "Salary structure",
+    {"key": "structure_name", "studio": "both", "kind": "structure", "label": "Salary structure",
      "help": "Basic and house rent as a percent of the gross salary, medical and conveyance as fixed monthly amounts. "
              "Leave the name empty to skip. Amounts per person are set when you give the structure to people."},
 ]
@@ -108,6 +125,9 @@ def normalize_answers(raw, year: int | None = None) -> dict:
     holidays, unread = parse_holidays(raw.get("holidays"), year)
     out = {
         "industry": clean_text(raw.get("industry"), 60),
+        "country": clean_text(raw.get("country"), 60),
+        "language": raw.get("language") if raw.get("language") in LANGUAGES else "",
+        "locations": split_names(raw.get("locations")),
         "extra_departments": split_names(raw.get("extra_departments")),
         "extra_titles": split_names(raw.get("extra_titles")),
         "weekly_off": days or ["Friday"] if "weekly_off" not in raw else days,
@@ -159,6 +179,15 @@ def build_plan(answers: dict, segment: dict | None, company: str, existing: dict
                f"{len(segment['leave_types'])} leave types are added where missing")])
     else:
         step("industry", "Industry", [], "skipped", "No industry chosen, so no starter items are added.")
+    country = answers["country"]
+    step("country", f"Country: {country}" if country else "Country",
+         [f"Saved on the company if it has none yet. Usual weekly off: {', '.join(suggest_weekly_off(country))}"] if country else ["Nothing to add"],
+         "ready" if country else "skipped")
+    step("language", "Language", [LANGUAGES[answers["language"]]] if answers["language"] else ["Nothing to add"],
+         "ready" if answers["language"] else "skipped", "This changes your own language setting only." if answers["language"] else "")
+    have = existing.get("branches", set())
+    new_locations = [n for n in answers["locations"] if n not in have]
+    step("locations", "Locations (branches)", new_locations or ["Nothing to add"], "ready" if new_locations else "skipped")
     have = existing.get("departments", set())
     new_departments = [d for d in answers["extra_departments"] if d not in have]
     step("departments", "Departments", new_departments or ["Nothing to add"], "ready" if new_departments else "skipped")
