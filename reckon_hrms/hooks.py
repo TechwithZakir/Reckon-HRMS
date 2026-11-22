@@ -106,3 +106,5 @@ after_request = ["reckon_hrms.pwa.rebrand_response"]
 
 # Ask Aura AI agents: a chat that asks questions and then does the work, by name.
 aura_agents = {"hrms_setup": "reckon_hrms.ai_agent.chat"}
+# A plain question that is really a request for that agent starts it (the function returns its first message, or None).
+aura_agent_intents = {"hrms_setup": "reckon_hrms.ai_agent.intent"}

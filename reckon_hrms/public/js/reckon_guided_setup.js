@@ -196,7 +196,11 @@
 		const $prev = root.find("[data-preview]");
 
 		root.find("[data-ask-main]").on("click", () => window.ReckonStudioAsk(studio));
-		root.find("[data-ask-industry]").on("click", () => askAi("Which industry should I choose for my company, and what will it pre-load? Ask me what my company does if you need to."));
+		// The agent asks what the company does, picks the industry from the answer and shows what it pre-loads.
+		root.find("[data-ask-industry]").on("click", () => {
+			if (window.aura && window.aura.start_agent) window.aura.start_agent("hrms_setup", "start industry");
+			else askAi("Which industry should I choose for my company, and what will it pre-load?");
+		});
 		function showNow(label) {
 			current.label = label || "";
 			$now.html(label ? `Current industry: <b>${esc(label)}</b>` : "Not chosen yet. Choose one below to see what it pre-loads.");

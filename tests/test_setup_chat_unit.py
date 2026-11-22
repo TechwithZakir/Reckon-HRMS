@@ -136,3 +136,36 @@ class ChatTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IntentTests(unittest.TestCase):
+    def test_a_setup_question_on_an_hr_page_starts_the_agent_instead_of_a_text_answer(self):
+        q = "Which industry should I choose for my company, and what will it pre-load? Ask me what my company does if you need to."
+        self.assertEqual(sc.intent(q, "reckon-hrms/reckon-hrms-hr-studio"), "start industry")
+        self.assertEqual(sc.intent("Guide me through setting up HR Studio step by step for my company.", "reckon-hrms/reckon-hrms-setup"), "start")
+        self.assertEqual(sc.intent("Help me set up payroll", "reckon-hrms/reckon-hrms-hr-studio"), "start")
+
+    def test_other_questions_and_other_pages_are_left_to_the_normal_answer(self):
+        self.assertIsNone(sc.intent("Why can't I create a leave application?", "reckon-hrms/reckon-hrms-hr-studio"))
+        self.assertIsNone(sc.intent("How do I set up a sales invoice?", "accounts-saas/sales-invoice"))
+        self.assertIsNone(sc.intent("", ""))
+
+    def test_the_agent_can_start_at_the_industry_question(self):
+        r = sc.turn("start industry", None, make_env())
+        self.assertEqual(r["state"]["idx"], sc.STEPS.index("industry"))
+        self.assertIn("What does your company do", r["reply"])
+
+    def test_a_description_of_the_business_picks_the_industry(self):
+        env = make_env()
+        env["industries"] = [{"key": "it_software", "label": "IT / Software"}, {"key": "manufacturing_rmg_textile", "label": "Manufacturing / RMG / Textile"},
+                             {"key": "healthcare", "label": "Healthcare"}]
+        r = sc.turn("start industry", None, env)
+        r = sc.turn("we make garments in a factory near Gazipur", r["state"], env)
+        self.assertEqual(r["state"]["answers"]["industry"], "manufacturing_rmg_textile")
+        self.assertIn("Manufacturing / RMG / Textile", r["reply"])
+        r2 = sc.turn("start industry", None, env)
+        r2 = sc.turn("a small clinic", r2["state"], env)
+        self.assertEqual(r2["state"]["answers"]["industry"], "healthcare")
+        r3 = sc.turn("start industry", None, env)
+        r3 = sc.turn("we do many things", r3["state"], env)
+        self.assertNotIn("industry", r3["state"]["answers"])

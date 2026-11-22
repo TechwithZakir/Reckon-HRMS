@@ -53,6 +53,32 @@ def _pick_country(text: str, countries: list[str]):
     return None, ("I could not find that country." + (f" Did you mean {', '.join(close)}?" if close else " Please type the country's full name."))
 
 
+# Words people use for what their company does, mapped to the industry keys of the benchmark.
+INDUSTRY_WORDS = {
+    "it_software": ("software", "it company", "tech", "app development", "web development", "saas", "digital agency"),
+    "manufacturing_rmg_textile": ("garment", "rmg", "textile", "factory", "knit", "apparel", "spinning", "weaving", "manufactur"),
+    "construction_engineering": ("construction", "contractor", "civil", "engineering firm", "real estate developer", "builder"),
+    "corporate_finance": ("bank", "finance", "accounting", "audit", "insurance", "corporate", "consult"),
+    "sales_marketing": ("marketing", "advertis", "sales agency", "promotion"),
+    "pharmaceuticals": ("pharma", "medicine", "drug"),
+    "trading_distribution": ("trading", "distribut", "wholesale", "importer", "dealer", "fmcg"),
+    "healthcare": ("hospital", "clinic", "diagnostic", "healthcare", "medical centre", "nursing"),
+    "education_ngo_services": ("school", "college", "university", "ngo", "nonprofit", "training", "education", "service"),
+    "retail_logistics": ("retail", "shop", "store", "supermarket", "logistics", "courier", "delivery", "transport"),
+}
+SETUP_INTENT = re.compile(r"(set ?up|configure|guide me|get started|onboard|which industry|choose (?:my |an |the )?industry|pre-?load|what will .* load)", re.IGNORECASE)
+
+
+def intent(question: str, route: str) -> str | None:
+    """The first chat message for the setup agent when a plain question on an HR page is really a request to set up, else None."""
+    if "reckon-hrms" not in (route or "").casefold() and "hr-studio" not in (route or "").casefold():
+        return None
+    text = (question or "")[:600]
+    if not SETUP_INTENT.search(text):
+        return None
+    return "start industry" if re.search(r"industry|what does my company do", text, re.IGNORECASE) else "start"
+
+
 def _pick_industry(text: str, industries: list[dict]):
     word = text.strip().casefold()
     if word.isdigit() and 1 <= int(word) <= len(industries):
@@ -63,6 +89,10 @@ def _pick_industry(text: str, industries: list[dict]):
     hits = [i for i in industries if word and (word in i["label"].casefold() or any(w in i["label"].casefold() for w in re.findall(r"[a-z]{4,}", word)))]
     if len(hits) == 1:
         return hits[0]["key"], None
+    # A description of the business ("we make garments", "a small clinic") picks the industry whose words it uses most.
+    scored = sorted(((sum(w in word for w in words), key) for key, words in INDUSTRY_WORDS.items() if any(i["key"] == key for i in industries)), reverse=True)
+    if scored and scored[0][0] and (len(scored) < 2 or scored[0][0] > scored[1][0]):
+        return scored[0][1], None
     return None, "Please pick one by number:\n" + "\n".join(f"{n}. {i['label']}" for n, i in enumerate(industries, 1))
 
 
@@ -210,10 +240,13 @@ def turn(message: str, state, env: dict) -> dict:
         question, replies = _question(st["idx"], env, answers)
         return out(question, replies)
 
-    if not st["started"] or low in ("start", "restart", "begin"):
-        st = {"idx": 0, "answers": {}, "phase": "ask", "started": True}
+    begin = re.fullmatch(r"(?:start|restart|begin)(?: at| with)?(?: ([a-z_ ]+))?", low)
+    if not st["started"] or begin:
+        wanted = (begin.group(1) or "").strip().replace(" ", "_") if begin else ""
+        first = STEPS.index(wanted) if wanted in STEPS else 0
+        st = {"idx": first, "answers": {}, "phase": "ask", "started": True}
         answers = st["answers"]
-        question, replies = _question(0, env, answers)
+        question, replies = _question(first, env, answers)
         return out(f"I will set up HR and payroll for **{env['company']}** by asking a few questions, then do the setup for you. "
                    "Answer in your own words, say `skip` to skip a question or `back` to go back. Nothing is created until you confirm at the end.\n\n" + question, replies)
     if low in ("cancel", "stop", "quit", "exit"):

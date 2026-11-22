@@ -39,6 +39,13 @@ def _env(company: str) -> dict:
     }
 
 
+def intent(question: str, route: str = "") -> str | None:
+    """Aura asks every plain question on an HR page: a setup request starts the agent instead of a text suggestion."""
+    if not set(ROLES) & set(frappe.get_roles()):
+        return None
+    return setup_chat.intent(question, route)
+
+
 def chat(message: str, state=None) -> dict:
     """One turn of the setup chat: ``{"reply", "state", "replies", "done"}``."""
     if not set(ROLES) & set(frappe.get_roles()):
