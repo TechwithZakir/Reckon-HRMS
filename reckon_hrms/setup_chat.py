@@ -156,7 +156,7 @@ def _parse_structure(text: str, default_name: str = ""):
         return None, "Tell me Basic as a percent of the gross salary, for example: basic 60, house rent 20, medical 1500, conveyance 1000."
     out = {"structure_name": default_name or "Standard Structure", "basic_pct": basic}
     # A name written first ("Standard, basic 60 ...") is the structure's name.
-    lead = re.split(r"(?:,|\s)\s*(?=basic)", text, maxsplit=1, flags=re.IGNORECASE)[0].strip(" ,:-")
+    lead = text[: re.search(r"basic", text, re.IGNORECASE).start()].strip(" ,:-")
     if lead and 2 <= len(lead) <= 40 and re.fullmatch(r"[A-Za-z][\w .&'-]*", lead):
         out["structure_name"] = lead
     for key, pattern in (("hra_pct", r"(?:hra|house\s*rent)"), ("medical_amount", r"medical"), ("conveyance_amount", r"(?:conveyance|transport)")):
