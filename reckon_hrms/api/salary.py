@@ -17,6 +17,12 @@ from reckon_hrms.salary_formula import describe
 SALARY_ROLES = ["HR Manager", "HR User", "Payroll Manager", "System Manager"]
 
 
+def _mine() -> str:
+    from reckon_hrms.api.home import _company
+
+    return _company()
+
+
 def _gate(doctype: str):
     frappe.only_for(SALARY_ROLES)
     if not frappe.has_permission(doctype, "read"):
@@ -35,7 +41,7 @@ def list_components(start=0, page_length=DEFAULT_PAGE) -> dict:
     )
     return {
         "rows": rows,
-        "total": frappe.db.count("Salary Component"),
+        "total": len(frappe.get_list("Salary Component", pluck="name", limit_page_length=0)),  # what this person may see, not every company's
         "add_new": route("Salary Component", "new"),
         "list": route("Salary Component", "list"),
     }
@@ -45,7 +51,8 @@ def list_components(start=0, page_length=DEFAULT_PAGE) -> dict:
 def list_structures(company: str | None = None, start=0, page_length=DEFAULT_PAGE) -> dict:
     _gate("Salary Structure")
     start_i, length_i = page_bounds(start, page_length)
-    filters = {"company": company} if company else {}
+    # The company argument is ignored: structures listed and counted are always the signed-in person's own company.
+    filters = {"company": _mine()}
     rows = frappe.get_list(
         "Salary Structure", filters=filters,
         fields=["name", "is_active", "payroll_frequency", "company", "docstatus"],
@@ -92,9 +99,8 @@ def list_tax_slabs(company: str | None = None, start=0, page_length=DEFAULT_PAGE
 def assignment_summary(company: str | None = None) -> dict:
     """How many active people have a structure and how many do not. Counts only, no row list."""
     _gate("Salary Structure Assignment")
-    employee_filters = {"status": "Active"}
-    if company:
-        employee_filters["company"] = company
+    company = _mine()  # never a company the page sends
+    employee_filters = {"status": "Active", "company": company}
     active = frappe.db.count("Employee", employee_filters)
     assigned = frappe.db.sql(
         "SELECT COUNT(DISTINCT ssa.employee) FROM `tabSalary Structure Assignment` ssa "
@@ -211,7 +217,9 @@ def bulk_assign(structure: str, base, from_date: str, company: str | None = None
     frappe.only_for(["HR Manager", "Payroll Manager", "System Manager"])
     if not frappe.has_permission("Salary Structure Assignment", "create"):
         frappe.throw(_("You do not have permission to assign salary structures."), frappe.PermissionError)
-    if not frappe.db.exists("Salary Structure", {"name": structure, "docstatus": 1}):
+    # Always the signed-in person's own company: a company sent by the page is ignored, so no other company's people are touched.
+    company = _mine()
+    if not frappe.db.exists("Salary Structure", {"name": structure, "docstatus": 1, "company": company}):
         frappe.throw(_("Choose a submitted salary structure."))
     if flt(base) <= 0:
         frappe.throw(_("Base salary must be above zero."))

@@ -45,3 +45,25 @@ class ScopeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+SALARY = (ROOT / "api" / "salary.py").read_text(encoding="utf-8")
+
+
+class SalaryScopeTests(unittest.TestCase):
+    """The Payroll Studio salary screens never act on a company the page sends."""
+
+    def test_structures_and_the_assignment_summary_use_the_servers_company(self):
+        self.assertIn('filters = {"company": _mine()}', SALARY)
+        body = SALARY[SALARY.index("def assignment_summary"): SALARY.index("def bulk_assign")]
+        self.assertIn("company = _mine()", body)
+        self.assertNotIn("if company:", body)
+
+    def test_bulk_assign_only_touches_the_own_company_and_only_its_own_structure(self):
+        body = SALARY[SALARY.index("def bulk_assign"): SALARY.index("def run_bulk_assign")]
+        self.assertIn("company = _mine()", body)
+        self.assertIn('"company": company}', body)
+        self.assertIn("company=company", body)
+
+    def test_the_component_total_is_what_the_person_may_see(self):
+        self.assertNotIn('frappe.db.count("Salary Component")', SALARY)
