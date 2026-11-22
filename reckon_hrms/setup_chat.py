@@ -148,6 +148,30 @@ def _question(i: int, env, answers: dict) -> tuple[str, list[str]]:
     return head + "How should the salary structure be built?**\nBasic and house rent as a percent of the gross, medical and conveyance as fixed monthly amounts.\nFor example: basic 60, house rent 20, medical 1500, conveyance 1000.", ["skip"]
 
 
+def _echo(key: str, value: dict, env: dict) -> str:
+    """What was understood, in words, so the person can catch a misreading at once."""
+    if key == "language":
+        return sp.LANGUAGES[value["language"]]
+    if key == "industry":
+        return next((i["label"] for i in env["industries"] if i["key"] == value["industry"]), value["industry"])
+    if key == "weekly_off":
+        return " and ".join(value["weekly_off"])
+    if key == "shift":
+        return f"{value['shift_name']}, {value['shift_start']} to {value['shift_end']}" + (f", grace {value['late_grace']} min" if value.get("late_grace") else "")
+    if key == "leave":
+        names = {k: label for k, label in sp.LEAVE_QUESTIONS}
+        return ", ".join(f"{names[k].replace(' Leave', '')} {v}" for k, v in value.items())
+    if key == "structure":
+        parts = [f"basic {value['basic_pct']}%"]
+        if value.get("hra_pct"):
+            parts.append(f"house rent {value['hra_pct']}%")
+        for field, label in (("medical_amount", "medical"), ("conveyance_amount", "conveyance")):
+            if value.get(field):
+                parts.append(f"{label} {value[field]}")
+        return ", ".join(parts)
+    return ", ".join(f"{v}" if not isinstance(v, list) else " and ".join(v) for v in value.values())
+
+
 def _summary(plan: dict) -> str:
     rows = []
     for step in plan["steps"]:
@@ -266,7 +290,7 @@ def turn(message: str, state, env: dict) -> dict:
         return out(f"{error or 'I could not read that.'}\n\n{question}", replies)
     answers.update(value)
     st["idx"] += 1
-    shown = ", ".join(f"{v}" if not isinstance(v, list) else " and ".join(v) for v in value.values())
+    shown = _echo(key, value, env)
     nxt = ask_next()
     nxt["reply"] = f"✓ {TITLES[key]}: {shown[:160]}\n\n" + nxt["reply"]
     return nxt
