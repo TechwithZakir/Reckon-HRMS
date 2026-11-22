@@ -287,7 +287,10 @@ def _summary(plan: dict) -> str:
     rows = []
     for step in plan["steps"]:
         mark = {"ready": "✓", "attention": "!", "skipped": "–"}.get(step["status"], "–")
-        items = "; ".join(step["items"][:4]) if step["status"] != "skipped" else "skipped"
+        if step["status"] == "skipped":
+            items = step["note"] if step["note"].startswith("Already") else "skipped"
+        else:
+            items = "; ".join(step["items"][:4])
         rows.append(f"{mark} **{step['title']}**: {items}" + (f"\n   _{step['note']}_" if step["status"] == "attention" and step["note"] else ""))
     return "\n".join(rows)
 

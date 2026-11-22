@@ -83,7 +83,7 @@ class PlanTests(unittest.TestCase):
 
     def test_what_the_company_already_has_is_not_added_again(self):
         plan = self.plan({"extra_departments": "Sales, Legal"}, existing={"departments": {"Sales"}})
-        self.assertEqual(self.steps(plan)["departments"]["items"], ["Legal"])
+        self.assertEqual(self.steps(plan)["departments"]["items"], ["Legal", "Sales (already there)"])
 
     def test_problems_ask_for_attention_instead_of_guessing(self):
         steps = self.steps(self.plan({"structure_name": "S", "basic_pct": "70", "hra_pct": "50", "holidays": "Eid sometime"}))
@@ -102,3 +102,56 @@ class PlanTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoDuplicateTests(unittest.TestCase):
+    """What already exists is never added again: the plan says so before anything runs."""
+
+    def plan(self, raw, existing):
+        return sp.build_plan(sp.normalize_answers(raw, 2026), SEG, "Acme", existing)
+
+    def steps(self, plan):
+        return {s["key"]: s for s in plan["steps"]}
+
+    def test_names_differing_only_in_case_or_spacing_are_the_same(self):
+        self.assertTrue(sp.same("Sales", " sales  "))
+        self.assertTrue(sp.same("Head  Office", "head office"))
+        self.assertFalse(sp.same("Sales", "Sale"))
+        self.assertEqual(sp.missing(["Sales", "Legal", "Data  Science"], {"sales", "data science"}), ["Legal"])
+
+    def test_existing_departments_titles_and_branches_are_listed_as_already_there_and_skipped(self):
+        existing = {"departments": {"sales", "Legal"}, "designations": {"Intern"}, "branches": {"Head Office"}}
+        steps = self.steps(self.plan({"extra_departments": "Sales, Legal", "extra_titles": "intern", "locations": "head  office"}, existing))
+        for key in ("departments", "titles", "locations"):
+            self.assertEqual(steps[key]["status"], "skipped", key)
+            self.assertIn("Already set up", steps[key]["note"])
+        self.assertIn("Sales (already there)", steps["departments"]["items"])
+
+    def test_a_mix_adds_only_the_new_ones_and_still_shows_the_others(self):
+        steps = self.steps(self.plan({"extra_departments": "Sales, Legal"}, {"departments": {"Sales"}}))
+        self.assertEqual(steps["departments"]["status"], "ready")
+        self.assertEqual(steps["departments"]["items"], ["Legal", "Sales (already there)"])
+
+    def test_a_second_shift_with_the_same_name_or_the_same_hours_is_not_added(self):
+        raw = {"shift_name": "Day", "shift_start": "09:00", "shift_end": "17:30"}
+        same_hours = self.steps(self.plan(raw, {"shifts": [{"name": "General Shift - Acme", "start": "09:00:00", "end": "17:30:00"}]}))["shift"]
+        self.assertEqual(same_hours["status"], "skipped")
+        self.assertIn("General Shift - Acme", same_hours["note"])
+        same_name = self.steps(self.plan(raw, {"shifts": [{"name": "day", "start": "08:00:00", "end": "16:00:00"}]}))["shift"]
+        self.assertEqual(same_name["status"], "skipped")
+        other = self.steps(self.plan(raw, {"shifts": [{"name": "Night", "start": "20:00:00", "end": "04:00:00"}]}))["shift"]
+        self.assertEqual(other["status"], "ready")
+
+    def test_an_existing_leave_policy_is_not_replaced_and_the_note_names_where_to_edit_it(self):
+        step = self.steps(self.plan({"leave_casual": "10"}, {"leave_policy": "HR-LPOL-2026-00001"}))["leave"]
+        self.assertEqual(step["status"], "skipped")
+        self.assertIn("Leave Policy", step["note"])
+        self.assertEqual(self.steps(self.plan({"leave_casual": "10"}, {}))["leave"]["status"], "ready")
+
+    def test_a_structure_with_the_same_name_is_skipped_and_a_new_name_warns_about_the_others(self):
+        raw = {"structure_name": "Standard", "basic_pct": "60"}
+        skipped = self.steps(self.plan(raw, {"structures": ["standard"]}))["structure"]
+        self.assertEqual(skipped["status"], "skipped")
+        added = self.steps(self.plan(raw, {"structures": ["Reckon BD SME"]}))["structure"]
+        self.assertEqual(added["status"], "ready")
+        self.assertIn("You already have: Reckon BD SME", added["note"])

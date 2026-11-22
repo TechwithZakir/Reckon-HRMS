@@ -59,6 +59,17 @@ def clean_text(value, limit: int = 4000) -> str:
     return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", str(value or "")).strip()[:limit]
 
 
+def same(a: str, b: str) -> bool:
+    """Two names are the same when they differ only in case or spacing."""
+    return re.sub(r"\s+", " ", str(a)).strip().casefold() == re.sub(r"\s+", " ", str(b)).strip().casefold()
+
+
+def missing(names: list[str], have) -> list[str]:
+    """The names that the company does not have yet (case and spacing ignored)."""
+    keys = {re.sub(r"\s+", " ", str(h)).strip().casefold() for h in have}
+    return [n for n in names if re.sub(r"\s+", " ", n).strip().casefold() not in keys]
+
+
 def split_names(text, limit: int = MAX_LIST) -> list[str]:
     """Names separated by commas, semicolons or new lines: trimmed, no repeats, in the order given."""
     seen, out = set(), []
@@ -166,6 +177,11 @@ def structure_problem(structure: dict | None) -> str | None:
     return None
 
 
+def _there(wanted: list[str], new: list[str]) -> list[str]:
+    """The wanted names that already exist, shown as "X (already there)"."""
+    return [f"{n} (already there)" for n in wanted if n not in new]
+
+
 def build_plan(answers: dict, segment: dict | None, company: str, existing: dict | None = None) -> dict:
     """Turn clean answers into reviewable steps. ``existing`` marks names the company already has (sets)."""
     existing = existing or {}
@@ -187,14 +203,17 @@ def build_plan(answers: dict, segment: dict | None, company: str, existing: dict
     step("language", "Language", [LANGUAGES[answers["language"]]] if answers["language"] else ["Nothing to add"],
          "ready" if answers["language"] else "skipped", "This changes your own language setting only." if answers["language"] else "")
     have = existing.get("branches", set())
-    new_locations = [n for n in answers["locations"] if n not in have]
-    step("locations", "Locations (branches)", new_locations or ["Nothing to add"], "ready" if new_locations else "skipped")
+    new_locations = missing(answers["locations"], have)
+    step("locations", "Locations (branches)", [*new_locations, *_there(answers["locations"], new_locations)] or ["Nothing to add"],
+         "ready" if new_locations else "skipped", "" if new_locations or not answers["locations"] else "Already set up. Edit them in Branch.")
     have = existing.get("departments", set())
-    new_departments = [d for d in answers["extra_departments"] if d not in have]
-    step("departments", "Departments", new_departments or ["Nothing to add"], "ready" if new_departments else "skipped")
+    new_departments = missing(answers["extra_departments"], have)
+    step("departments", "Departments", [*new_departments, *_there(answers["extra_departments"], new_departments)] or ["Nothing to add"],
+         "ready" if new_departments else "skipped", "" if new_departments or not answers["extra_departments"] else "Already set up. Edit them in Department.")
     have = existing.get("designations", set())
-    new_titles = [t for t in answers["extra_titles"] if t not in have]
-    step("titles", "Job titles", new_titles or ["Nothing to add"], "ready" if new_titles else "skipped")
+    new_titles = missing(answers["extra_titles"], have)
+    step("titles", "Job titles", [*new_titles, *_there(answers["extra_titles"], new_titles)] or ["Nothing to add"],
+         "ready" if new_titles else "skipped", "" if new_titles or not answers["extra_titles"] else "Already set up. Edit them in Designation.")
 
     holiday_items = [f"Weekly off: {', '.join(answers['weekly_off']) or 'none'}"]
     count = existing.get("country_holidays")
@@ -212,12 +231,21 @@ def build_plan(answers: dict, segment: dict | None, company: str, existing: dict
          "attention" if answers["holidays_unread"] else "ready", note)
     if answers["shift"]:
         s = answers["shift"]
-        step("shift", "Working hours", [f"{s['name']}: {s['start'][:5]} to {s['end'][:5]}" + (f", late entry after {s['grace']} min" if s["grace"] else "")])
+        line = f"{s['name']}: {s['start'][:5]} to {s['end'][:5]}" + (f", late entry after {s['grace']} min" if s["grace"] else "")
+        twin = next((x for x in existing.get("shifts", []) if same(x["name"], s["name"]) or (x["start"][:5] == s["start"][:5] and x["end"][:5] == s["end"][:5])), None)
+        if twin:
+            step("shift", "Working hours", [line], "skipped",
+                 f"Already set up: {twin['name']} ({twin['start'][:5]} to {twin['end'][:5]}). A second shift is not added. Edit it in Shift Type.")
+        else:
+            step("shift", "Working hours", [line])
     elif answers.get("shift_problem"):
         step("shift", "Working hours", [], "attention", answers["shift_problem"])
     else:
         step("shift", "Working hours", ["Nothing to add"], "skipped")
-    if answers["leave"]:
+    if answers["leave"] and existing.get("leave_policy"):
+        step("leave", "Leave policy", [f"{k}: {v:g} days a year" for k, v in answers["leave"].items()], "skipped",
+             f"Already set up ({existing['leave_policy']}). It is not changed here: edit the days in Leave Policy.")
+    elif answers["leave"]:
         step("leave", "Leave policy", [f"{k}: {v:g} days a year" for k, v in answers["leave"].items()],
              "ready", "Employees get these days when you assign the policy to them. Nothing is given now.")
     else:
@@ -231,9 +259,15 @@ def build_plan(answers: dict, segment: dict | None, company: str, existing: dict
             items.append(f"Medical Allowance: {s['medical']:g} fixed")
         if s["conveyance"]:
             items.append(f"Conveyance Allowance: {s['conveyance']:g} fixed")
-        step("structure", f"Salary structure: {s['name']}", items, "ready",
-             "Amounts per person come from each person's gross when you give them the structure." +
-             (f" {other:g}% of the gross has no pay item yet." if other > 0 else ""))
+        have_structures = existing.get("structures", [])
+        if any(same(x, s["name"]) for x in have_structures):
+            step("structure", f"Salary structure: {s['name']}", items, "skipped",
+                 "Already set up with this name. It is not changed here: edit it in Salary Structure.")
+        else:
+            others = f" You already have: {', '.join(have_structures[:3])}; this adds another." if have_structures else ""
+            step("structure", f"Salary structure: {s['name']}", items, "ready",
+                 "Amounts per person come from each person's gross when you give them the structure." +
+                 (f" {other:g}% of the gross has no pay item yet." if other > 0 else "") + others)
     elif problem:
         step("structure", "Salary structure", [], "attention", problem)
     else:

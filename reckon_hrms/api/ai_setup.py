@@ -54,6 +54,11 @@ def _existing(company: str, country: str = "", year: int | None = None) -> dict:
         "departments": set(frappe.get_all("Department", filters={"company": company}, pluck="department_name")),
         "designations": set(frappe.get_all("Designation", pluck="designation_name")),
         "branches": set(frappe.get_all("Branch", filters={"company": ["in", [company, "", None]]}, pluck="name")),
+        "shifts": [{"name": r.name, "start": str(r.start_time), "end": str(r.end_time)}
+                   for r in frappe.get_all("Shift Type", filters={"company": company}, fields=["name", "start_time", "end_time"])],
+        "leave_policy": frappe.db.get_value("Leave Policy", {"company": company, "docstatus": 1}, "name") or "",
+        "structures": [r.rsplit(" - " + company, 1)[0] if r.endswith(" - " + company) else r
+                       for r in frappe.get_all("Salary Structure", filters={"company": company, "docstatus": 1}, pluck="name")],
     }
 
 
@@ -274,8 +279,10 @@ def _holiday_list(company: str, answers: dict) -> str:
 def _shift(company: str, shift: dict) -> str:
     abbr = frappe.db.get_value("Company", company, "abbr") or ""
     name = f"{shift['name']} - {abbr}"[:140] if abbr else shift["name"]
-    if frappe.db.exists("Shift Type", name):
-        return "exists"
+    if frappe.db.exists("Shift Type", name) or frappe.db.exists(
+        "Shift Type", {"company": company, "start_time": shift["start"], "end_time": shift["end"]}
+    ):
+        return "Already there, left as it is"
     values = {"doctype": "Shift Type", "name": name, "company": company, "start_time": shift["start"], "end_time": shift["end"]}
     if shift["grace"]:
         values.update(enable_late_entry_marking=1, late_entry_grace_period=shift["grace"])
@@ -285,8 +292,8 @@ def _shift(company: str, shift: dict) -> str:
 
 def _leave_policy(company: str, leave: dict) -> str:
     title = f"{company} Leave Policy"[:140]
-    if frappe.db.exists("Leave Policy", {"title": title}):
-        return "exists"
+    if frappe.db.exists("Leave Policy", {"title": title}) or frappe.db.exists("Leave Policy", {"company": company, "docstatus": 1}):
+        return "Already there, left as it is"
     for leave_type in leave:
         industry_seed._leave_type(leave_type)
     doc = frappe.get_doc({"doctype": "Leave Policy", "title": title,
@@ -299,7 +306,7 @@ def _leave_policy(company: str, leave: dict) -> str:
 def _structure(company: str, spec: dict) -> str:
     name = f"{spec['name']} - {company}"[:140]
     if frappe.db.exists("Salary Structure", name):
-        return "exists"
+        return "Already there, left as it is"
     for component in STRUCTURE_COMPONENTS:
         industry_seed._component(component)
         industry_seed._ensure_component_account(company, component)
