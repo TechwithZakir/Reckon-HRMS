@@ -18,6 +18,23 @@ def list_segments() -> list[dict]:
     return salary_suggest.segments()
 
 
+@frappe.whitelist(methods=["GET"])
+def preview_segment(segment: str) -> dict:
+    """What choosing this industry would load for the signed-in company, and what is already there. Changes nothing."""
+    frappe.only_for(ADMIN_ROLES + ["Payroll Manager"])
+    return industry_seed.preview_segment(_company(), segment)
+
+
+@frappe.whitelist(methods=["GET"])
+def current_segment() -> dict:
+    """The industry the signed-in company chose, with its label, for the guided setup pages."""
+    frappe.only_for(ADMIN_ROLES + ["Payroll Manager"])
+    company = _company()
+    key = frappe.db.get_value("Company", company, "reckon_industry") or ""
+    label = next((s["label"] for s in salary_suggest.segments() if s["key"] == key), "")
+    return {"company": company, "segment": key, "label": label}
+
+
 @frappe.whitelist(methods=["POST"])
 def choose_segment(segment: str) -> dict:
     """Seed the signed-in company's starter masters for the chosen segment. Repeat calls are safe."""

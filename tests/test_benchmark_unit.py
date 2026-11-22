@@ -92,3 +92,53 @@ class SuggestionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IndustryPreviewTests(unittest.TestCase):
+    """The guided setup shows what an industry would load before anything is added."""
+
+    @classmethod
+    def setUpClass(cls):
+        import sys
+        import types
+
+        sys.modules.setdefault("frappe", types.ModuleType("frappe"))  # the preview rules are pure; the module only imports frappe
+        from reckon_hrms import industry_seed
+
+        cls.seed = industry_seed
+        with open(DATA_PATH, encoding="utf-8") as fh:
+            cls.data = json.load(fh)
+
+    def empty(self, **extra):
+        base = {"designations": set(), "departments": set(), "leave_types": set(), "components": set(), "code_taken": set(), "overtime": False}
+        base.update(extra)
+        return base
+
+    def test_a_blank_company_would_get_everything_the_industry_lists(self):
+        seg = self.data["segments"]["manufacturing_rmg_textile"]
+        preview = self.seed.build_preview(seg, self.empty())
+        self.assertEqual(preview["will_add"]["designations"], len(seg["roles"]))
+        self.assertEqual(preview["will_add"]["departments"], len(seg["departments"]))
+        self.assertEqual(preview["will_add"]["leave_types"], len(seg["leave_types"]))
+        self.assertEqual(preview["will_add"]["overtime"], 1)
+        self.assertTrue(all(i["status"] == "new" for g in preview["groups"] for i in g["items"]))
+        self.assertTrue(any("nothing is paid" in line.lower() for line in preview["not_loaded"]))
+
+    def test_what_already_exists_is_marked_and_not_counted(self):
+        seg = self.data["segments"]["pharmaceuticals"]
+        have = self.empty(departments={"Production"}, components={"Basic Salary"}, overtime=True, code_taken={"Sales Commission"})
+        preview = self.seed.build_preview(seg, have)
+        by = {g["key"]: {i["name"]: i["status"] for i in g["items"]} for g in preview["groups"]}
+        self.assertEqual(by["departments"]["Production"], "exists")
+        self.assertEqual(by["components"]["Basic Salary"], "exists")
+        self.assertEqual(by["components"]["Sales Commission"], "skipped")
+        self.assertEqual(by["overtime"]["Standard Overtime"], "exists")
+        self.assertEqual(preview["will_add"]["overtime"], 0)
+
+    def test_an_industry_without_overtime_has_no_overtime_rule(self):
+        preview = self.seed.build_preview(self.data["segments"]["sales_marketing"], self.empty())
+        self.assertNotIn("overtime", [g["key"] for g in preview["groups"]])
+
+    def test_preview_never_carries_pay_amounts(self):
+        preview = self.seed.build_preview(self.data["segments"]["it_software"], self.empty())
+        self.assertNotIn("min", json.dumps(preview))

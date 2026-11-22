@@ -2,7 +2,7 @@
 // Served at /desk/reckon-hrms/reckon-hrms-setup. Old stage URLs redirect here (see their page files).
 frappe.pages["reckon-hrms-setup"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({ parent: wrapper, title: "Payroll Studio", single_column: true });
-	const STAGES = [["salary", "Salary rules"], ["run", "Run salary"]];
+	const STAGES = [["guided", "Guided setup"], ["salary", "Salary rules"], ["run", "Run salary"]];
 	const shell = $(`<div class="rhs-shell" style="display:block"></div>`).appendTo(page.main);
 	const nav = $(`<nav class="rhs-stages" role="tablist" aria-label="Setup stages" style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border-color);margin:10px 0 14px"></nav>`).appendTo(shell);
 	const body = $(`<div class="rhs-body" style="min-width:0"></div>`).appendTo(shell);
@@ -14,7 +14,8 @@ frappe.pages["reckon-hrms-setup"].on_page_load = function (wrapper) {
 		nav.find("button").attr("aria-current", null);
 		nav.find(`[data-stage="${stage}"]`).attr("aria-current", "step");
 		body.empty();
-		window.ReckonSetupStages[stage](body);
+		if (stage === "guided") window.ReckonGuidedSetup(body, "payroll");
+		else window.ReckonSetupStages[stage](body);
 		window.ReckonFormControls(body);
 		history.replaceState(null, "", `#${stage}`);
 	}
@@ -26,5 +27,10 @@ frappe.pages["reckon-hrms-setup"].on_page_load = function (wrapper) {
 	const fromRoute = frappe.route_options && frappe.route_options.stage;
 	const fromHash = (location.hash || "").replace("#", "");
 	frappe.route_options = null;
-	go(fromRoute || fromHash || "salary");
+	page.set_secondary_action(__("Ask AI"), () => window.ReckonStudioAsk("payroll"), "es-line-add");
+	if (fromRoute || fromHash) go(fromRoute || fromHash);
+	else {
+		frappe.call({ method: "reckon_hrms.api.industry.current_segment", type: "GET" })
+			.then((r) => go(r.message && r.message.segment ? "salary" : "guided")).catch(() => go("salary"));
+	}
 };

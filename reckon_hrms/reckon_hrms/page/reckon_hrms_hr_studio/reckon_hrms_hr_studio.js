@@ -2,7 +2,7 @@
 // Served at /desk/reckon-hrms/reckon-hrms-hr-studio. "Your company" is the shared company stage.
 frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({ parent: wrapper, title: "HR Studio", single_column: true });
-	const STAGES = [["hiring", "Hiring"], ["company", "Company and employee setup"], ["onboarding", "Onboarding"], ["employees", "Employee details"],
+	const STAGES = [["guided", "Guided setup"], ["hiring", "Hiring"], ["company", "Company and employee setup"], ["onboarding", "Onboarding"], ["employees", "Employee details"],
 		["attendance", "Time and attendance"], ["leave", "Leave and holidays"], ["exit", "Exit"]];
 	const shell = $(`<div class="rhs-shell" style="display:block"></div>`).appendTo(page.main);
 	const nav = $(`<nav class="rhs-stages" role="tablist" aria-label="HR Studio steps" style="display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border-color);margin:10px 0 14px"></nav>`).appendTo(shell);
@@ -16,6 +16,7 @@ frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
 		nav.find(`[data-stage="${stage}"]`).attr("aria-current", "step");
 		body.empty();
 		if (stage === "company") window.ReckonSetupStages.company(body);
+		else if (stage === "guided") window.ReckonGuidedSetup(body, "hr");
 		else window.ReckonHrStages[stage](body);
 		window.ReckonFormControls(body);
 		history.replaceState(null, "", `#${stage}`);
@@ -25,10 +26,16 @@ frappe.pages["reckon-hrms-hr-studio"].on_page_load = function (wrapper) {
 		$(`<button type="button" role="tab" data-stage="${key}">${label}</button>`).on("click", () => go(key)).appendTo(nav);
 	});
 
+	page.set_secondary_action(__("Ask AI"), () => window.ReckonStudioAsk("hr"), "es-line-add");
 	const fromRoute = frappe.route_options && frappe.route_options.stage;
 	const fromHash = (location.hash || "").replace("#", "");
 	frappe.route_options = null;
-	go(fromRoute || fromHash || "hiring");
+	if (fromRoute || fromHash) go(fromRoute || fromHash);
+	else {
+		// A company with no industry yet starts on the guided setup; everyone else on the first working step.
+		frappe.call({ method: "reckon_hrms.api.industry.current_segment", type: "GET" })
+			.then((r) => go(r.message && r.message.segment ? "hiring" : "guided")).catch(() => go("hiring"));
+	}
 };
 
 // Steps that open the standard lists: an icon to open the list and an icon to add a record.
