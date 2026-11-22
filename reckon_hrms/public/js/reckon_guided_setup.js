@@ -12,21 +12,15 @@
 	}
 	window.ReckonAskAi = function (question) { askAi(question); };
 
-	const STEPS = {
-		hr: [
-			["Choose your industry", "Guide me through choosing my industry in HR Studio and what it pre-loads."],
-			["Departments and job titles", "Which departments and job titles should I keep or add for my company?"],
-			["Holidays and leave", "Help me set up the holiday list and leave types for my company. Do not invent leave days."],
-			["Shifts and attendance", "How should I set up shifts and attendance (devices or app check-in) for my company?"],
-			["Add your people", "How do I add my employees and what must each one have before payroll?"],
-		],
-		payroll: [
-			["Confirm pay items", "Which pay items did my industry load, and which should I use? Explain each one."],
-			["Salary structure", "Help me design a salary structure from my pay items without guessing amounts."],
-			["Give structures to people", "How do I give the salary structure to my employees, and what start date should it have?"],
-			["Run salary", "Walk me through running salary for a month: draft, review, approve and pay."],
-			["Before the first run", "What should I check before my first payroll run?"],
-		],
+	// What each question's "Help me answer" button asks Ask AI (it knows the company's industry).
+	const HELP = {
+		extra_departments: "Which departments should a company like mine have? List them so I can type them in.",
+		extra_titles: "Which job titles should a company like mine have? List them so I can type them in.",
+		weekly_off: "Which weekly off days are usual for a company like mine, and what should I check before choosing?",
+		holidays: "Explain how to list my public holidays for this year. Do not invent dates: tell me what to look up.",
+		shift: "What working hours and shift setup suits a company like mine? Ask me about my work pattern first.",
+		leave: "How should I decide leave days per year for casual, sick, earned and maternity leave? Do not invent numbers.",
+		structure: "Help me decide the basic and house rent percentages and the fixed allowances for a salary structure. Ask me questions first, and do not guess amounts.",
 	};
 	const STUDIO_ASK = {
 		hr: "Guide me through setting up HR Studio step by step for my company.",
@@ -56,6 +50,81 @@
 	.rgs-spark{color:var(--primary)}
 	</style>`;
 
+	// ---- the setup interview: questions for every step, one plan to review, one apply
+	function interview(root, studio, $sel) {
+		const KEY = "reckon_setup_answers";
+		let answers = {};
+		try { answers = JSON.parse(sessionStorage.getItem(KEY) || "{}"); } catch (e) { answers = {}; }
+		const save = () => { try { sessionStorage.setItem(KEY, JSON.stringify(answers)); } catch (e) { /* private window */ } };
+		const $form = root.find("[data-form]");
+		const $plan = root.find("[data-plan]");
+		const val = (k) => (answers[k] == null ? "" : answers[k]);
+		const field = (k, label, extra = "") => `<label class="rgs-f"><span>${esc(label)}</span><input class="form-control input-sm" data-a="${k}" value="${esc(val(k))}" ${extra}></label>`;
+		const help = (k) => `<button type="button" class="btn btn-default btn-xs rgs-ask" data-help="${k}">✦ Help me answer</button>`;
+
+		frappe.call({ method: "reckon_hrms.api.ai_setup.questions", type: "GET" }).then((r) => {
+			const q = r.message;
+			const mine = q.questions.filter((x) => x.studio === studio && x.kind !== "industry");
+			const days = q.weekdays;
+			const picked = Array.isArray(answers.weekly_off) ? answers.weekly_off : ["Friday"];
+			const html = mine.map((x, i) => {
+				let body = "";
+				if (x.kind === "list") body = `<textarea class="form-control" rows="2" data-a="${x.key}">${esc(val(x.key))}</textarea>`;
+				else if (x.kind === "text") body = `<textarea class="form-control" rows="4" data-a="${x.key}" placeholder="2026-03-26 Independence Day">${esc(val(x.key))}</textarea>`;
+				else if (x.kind === "days") body = `<div class="rgs-days">${days.map((d) => `<label><input type="checkbox" data-day="${d}" ${picked.includes(d) ? "checked" : ""}> ${d}</label>`).join("")}</div>`;
+				else if (x.kind === "shift") body = `<div class="rgs-grid">${field("shift_name", "Shift name", 'placeholder="General Shift"')}${field("shift_start", "Starts", 'placeholder="09:00"')}${field("shift_end", "Ends", 'placeholder="17:00"')}${field("late_grace", "Late entry grace (minutes)", 'inputmode="numeric"')}</div>`;
+				else if (x.kind === "leave") body = `<div class="rgs-grid">${field("leave_casual", "Casual Leave", 'inputmode="decimal"')}${field("leave_sick", "Sick Leave", 'inputmode="decimal"')}${field("leave_earned", "Earned Leave", 'inputmode="decimal"')}${field("leave_maternity", "Maternity Leave", 'inputmode="decimal"')}</div>`;
+				else if (x.kind === "structure") body = `<div class="rgs-grid">${field("structure_name", "Structure name", 'placeholder="Standard Structure"')}${field("basic_pct", "Basic, % of gross", 'inputmode="decimal"')}${field("hra_pct", "House rent, % of gross", 'inputmode="decimal"')}${field("medical_amount", "Medical, fixed per month", 'inputmode="decimal"')}${field("conveyance_amount", "Conveyance, fixed per month", 'inputmode="decimal"')}</div>`;
+				const helpKey = x.kind === "list" ? x.key : (x.kind === "text" ? "holidays" : x.kind === "days" ? "weekly_off" : x.kind);
+				return `<div class="rgs-q"><div class="rgs-qh"><b>${i + 1}. ${esc(x.label)}</b>${help(helpKey)}</div><div class="rgs-muted">${esc(x.help)}</div>${body}</div>`;
+			}).join("");
+			$form.html(`<style>.rgs-q{padding:12px 0;border-bottom:1px dotted var(--border-color)}.rgs-q:last-child{border-bottom:0}.rgs-qh{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:2px}.rgs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:8px}.rgs-f span{display:block;font-size:12px;color:var(--text-muted);margin-bottom:2px}.rgs-days{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}.rgs-days label{display:inline-flex;gap:5px;align-items:center;margin:0;font-weight:400}.rgs-st{display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:1px 8px;margin-left:8px}.rgs-st.ready{background:var(--green-100,#e4f5e9);color:var(--green-700,#1e6b3a)}.rgs-st.skipped{background:var(--control-bg);color:var(--text-muted)}.rgs-st.attention,.rgs-st.failed{background:var(--orange-100,#fff1db);color:var(--orange-700,#8a5300)}.rgs-st.done{background:var(--green-100,#e4f5e9);color:var(--green-700,#1e6b3a)}.rgs-plan li{margin:2px 0}</style>${html}`);
+			$form.on("click", "[data-help]", function () { askAi(HELP[this.dataset.help] || HELP.structure); });
+			$form.on("input", "[data-a]", function () { answers[this.dataset.a] = this.value; save(); });
+			$form.on("change", "[data-day]", function () {
+				answers.weekly_off = $form.find("[data-day]:checked").map((_i, el) => el.dataset.day).get();
+				save();
+			});
+			if (!Array.isArray(answers.weekly_off)) answers.weekly_off = picked;
+		}).catch(() => $form.html(`<div class="rgs-muted">The interview needs the HR Manager role.</div>`));
+
+		const gather = () => Object.assign({}, answers, { industry: $sel.val() || "" });
+		const badge = (s) => `<span class="rgs-st ${esc(s)}">${esc(({ ready: "will be added", skipped: "skipped", attention: "needs your attention", done: "done", failed: "failed" })[s] || s)}</span>`;
+
+		root.find("[data-prepare]").on("click", function () {
+			const $btn = $(this).prop("disabled", true);
+			$plan.html(`<div class="rgs-muted" style="margin-top:10px">✦ Ask AI is reading your answers…</div>`);
+			frappe.call({ method: "reckon_hrms.api.ai_setup.prepare", args: { answers: JSON.stringify(gather()) } }).then((r) => {
+				const p = r.message;
+				$plan.html(`<div class="rgs-plan" style="margin-top:14px"><b>Your setup plan for ${esc(p.company)}</b>
+					<div class="rgs-muted">${p.ready} steps will run${p.attention ? `, ${p.attention} need your attention (fix them above and prepare again)` : ""}.${p.ai_used ? " Ask AI read your holiday text." : ""} Nothing has been created yet.</div>
+					${p.steps.map((s) => `<div class="rgs-group" style="margin-top:10px"><b>${esc(s.title)}</b>${badge(s.status)}
+						${s.items.length ? `<ul style="margin:6px 0 0 18px;padding:0">${s.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
+						${s.note ? `<div class="rgs-muted" style="margin-top:4px">${esc(s.note)}</div>` : ""}</div>`).join("")}
+					<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-apply-all ${p.ready ? "" : "disabled"}>Set everything up</button>
+						<button type="button" class="btn btn-default btn-sm" data-ask-plan>✦ Review this plan with Ask AI</button></div>
+					<div data-result></div></div>`);
+				$plan.find("[data-ask-plan]").on("click", () => askAi("Review my setup plan and tell me what I might have missed for my industry. My plan: " +
+					p.steps.filter((s) => s.status === "ready").map((s) => `${s.title}: ${s.items.join("; ")}`).join(" | ").slice(0, 1500)));
+				$plan.find("[data-apply-all]").on("click", function () {
+					frappe.confirm(`Set up ${esc(p.company)} with this plan? Nothing is paid and no one's salary is set.`, () => {
+						const $a = $(this).prop("disabled", true);
+						$plan.find("[data-result]").html(`<div class="rgs-muted" style="margin-top:10px">Setting up…</div>`);
+						frappe.call({ method: "reckon_hrms.api.ai_setup.apply", args: { answers: JSON.stringify(gather()) } }).then((a) => {
+							const res = a.message;
+							$plan.find("[data-result]").html(`<div style="margin-top:12px"><b>${res.done} steps done${res.failed ? `, ${res.failed} failed` : ""}</b>
+								<ul style="margin:6px 0 0 18px;padding:0">${res.results.map((x) => `<li>${esc(x.label)} ${badge(x.result)} <span class="rgs-muted">${esc(x.message)}</span></li>`).join("")}</ul></div>`);
+							try { sessionStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+							frappe.show_alert({ message: res.failed ? "Some steps failed. See the list." : "Setup finished.", indicator: res.failed ? "orange" : "green" });
+							$sel.trigger("change");
+						}).catch((e) => { $a.prop("disabled", false); $plan.find("[data-result]").html(`<div class="rgs-muted">${esc((e && e.message) || "Could not run the setup.")}</div>`); });
+					});
+				});
+			}).catch((e) => $plan.html(`<div class="rgs-muted" style="margin-top:10px">${esc((e && e.message) || "Could not prepare the plan.")}</div>`))
+				.then(() => $btn.prop("disabled", false), () => $btn.prop("disabled", false));
+		});
+	}
+
 	window.ReckonGuidedSetup = function (parent, studio) {
 		studio = studio === "payroll" ? "payroll" : "hr";
 		const root = $(`<div class="rgs">${STYLE}
@@ -69,8 +138,11 @@
 				<div class="rgs-row"><select class="form-control" data-sel aria-label="Industry" style="flex:1 1 260px;max-width:420px"><option value="">Choose an industry</option></select>
 					<button type="button" class="btn btn-default btn-sm" data-ask-industry>✦ Which one fits me?</button></div>
 				<div data-preview></div></div>
-			<div class="rgs-card"><h2>${studio === "payroll" ? "Payroll steps" : "Setup steps"}</h2>
-				<ul class="rgs-steps" data-steps></ul></div></div>`).appendTo(parent);
+			<div class="rgs-card" data-interview><h2>Setup interview</h2>
+				<div class="rgs-muted">Answer what you know. Ask AI prepares one plan from all your answers, you review it, and then it sets everything up. Anything you leave empty is skipped, and Ask AI never makes up amounts or days.</div>
+				<div data-form></div>
+				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-prepare>✦ Ask AI to prepare my setup</button></div>
+				<div data-plan></div></div></div></div>`).appendTo(parent);
 
 		const $now = root.find("[data-now]");
 		const $sel = root.find("[data-sel]");
@@ -78,10 +150,6 @@
 
 		root.find("[data-ask-main]").on("click", () => window.ReckonStudioAsk(studio));
 		root.find("[data-ask-industry]").on("click", () => askAi("Which industry should I choose for my company, and what will it pre-load? Ask me what my company does if you need to."));
-		root.find("[data-steps]").html(STEPS[studio].map(([title, q], i) =>
-			`<li><span>${esc(title)}</span><button type="button" class="btn btn-default btn-xs rgs-ask" data-q="${i}">✦ Ask AI</button></li>`).join(""));
-		root.on("click", "[data-q]", function () { askAi(STEPS[studio][Number(this.dataset.q)][1]); });
-
 		function showNow(label) {
 			current.label = label || "";
 			$now.html(label ? `Current industry: <b>${esc(label)}</b>` : "Not chosen yet. Choose one below to see what it pre-loads.");
@@ -129,5 +197,6 @@
 			}).catch(() => $prev.html(`<div class="rgs-muted" style="margin-top:10px">Could not load the preview.</div>`));
 		}
 		$sel.on("change", function () { showPreview(this.value); });
+		interview(root, studio, $sel);
 	};
 })();
