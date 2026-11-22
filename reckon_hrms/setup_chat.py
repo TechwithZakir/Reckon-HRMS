@@ -161,7 +161,7 @@ def _question(i: int, env, answers: dict) -> tuple[str, list[str]]:
         return head + "Where do you work? Give your offices, factories or sites.**\nFor example: Head Office, Dhaka Factory. They become your branches.", ["skip"]
     if key == "industry":
         inds = env["industries"]
-        return head + "What does your company do?** Reply with a number.\n" + "\n".join(f"{n}. {x['label']}" for n, x in enumerate(inds, 1)), ["skip"]
+        return head + "What does your company do?** Reply with a number, or just tell me what you do.\n" + "\n".join(f"{n}. {x['label']}" for n, x in enumerate(inds, 1)), ["skip"]
     if key == "extra_departments":
         return head + "Which departments do you have?**\nSeparate them with commas. Your industry's usual departments are added too.", ["skip"]
     if key == "extra_titles":
