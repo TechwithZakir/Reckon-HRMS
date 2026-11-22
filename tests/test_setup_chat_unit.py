@@ -76,7 +76,8 @@ class ChatTests(unittest.TestCase):
         r = self.run_all(make_env(applied))
         self.assertIn("Here is your setup plan", r["reply"])
         self.assertIn("Nothing has been created yet", r["reply"])
-        self.assertIn("Yes, set everything up", r["replies"])
+        self.assertEqual([o["value"] for o in r["choices"]["options"]], ["Yes, set everything up", "Change an answer"])
+        self.assertEqual(r["choices"]["type"], "single")
         self.assertEqual(applied, [])
         a = r["state"]["answers"]
         self.assertEqual((a["shift_start"], a["shift_end"], a["late_grace"]), ("09:00", "17:30", "10"))
@@ -204,7 +205,8 @@ class CalendarTests(unittest.TestCase):
     def test_when_erpnext_has_the_countrys_calendar_the_chat_offers_it(self):
         r = self.to_holidays(self.env(18))
         self.assertIn("18 public holidays for Bangladesh", r["reply"])
-        self.assertIn("Yes, add them", r["replies"])
+        values = [o["value"] for o in r["choices"]["options"]]
+        self.assertEqual((r["choices"]["type"], values), ("single", ["Yes, add them", "I will list my own"]))
         r = say("Yes, add them", r["state"], self.env(18))
         self.assertEqual(r["state"]["answers"]["holidays_country"], "1")
         self.assertNotIn("holidays", {k for k in r["state"]["answers"] if k == "holidays"})
@@ -220,6 +222,65 @@ class CalendarTests(unittest.TestCase):
         self.assertTrue(any("18 public holidays of Bangladesh from the ReckonERP holiday calendar" in i for i in item))
         none = sp.build_plan(a, None, "Acme", {"country_holidays": 0})
         self.assertIn("no holiday calendar", next(s for s in none["steps"] if s["key"] == "holidays")["note"])
+
+
+class ChoiceTests(unittest.TestCase):
+    """Single answers are radio buttons, several answers are checkboxes."""
+
+    def at(self, key, **answers):
+        env = make_env()
+        r = say("start", None, env)
+        r["state"]["answers"].update(answers)
+        r["state"]["idx"] = sc.STEPS.index(key)
+        return env, sc.turn("back", {**r["state"], "idx": sc.STEPS.index(key) + 1}, env)
+
+    def test_language_and_industry_are_radio_buttons(self):
+        _env, r = self.at("language")
+        self.assertEqual(r["choices"]["type"], "single")
+        self.assertEqual([o["value"] for o in r["choices"]["options"]], ["English", "Bangla"])
+        _env, r = self.at("industry")
+        self.assertEqual(r["choices"]["type"], "single")
+        self.assertEqual([o["label"] for o in r["choices"]["options"]], [i["label"] for i in SEGMENTS])
+        self.assertNotIn("1. IT", r["reply"])  # the options are buttons now, not a typed list
+
+    def test_weekly_off_is_checkboxes_with_the_countrys_usual_days_ticked(self):
+        _env, r = self.at("weekly_off", country="Bangladesh")
+        self.assertEqual(r["choices"]["type"], "multi")
+        ticked = [o["value"] for o in r["choices"]["options"] if o["checked"]]
+        self.assertEqual(ticked, ["Friday"])
+        self.assertEqual(len(r["choices"]["options"]), 7)
+        _env, r = self.at("weekly_off", country="Germany")
+        self.assertEqual({o["value"] for o in r["choices"]["options"] if o["checked"]}, {"Saturday", "Sunday"})
+
+    def test_a_ticked_set_of_days_is_read_as_the_reply(self):
+        env, r = self.at("weekly_off", country="Bangladesh")
+        r = sc.turn("Friday, Saturday", {**r["state"], "idx": sc.STEPS.index("weekly_off")}, env)
+        self.assertEqual(r["state"]["answers"]["weekly_off"], ["Friday", "Saturday"])
+
+    def test_text_questions_have_no_buttons_and_the_skip_chip_stays_beside_radios(self):
+        _env, r = self.at("locations")
+        self.assertIsNone(r["choices"])
+        _env, r = self.at("language")
+        self.assertEqual(r["replies"], ["skip"])
+
+    def test_choosing_to_list_my_own_asks_for_the_list_without_an_error(self):
+        env = make_env()
+        env["country_holiday_count"] = lambda country: 18
+        r = say("start", None, env)
+        r["state"]["answers"]["country"] = "Bangladesh"
+        r["state"]["idx"] = sc.STEPS.index("holidays")
+        r = sc.turn("I will list my own", r["state"], env)
+        self.assertIn("Type your holidays", r["reply"])
+        self.assertNotIn("could not", r["reply"])
+        self.assertEqual(r["state"]["idx"], sc.STEPS.index("holidays"))
+
+    def test_an_industry_that_cannot_be_told_does_not_repeat_the_list_in_the_error(self):
+        env = make_env()
+        r = say("start industry", None, env)
+        r = say("we do many things", r["state"], env)
+        self.assertIn("could not tell which industry fits", r["reply"])
+        self.assertEqual(r["reply"].count("IT / Software"), 0)
+        self.assertEqual(r["choices"]["type"], "single")
 
 
 class IntentTests(unittest.TestCase):

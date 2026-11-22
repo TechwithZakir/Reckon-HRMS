@@ -109,7 +109,7 @@ def _pick_industry(text: str, industries: list[dict]):
     scored = sorted(((sum(w in word for w in words), key) for key, words in INDUSTRY_WORDS.items() if any(i["key"] == key for i in industries)), reverse=True)
     if scored and scored[0][0] and (len(scored) < 2 or scored[0][0] > scored[1][0]):
         return scored[0][1], None
-    return None, "Please pick one by number:\n" + "\n".join(f"{n}. {i['label']}" for n, i in enumerate(industries, 1))
+    return None, "I could not tell which industry fits."
 
 
 def _parse_days(text: str, country: str):
@@ -165,6 +165,25 @@ def _parse_structure(text: str):
     return out, None
 
 
+def _choices(key: str, env: dict, answers: dict):
+    """Radio buttons for a single answer, checkboxes for several: what the chat draws under the question."""
+    if key == "language":
+        return {"type": "single", "options": [{"label": "English", "value": "English"}, {"label": sp.LANGUAGES["bn"], "value": "Bangla"}]}
+    if key == "industry":
+        return {"type": "single", "options": [{"label": i["label"], "value": i["label"]} for i in env["industries"]]}
+    if key == "weekly_off":
+        usual = set(answers.get("weekly_off") or sp.suggest_weekly_off(answers.get("country")))
+        return {"type": "multi", "options": [{"label": d, "value": d, "checked": d in usual} for d in sp.WEEKDAYS]}
+    if key == "holidays":
+        country, count = answers.get("country"), None
+        if country and env.get("country_holiday_count"):
+            count = env["country_holiday_count"](country)
+        if count:
+            return {"type": "single", "options": [{"label": f"Add the {count} public holidays of {country}", "value": "Yes, add them"},
+                                                  {"label": "I will list my own", "value": "I will list my own"}]}
+    return None
+
+
 def _question(i: int, env, answers: dict) -> tuple[str, list[str]]:
     key = STEPS[i]
     head = f"**{i + 1} of {len(STEPS)}. "
@@ -172,26 +191,25 @@ def _question(i: int, env, answers: dict) -> tuple[str, list[str]]:
         now = env["current_country"]
         return head + "Which country is your company in?**" + (f"\nYour company is saved as {now}. Reply with the same, or a different country." if now else ""), ([now] if now else [])
     if key == "language":
-        return head + "Which language do you want to work in, English or Bangla?**", ["English", "Bangla"]
+        return head + "Which language do you want to work in?** Choose one.", ["skip"]
     if key == "locations":
         return head + "Where do you work? Give your offices, factories or sites.**\nFor example: Head Office, Dhaka Factory. They become your branches.", ["skip"]
     if key == "industry":
-        inds = env["industries"]
-        return head + "What does your company do?** Reply with a number, or just tell me what you do.\n" + "\n".join(f"{n}. {x['label']}" for n, x in enumerate(inds, 1)), ["skip"]
+        return head + "What does your company do?** Choose one below, or just tell me what you do.", ["skip"]
     if key == "extra_departments":
         return head + "Which departments do you have?**\nSeparate them with commas. Your industry's usual departments are added too.", ["skip"]
     if key == "extra_titles":
         return head + "Which job titles do you have?**\nSeparate them with commas.", ["skip"]
     if key == "weekly_off":
         usual = sp.suggest_weekly_off(answers.get("country"))
-        return head + "Which days are your weekly off?**\nThe usual for your country is " + " and ".join(usual) + ".", ["usual", "skip"]
+        return head + "Which days are your weekly off?** Tick every day that applies.\nThe usual for your country is " + " and ".join(usual) + ".", ["skip"]
     if key == "holidays":
         country, count = answers.get("country"), None
         if country and env.get("country_holiday_count"):
             count = env["country_holiday_count"](country)
         if count:
             return (head + f"Public holidays for {env['year']}.**\nReckonERP's holiday calendar has {count} public holidays for {country}. "
-                    "Reply **yes** to add them all, or list your own (date first, one per line). I will not guess any dates."), ["Yes, add them", "skip"]
+                    "Choose below, or type your own list (date first, one per line). I will not guess any dates."), ["skip"]
         return head + f"List your public holidays for {env['year']}, one per line, date first.**\nFor example: {env['year']}-03-26 Independence Day. I will not guess any dates.", ["skip"]
     if key == "shift":
         return head + "What are your working hours?** Give a shift name, start and end time.\nFor example: General Shift 09:00 to 17:30, grace 10 minutes.", ["skip"]
@@ -245,9 +263,22 @@ def turn(message: str, state, env: dict) -> dict:
     low = text.casefold().strip()
     answers = st["answers"]
 
-    def out(reply, replies=(), done=False):
+    def out(reply, replies=(), done=False, choices="auto"):
         st["phase"] = "done" if done else st["phase"]
-        return {"reply": reply, "state": None if done else st, "replies": list(replies)[:8], "done": done}
+        if choices == "auto":
+            if done:
+                choices = None
+            elif st["phase"] == "review":
+                choices = {"type": "single", "options": [{"label": "Yes, set everything up", "value": "Yes, set everything up"},
+                                                         {"label": "Change an answer", "value": "Change an answer"}]}
+                replies = ()
+            elif st["idx"] < len(STEPS):
+                choices = _choices(STEPS[st["idx"]], env, answers)
+                if choices:
+                    replies = [r for r in replies if r.casefold() == "skip"]
+            else:
+                choices = None
+        return {"reply": reply, "state": None if done else st, "replies": list(replies)[:8], "done": done, "choices": choices}
 
     def page_link(message):
         """The menu name for a page the person asked for; Aura turns it into a link."""
@@ -309,7 +340,7 @@ def turn(message: str, state, env: dict) -> dict:
             return out(f"You can open {link} any time. I am still waiting on the plan above: reply **yes** to set everything up, or say which step to change.",
                        ["Yes, set everything up", "Change an answer"])
         if low in ("change an answer", "change", "edit"):
-            return out("Which step do you want to change? Pick one:", [TITLES[k] for k in STEPS])
+            return out("Which step do you want to change? Pick one:", choices={"type": "single", "options": [{"label": TITLES[k], "value": TITLES[k]} for k in STEPS]})
         return out("I am waiting for your go-ahead on the plan above. Reply **yes** to set everything up, or say which step to change, or `cancel` to stop.",
                    ["Yes, set everything up", "Change an answer"])
 
@@ -348,6 +379,8 @@ def turn(message: str, state, env: dict) -> dict:
     elif key == "industry":
         picked, error = _pick_industry(text, env["industries"])
         value = {"industry": picked} if picked else None
+        if error:
+            error = "I could not tell which industry fits. Choose one below, or describe what your company does."
     elif key in ("extra_departments", "extra_titles"):
         names = sp.split_names(text)
         value, error = ({key: ", ".join(names)}, None) if names else (None, "Give one or more names, separated by commas, or say skip.")
@@ -356,6 +389,8 @@ def turn(message: str, state, env: dict) -> dict:
         value = {"weekly_off": days} if days else None
     elif key == "holidays" and low in ("yes", "yes, add them", "add them", "yes please", "y", "ok") and answers.get("country"):
         value = {"holidays_country": "1"}
+    elif key == "holidays" and "list my own" in low:
+        return out(f"Type your holidays, one per line, date first. For example: {env['year']}-03-26 Independence Day. I will not guess any dates.", ["skip"], choices=None)
     elif key == "holidays":
         rows, unread = sp.parse_holidays(text, env["year"])
         if unread and env.get("ai_holidays"):
