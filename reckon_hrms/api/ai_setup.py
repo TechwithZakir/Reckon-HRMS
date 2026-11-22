@@ -34,7 +34,7 @@ def _segment(key: str):
 
 
 def country_holiday_count(country: str, year: int):
-    """How many public holidays ERPNext's holiday calendar (the ``holidays`` library) knows for the country that year, else None."""
+    """How many public holidays ReckonERP's holiday calendar (the ``holidays`` library) knows for the country that year, else None."""
     code = frappe.db.get_value("Country", country, "code") if country else None
     if not code:
         return None
@@ -156,14 +156,14 @@ def _holiday_list(company: str, answers: dict) -> str:
             have.add(day.isoformat())
         day += timedelta(days=1)
     if answers.get("holidays_country") and answers.get("country"):
-        # ERPNext's own feature: pick the country on the Holiday List and "Get holidays" fills in its public holidays.
+        # ReckonERP's own feature: pick the country on the Holiday List and "Get holidays" fills in its public holidays.
         code = frappe.db.get_value("Country", answers["country"], "code")
         if code:
             doc.country = code.upper()
             try:
                 doc.get_local_holidays()
             except NotImplementedError:
-                frappe.msgprint(_("ERPNext has no holiday calendar for {0}.").format(answers["country"]))
+                frappe.msgprint(_("ReckonERP has no holiday calendar for {0}.").format(answers["country"]))
     have = {str(r.holiday_date) for r in doc.get("holidays") or []}
     for h in answers["holidays"]:
         if h["date"] not in have:

@@ -217,7 +217,7 @@ class CalendarTests(unittest.TestCase):
         a = sp.normalize_answers({"country": "Bangladesh", "holidays_country": "1"}, 2026)
         plan = sp.build_plan(a, None, "Acme", {"country_holidays": 18})
         item = next(s for s in plan["steps"] if s["key"] == "holidays")["items"]
-        self.assertTrue(any("18 public holidays of Bangladesh from the ERPNext holiday calendar" in i for i in item))
+        self.assertTrue(any("18 public holidays of Bangladesh from the ReckonERP holiday calendar" in i for i in item))
         none = sp.build_plan(a, None, "Acme", {"country_holidays": 0})
         self.assertIn("no holiday calendar", next(s for s in none["steps"] if s["key"] == "holidays")["note"])
 

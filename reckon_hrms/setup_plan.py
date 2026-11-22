@@ -201,10 +201,10 @@ def build_plan(answers: dict, segment: dict | None, company: str, existing: dict
     note = ""
     if answers["holidays_country"] and answers["country"]:
         if count:
-            holiday_items.append(f"The {count} public holidays of {answers['country']} from the ERPNext holiday calendar")
+            holiday_items.append(f"The {count} public holidays of {answers['country']} from the ReckonERP holiday calendar")
         else:
-            holiday_items.append(f"Public holidays of {answers['country']} from the ERPNext holiday calendar")
-            note = f"ERPNext has no holiday calendar for {answers['country']}. Add the holidays by hand instead." if count == 0 else ""
+            holiday_items.append(f"Public holidays of {answers['country']} from the ReckonERP holiday calendar")
+            note = f"ReckonERP has no holiday calendar for {answers['country']}. Add the holidays by hand instead." if count == 0 else ""
     holiday_items += [f"{h['date']}  {h['name']}" for h in answers["holidays"]]
     if answers["holidays_unread"]:
         note = "These lines could not be read (use date first, in this year): " + "; ".join(answers["holidays_unread"])

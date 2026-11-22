@@ -190,7 +190,7 @@ def _question(i: int, env, answers: dict) -> tuple[str, list[str]]:
         if country and env.get("country_holiday_count"):
             count = env["country_holiday_count"](country)
         if count:
-            return (head + f"Public holidays for {env['year']}.**\nERPNext's holiday calendar has {count} public holidays for {country}. "
+            return (head + f"Public holidays for {env['year']}.**\nReckonERP's holiday calendar has {count} public holidays for {country}. "
                     "Reply **yes** to add them all, or list your own (date first, one per line). I will not guess any dates."), ["Yes, add them", "skip"]
         return head + f"List your public holidays for {env['year']}, one per line, date first.**\nFor example: {env['year']}-03-26 Independence Day. I will not guess any dates.", ["skip"]
     if key == "shift":

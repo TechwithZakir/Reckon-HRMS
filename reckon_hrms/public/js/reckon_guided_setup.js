@@ -89,7 +89,7 @@
 			else if (x.kind === "list") body = `<textarea class="form-control" rows="3" data-a="${x.key}">${esc(val(x.key))}</textarea>`;
 			else if (x.kind === "text") {
 				if (answers.holidays_country === undefined && val("country")) { answers.holidays_country = "1"; save(); }
-				body = `<label class="rgs-days" style="display:flex;gap:6px;align-items:center;margin:10px 0 6px;font-weight:400"><input type="checkbox" data-hc ${answers.holidays_country === "1" ? "checked" : ""}> Add the public holidays of ${esc(val("country") || "my country")} from the ERPNext holiday calendar</label>
+				body = `<label class="rgs-days" style="display:flex;gap:6px;align-items:center;margin:10px 0 6px;font-weight:400"><input type="checkbox" data-hc ${answers.holidays_country === "1" ? "checked" : ""}> Add the public holidays of ${esc(val("country") || "my country")} from the ReckonERP holiday calendar</label>
 					<div class="rgs-muted">Your own holidays, if any (one per line, date first):</div>
 					<textarea class="form-control" rows="4" data-a="${x.key}" placeholder="${esc(Q.year)}-03-26 Independence Day">${esc(val(x.key))}</textarea>`;
 			}
