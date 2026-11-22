@@ -18,7 +18,7 @@ ROLES = ("HR Manager", "System Manager")
 def _env(company: str) -> dict:
     def build_plan(answers):
         clean = ai_setup._answers(answers)
-        plan = setup_plan.build_plan(clean, ai_setup._segment(clean["industry"]), company, ai_setup._existing(company))
+        plan = setup_plan.build_plan(clean, ai_setup._segment(clean["industry"]), company, ai_setup._existing(company, clean["country"], clean["year"]))
         return plan
 
     def ai_holidays(text):
@@ -33,6 +33,7 @@ def _env(company: str) -> dict:
         "industries": salary_suggest.segments(),
         "year": setup_plan.normalize_answers({})["year"],
         "current_country": frappe.db.get_value("Company", company, "country") or "",
+        "country_holiday_count": lambda country: ai_setup.country_holiday_count(country, setup_plan.normalize_answers({})["year"]),
         "build_plan": build_plan,
         "apply": ai_setup.run_setup,
         "ai_holidays": ai_holidays,

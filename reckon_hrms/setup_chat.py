@@ -18,6 +18,21 @@ STEPS = ["country", "language", "locations", "industry", "extra_departments", "e
 TITLES = {"country": "Country", "language": "Language", "locations": "Locations", "industry": "Industry",
           "extra_departments": "Departments", "extra_titles": "Job titles", "weekly_off": "Weekly off", "holidays": "Public holidays",
           "shift": "Working hours", "leave": "Leave days", "structure": "Salary structure"}
+# The answer keys each step owns: skipping or redoing a step clears them, so a half-answer never lingers in the plan.
+STEP_KEYS = {
+    "country": ("country",), "language": ("language",), "locations": ("locations",), "industry": ("industry",),
+    "extra_departments": ("extra_departments",), "extra_titles": ("extra_titles",), "weekly_off": ("weekly_off",),
+    "holidays": ("holidays", "holidays_country"), "shift": ("shift_name", "shift_start", "shift_end", "late_grace"),
+    "leave": ("leave_casual", "leave_sick", "leave_earned", "leave_maternity"),
+    "structure": ("structure_name", "basic_pct", "hra_pct", "medical_amount", "conveyance_amount"),
+}
+# A plan step belongs to the question that fixes it.
+PLAN_STEP_TO_QUESTION = {"departments": "extra_departments", "titles": "extra_titles"}
+# Words that ask for a page, and the menu name Aura turns into a link.
+PAGE_LINKS = (("holiday", "Holiday List"), ("employee", "Employee"), ("department", "Department"), ("branch", "Branch"), ("location", "Branch"),
+              ("leave", "Leave Type"), ("shift", "Shift Type"), ("salary structure", "Salary Structure"), ("payroll", "Payroll Studio"),
+              ("hr studio", "HR Studio"))
+CHANGE_WORDS = re.compile(r"\b(change|edit|redo|fix|update|correct|go to|back to)\b", re.IGNORECASE)
 SKIP = {"skip", "none", "no", "nothing", "n/a", "na", "pass", "না", "skip this"}
 YES = {"yes", "y", "ok", "okay", "confirm", "go", "go ahead", "set up", "set everything up", "yes, set everything up", "do it", "হ্যাঁ", "yes please"}
 ALIASES = {"bd": "Bangladesh", "uk": "United Kingdom", "usa": "United States", "us": "United States", "uae": "United Arab Emirates"}
@@ -36,7 +51,8 @@ def _clean_state(state) -> dict:
             keep[key] = value if not isinstance(value, list) else [str(v)[:40] for v in value[:10]]
     idx = state.get("idx") if isinstance(state.get("idx"), int) else 0
     phase = state.get("phase") if state.get("phase") in ("ask", "review", "done") else "ask"
-    return {"idx": max(0, min(idx, len(STEPS))), "answers": keep, "phase": phase, "started": bool(state.get("started"))}
+    return {"idx": max(0, min(idx, len(STEPS))), "answers": keep, "phase": phase, "started": bool(state.get("started")),
+            "fixing": bool(state.get("fixing"))}
 
 
 def _pick_country(text: str, countries: list[str]):
@@ -170,6 +186,12 @@ def _question(i: int, env, answers: dict) -> tuple[str, list[str]]:
         usual = sp.suggest_weekly_off(answers.get("country"))
         return head + "Which days are your weekly off?**\nThe usual for your country is " + " and ".join(usual) + ".", ["usual", "skip"]
     if key == "holidays":
+        country, count = answers.get("country"), None
+        if country and env.get("country_holiday_count"):
+            count = env["country_holiday_count"](country)
+        if count:
+            return (head + f"Public holidays for {env['year']}.**\nERPNext's holiday calendar has {count} public holidays for {country}. "
+                    "Reply **yes** to add them all, or list your own (date first, one per line). I will not guess any dates."), ["Yes, add them", "skip"]
         return head + f"List your public holidays for {env['year']}, one per line, date first.**\nFor example: {env['year']}-03-26 Independence Day. I will not guess any dates.", ["skip"]
     if key == "shift":
         return head + "What are your working hours?** Give a shift name, start and end time.\nFor example: General Shift 09:00 to 17:30, grace 10 minutes.", ["skip"]
@@ -227,15 +249,30 @@ def turn(message: str, state, env: dict) -> dict:
         st["phase"] = "done" if done else st["phase"]
         return {"reply": reply, "state": None if done else st, "replies": list(replies)[:8], "done": done}
 
+    def page_link(message):
+        """The menu name for a page the person asked for; Aura turns it into a link."""
+        if not re.search(r"\b(link|page|open|where|show)\b", message, re.IGNORECASE):
+            return None
+        for word, label in PAGE_LINKS:
+            if word in message.casefold():
+                return label
+        return None
+
     def ask_next():
         if st["idx"] >= len(STEPS):
-            st["phase"] = "review"
             plan = env["build_plan"](answers)
-            bad = plan.get("attention", 0)
-            reply = "Here is your setup plan. Nothing has been created yet.\n\n" + _summary(plan)
+            bad = [s for s in plan["steps"] if s["status"] == "attention"]
             if bad:
-                reply += f"\n\n{bad} step needs your attention. Say which step to change, for example \"change holidays\"."
-                return out(reply, ["Change an answer"])
+                # Fix what cannot run first, right here, instead of asking the person to name a step.
+                question_key = PLAN_STEP_TO_QUESTION.get(bad[0]["key"], bad[0]["key"])
+                if question_key in STEPS:
+                    st["idx"], st["phase"], st["fixing"] = STEPS.index(question_key), "ask", True
+                    for k in STEP_KEYS.get(question_key, ()):
+                        answers.pop(k, None)
+                    question, replies = _question(st["idx"], env, answers)
+                    return out(f"One thing needs fixing before I can set this up: {bad[0]['note'] or bad[0]['title']}\n\n" + question, replies)
+            st["phase"], st["fixing"] = "review", False
+            reply = "Here is your setup plan. Nothing has been created yet.\n\n" + _summary(plan)
             return out(reply + "\n\nReply **yes** to set everything up, or say which step to change.", ["Yes, set everything up", "Change an answer"])
         question, replies = _question(st["idx"], env, answers)
         return out(question, replies)
@@ -244,7 +281,7 @@ def turn(message: str, state, env: dict) -> dict:
     if not st["started"] or begin:
         wanted = (begin.group(1) or "").strip().replace(" ", "_") if begin else ""
         first = STEPS.index(wanted) if wanted in STEPS else 0
-        st = {"idx": first, "answers": {}, "phase": "ask", "started": True}
+        st = {"idx": first, "answers": {}, "phase": "ask", "started": True, "fixing": False}
         answers = st["answers"]
         question, replies = _question(first, env, answers)
         return out(f"I will set up HR and payroll for **{env['company']}** by asking a few questions, then do the setup for you. "
@@ -258,13 +295,23 @@ def turn(message: str, state, env: dict) -> dict:
             lines = [f"{'✓' if r['result'] == 'done' else '!' if r['result'] == 'failed' else '–'} **{r['label']}**: {r['message'] or r['result']}" for r in result["results"]]
             head = f"Done: {result['done']} steps set up" + (f", {result['failed']} failed" if result["failed"] else "") + "."
             return out(head + "\n\n" + "\n".join(lines) + "\n\nOpen HR Studio and Payroll Studio to see everything. Next you can add your employees and give them the salary structure.", done=True)
+        # Only a clear change request, or a step name on its own, reopens a step. A question or a request for a page does not.
         for i, key in enumerate(STEPS):
-            if TITLES[key].casefold() in low or key.replace("_", " ") in low:
-                st["idx"], st["phase"] = i, "ask"
-                answers.pop("_pending", None)
+            named = TITLES[key].casefold() == low or key.replace("_", " ") == low or (CHANGE_WORDS.search(text) and (TITLES[key].casefold() in low or key.replace("_", " ") in low))
+            if named:
+                st["idx"], st["phase"], st["fixing"] = i, "ask", True
+                for k in STEP_KEYS.get(key, ()):
+                    answers.pop(k, None)
                 question, replies = _question(i, env, answers)
                 return out("Okay, let us redo that one.\n\n" + question, replies)
-        return out("Which step do you want to change? Pick one:", [TITLES[k] for k in STEPS])
+        link = page_link(text)
+        if link:
+            return out(f"You can open {link} any time. I am still waiting on the plan above: reply **yes** to set everything up, or say which step to change.",
+                       ["Yes, set everything up", "Change an answer"])
+        if low in ("change an answer", "change", "edit"):
+            return out("Which step do you want to change? Pick one:", [TITLES[k] for k in STEPS])
+        return out("I am waiting for your go-ahead on the plan above. Reply **yes** to set everything up, or say which step to change, or `cancel` to stop.",
+                   ["Yes, set everything up", "Change an answer"])
 
     # ---- asking
     if low == "back":
@@ -272,10 +319,16 @@ def turn(message: str, state, env: dict) -> dict:
         question, replies = _question(st["idx"], env, answers)
         return out(question, replies)
     key = STEPS[st["idx"]]
+    link = page_link(text)
+    if link:
+        question, replies = _question(st["idx"], env, answers)
+        return out(f"You can open {link} any time. Back to the setup:\n\n{question}", replies)
     if low in SKIP:
+        for k in STEP_KEYS.get(key, ()):
+            answers.pop(k, None)
         if key == "weekly_off":
             answers["weekly_off"] = sp.suggest_weekly_off(answers.get("country"))  # the plan shows the days it will use
-        st["idx"] += 1
+        st["idx"] = len(STEPS) if st.get("fixing") else st["idx"] + 1
         return ask_next()
 
     value, error = None, None
@@ -301,6 +354,8 @@ def turn(message: str, state, env: dict) -> dict:
     elif key == "weekly_off":
         days, error = _parse_days(text, answers.get("country"))
         value = {"weekly_off": days} if days else None
+    elif key == "holidays" and low in ("yes", "yes, add them", "add them", "yes please", "y", "ok") and answers.get("country"):
+        value = {"holidays_country": "1"}
     elif key == "holidays":
         rows, unread = sp.parse_holidays(text, env["year"])
         if unread and env.get("ai_holidays"):
@@ -322,7 +377,7 @@ def turn(message: str, state, env: dict) -> dict:
         question, replies = _question(st["idx"], env, answers)
         return out(f"{error or 'I could not read that.'}\n\n{question}", replies)
     answers.update(value)
-    st["idx"] += 1
+    st["idx"] = len(STEPS) if st.get("fixing") else st["idx"] + 1
     shown = _echo(key, value, env)
     nxt = ask_next()
     nxt["reply"] = f"✓ {TITLES[key]}: {shown[:160]}\n\n" + nxt["reply"]

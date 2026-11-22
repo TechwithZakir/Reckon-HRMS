@@ -87,7 +87,12 @@
 			if (x.kind === "country") body = `<select class="form-control" data-a="country" style="max-width:360px"><option value="">Choose a country</option>${Q.countries.map((c) => `<option ${c === val("country") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
 			else if (x.kind === "language") body = `<select class="form-control" data-a="language" style="max-width:360px"><option value="">Keep as it is</option>${Object.keys(Q.languages).map((k) => `<option value="${k}" ${k === val("language") ? "selected" : ""}>${esc(Q.languages[k])}</option>`).join("")}</select>`;
 			else if (x.kind === "list") body = `<textarea class="form-control" rows="3" data-a="${x.key}">${esc(val(x.key))}</textarea>`;
-			else if (x.kind === "text") body = `<textarea class="form-control" rows="5" data-a="${x.key}" placeholder="${esc(Q.year)}-03-26 Independence Day">${esc(val(x.key))}</textarea>`;
+			else if (x.kind === "text") {
+				if (answers.holidays_country === undefined && val("country")) { answers.holidays_country = "1"; save(); }
+				body = `<label class="rgs-days" style="display:flex;gap:6px;align-items:center;margin:10px 0 6px;font-weight:400"><input type="checkbox" data-hc ${answers.holidays_country === "1" ? "checked" : ""}> Add the public holidays of ${esc(val("country") || "my country")} from the ERPNext holiday calendar</label>
+					<div class="rgs-muted">Your own holidays, if any (one per line, date first):</div>
+					<textarea class="form-control" rows="4" data-a="${x.key}" placeholder="${esc(Q.year)}-03-26 Independence Day">${esc(val(x.key))}</textarea>`;
+			}
 			else if (x.kind === "days") { const picked = days(); body = `<div class="rgs-days">${Q.weekdays.map((d) => `<label><input type="checkbox" data-day="${d}" ${picked.includes(d) ? "checked" : ""}> ${d}</label>`).join("")}</div>`; }
 			else if (x.kind === "shift") body = `<div class="rgs-grid">${field("shift_name", "Shift name", 'placeholder="General Shift"')}${field("shift_start", "Starts", 'placeholder="09:00"')}${field("shift_end", "Ends", 'placeholder="17:00"')}${field("late_grace", "Late entry grace (minutes)", 'inputmode="numeric"')}</div>`;
 			else if (x.kind === "leave") body = `<div class="rgs-grid">${field("leave_casual", "Casual Leave", 'inputmode="decimal"')}${field("leave_sick", "Sick Leave", 'inputmode="decimal"')}${field("leave_earned", "Earned Leave", 'inputmode="decimal"')}${field("leave_maternity", "Maternity Leave", 'inputmode="decimal"')}</div>`;
@@ -150,6 +155,7 @@
 			// A country gives the usual weekly off, unless the person already chose days.
 			if (this.dataset.a === "country" && !answers.__daysChosen) delete answers.weekly_off;
 		});
+		$step.on("change", "[data-hc]", function () { answers.holidays_country = this.checked ? "1" : ""; save(); });
 		$step.on("change", "[data-day]", function () {
 			answers.weekly_off = $step.find("[data-day]:checked").map((_i, el) => el.dataset.day).get();
 			answers.__daysChosen = true; save();

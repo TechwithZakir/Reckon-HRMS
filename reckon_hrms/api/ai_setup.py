@@ -33,8 +33,24 @@ def _segment(key: str):
     return salary_suggest.load_benchmark()["segments"].get(key) if key else None
 
 
-def _existing(company: str) -> dict:
+def country_holiday_count(country: str, year: int):
+    """How many public holidays ERPNext's holiday calendar (the ``holidays`` library) knows for the country that year, else None."""
+    code = frappe.db.get_value("Country", country, "code") if country else None
+    if not code:
+        return None
+    try:
+        from holidays import country_holidays
+
+        return len(country_holidays(code.upper(), years=year))
+    except NotImplementedError:
+        return 0
+    except Exception:  # noqa: BLE001 - the library is optional
+        return None
+
+
+def _existing(company: str, country: str = "", year: int | None = None) -> dict:
     return {
+        "country_holidays": country_holiday_count(country, year or setup_plan.normalize_answers({})["year"]) if country else None,
         "departments": set(frappe.get_all("Department", filters={"company": company}, pluck="department_name")),
         "designations": set(frappe.get_all("Designation", pluck="designation_name")),
         "branches": set(frappe.get_all("Branch", filters={"company": ["in", [company, "", None]]}, pluck="name")),
@@ -110,7 +126,7 @@ def build_reviewed_plan(answers) -> dict:
                     seen.add(h["date"])
                     holidays.append(h)
             clean["holidays"], clean["holidays_unread"] = holidays[:setup_plan.MAX_HOLIDAYS], []
-    plan = setup_plan.build_plan(clean, _segment(clean["industry"]), company, _existing(company))
+    plan = setup_plan.build_plan(clean, _segment(clean["industry"]), company, _existing(company, clean["country"], clean["year"]))
     plan["answers"] = {k: clean[k] for k in ("industry", "year")}
     plan["ai_used"] = ai_used
     return plan
@@ -139,6 +155,16 @@ def _holiday_list(company: str, answers: dict) -> str:
             doc.append("holidays", {"holiday_date": day.isoformat(), "description": weekday, "weekly_off": 1})
             have.add(day.isoformat())
         day += timedelta(days=1)
+    if answers.get("holidays_country") and answers.get("country"):
+        # ERPNext's own feature: pick the country on the Holiday List and "Get holidays" fills in its public holidays.
+        code = frappe.db.get_value("Country", answers["country"], "code")
+        if code:
+            doc.country = code.upper()
+            try:
+                doc.get_local_holidays()
+            except NotImplementedError:
+                frappe.msgprint(_("ERPNext has no holiday calendar for {0}.").format(answers["country"]))
+    have = {str(r.holiday_date) for r in doc.get("holidays") or []}
     for h in answers["holidays"]:
         if h["date"] not in have:
             doc.append("holidays", {"holiday_date": h["date"], "description": h["name"]})
@@ -217,7 +243,7 @@ def run_setup(answers) -> dict:
         frappe.throw(_("You do not have permission to change this company's setup."), frappe.PermissionError)
     company = _company()
     clean = _answers(answers)
-    plan = setup_plan.build_plan(clean, _segment(clean["industry"]), company, _existing(company))
+    plan = setup_plan.build_plan(clean, _segment(clean["industry"]), company, _existing(company, clean["country"], clean["year"]))
     results = []
 
     def run(key, label, fn):

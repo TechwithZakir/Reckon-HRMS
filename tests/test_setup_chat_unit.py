@@ -101,6 +101,8 @@ class ChatTests(unittest.TestCase):
         r = self.run_all(env)
         r = say("hmm maybe later", r["state"], env)
         self.assertEqual(applied, [])
+        self.assertIn("waiting for your go-ahead", r["reply"])
+        r = say("change an answer", r["state"], env)
         self.assertIn("Which step", r["reply"])
         r = say("change holidays", r["state"], env)
         self.assertIn("redo that one", r["reply"])
@@ -136,6 +138,88 @@ class ChatTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoopTests(unittest.TestCase):
+    """The loop in the screenshots: a plan with a problem, then a request for a page, sent the person round the steps again."""
+
+    def to_review(self, env, structure="basic 60, house rent 20"):
+        r = say("start", None, env)
+        for reply in ("India", "english", "skip", "1", "skip", "skip", "usual", "skip", "skip", "casual 10", structure):
+            r = say(reply, r["state"], env)
+        return r
+
+    def test_a_page_request_in_review_gives_the_link_and_does_not_reopen_a_step(self):
+        env = make_env()
+        r = self.to_review(env)
+        self.assertEqual(r["state"]["phase"], "review")
+        r = say("give me holidays page link", r["state"], env)
+        self.assertIn("Holiday List", r["reply"])
+        self.assertNotIn("redo", r["reply"])
+        self.assertEqual(r["state"]["phase"], "review")
+
+    def test_a_question_that_only_mentions_a_step_does_not_reopen_it(self):
+        env = make_env()
+        r = self.to_review(env)
+        r = say("what are the holidays like?", r["state"], env)
+        self.assertEqual(r["state"]["phase"], "review")
+        self.assertIn("waiting for your go-ahead", r["reply"])
+
+    def test_skipping_a_step_clears_its_answers_so_no_half_answer_stays_in_the_plan(self):
+        env = make_env()
+        r = say("start", None, env)
+        r["state"]["answers"].update(structure_name="Std")
+        r["state"]["idx"] = sc.STEPS.index("structure")
+        r = say("skip", r["state"], env)
+        self.assertNotIn("structure_name", r["state"]["answers"])
+        self.assertEqual(r["state"]["phase"], "review")
+        self.assertNotIn("needs fixing", r["reply"])
+
+    def test_a_problem_in_the_plan_asks_for_that_step_at_once(self):
+        env = make_env()
+        r = say("start", None, env)
+        r["state"]["answers"].update(shift_name="Day")  # a shift name without times cannot run
+        r["state"]["idx"] = len(sc.STEPS) - 1
+        r = say("skip", r["state"], env)
+        self.assertIn("One thing needs fixing", r["reply"])
+        self.assertIn("working hours", r["reply"].lower())
+        self.assertTrue(r["state"]["fixing"])
+        after = say("General 09:00 to 17:00", r["state"], env)
+        self.assertEqual(after["state"]["phase"], "review")  # straight back to the plan, no questions repeated
+        self.assertEqual(after["state"]["answers"]["shift_start"], "09:00")
+
+
+class CalendarTests(unittest.TestCase):
+    def env(self, count):
+        env = make_env()
+        env["country_holiday_count"] = lambda country: count
+        return env
+
+    def to_holidays(self, env):
+        r = say("start", None, env)
+        for reply in ("Bangladesh", "english", "skip", "skip", "skip", "skip", "usual"):
+            r = say(reply, r["state"], env)
+        return r
+
+    def test_when_erpnext_has_the_countrys_calendar_the_chat_offers_it(self):
+        r = self.to_holidays(self.env(18))
+        self.assertIn("18 public holidays for Bangladesh", r["reply"])
+        self.assertIn("Yes, add them", r["replies"])
+        r = say("Yes, add them", r["state"], self.env(18))
+        self.assertEqual(r["state"]["answers"]["holidays_country"], "1")
+        self.assertNotIn("holidays", {k for k in r["state"]["answers"] if k == "holidays"})
+
+    def test_without_a_calendar_it_asks_for_a_list_as_before(self):
+        r = self.to_holidays(self.env(0))
+        self.assertIn("List your public holidays", r["reply"])
+
+    def test_the_plan_names_the_calendar_and_the_count(self):
+        a = sp.normalize_answers({"country": "Bangladesh", "holidays_country": "1"}, 2026)
+        plan = sp.build_plan(a, None, "Acme", {"country_holidays": 18})
+        item = next(s for s in plan["steps"] if s["key"] == "holidays")["items"]
+        self.assertTrue(any("18 public holidays of Bangladesh from the ERPNext holiday calendar" in i for i in item))
+        none = sp.build_plan(a, None, "Acme", {"country_holidays": 0})
+        self.assertIn("no holiday calendar", next(s for s in none["steps"] if s["key"] == "holidays")["note"])
 
 
 class IntentTests(unittest.TestCase):

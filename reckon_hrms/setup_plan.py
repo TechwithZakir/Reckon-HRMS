@@ -132,6 +132,7 @@ def normalize_answers(raw, year: int | None = None) -> dict:
         "extra_titles": split_names(raw.get("extra_titles")),
         "weekly_off": days or ["Friday"] if "weekly_off" not in raw else days,
         "holidays": holidays, "holidays_unread": unread, "year": year,
+        "holidays_country": str(raw.get("holidays_country") or "").strip().casefold() in ("1", "true", "yes", "on"),
         "shift": None,
         "leave": {},
         "structure": None,
@@ -195,10 +196,20 @@ def build_plan(answers: dict, segment: dict | None, company: str, existing: dict
     new_titles = [t for t in answers["extra_titles"] if t not in have]
     step("titles", "Job titles", new_titles or ["Nothing to add"], "ready" if new_titles else "skipped")
 
-    holiday_items = [f"Weekly off: {', '.join(answers['weekly_off']) or 'none'}"] + [f"{h['date']}  {h['name']}" for h in answers["holidays"]]
+    holiday_items = [f"Weekly off: {', '.join(answers['weekly_off']) or 'none'}"]
+    count = existing.get("country_holidays")
+    note = ""
+    if answers["holidays_country"] and answers["country"]:
+        if count:
+            holiday_items.append(f"The {count} public holidays of {answers['country']} from the ERPNext holiday calendar")
+        else:
+            holiday_items.append(f"Public holidays of {answers['country']} from the ERPNext holiday calendar")
+            note = f"ERPNext has no holiday calendar for {answers['country']}. Add the holidays by hand instead." if count == 0 else ""
+    holiday_items += [f"{h['date']}  {h['name']}" for h in answers["holidays"]]
+    if answers["holidays_unread"]:
+        note = "These lines could not be read (use date first, in this year): " + "; ".join(answers["holidays_unread"])
     step("holidays", f"Holiday calendar {answers['year']}", holiday_items,
-         "attention" if answers["holidays_unread"] else "ready",
-         ("These lines could not be read (use date first, in this year): " + "; ".join(answers["holidays_unread"])) if answers["holidays_unread"] else "")
+         "attention" if answers["holidays_unread"] else "ready", note)
     if answers["shift"]:
         s = answers["shift"]
         step("shift", "Working hours", [f"{s['name']}: {s['start'][:5]} to {s['end'][:5]}" + (f", late entry after {s['grace']} min" if s["grace"] else "")])
