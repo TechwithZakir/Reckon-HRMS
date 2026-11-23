@@ -184,8 +184,9 @@ def payroll_readiness() -> dict:
         "active": active, "assigned": int(assigned or 0), "rules": _rules_now(company), "last_run": last,
     }
     groups = setup_review.payroll_groups(facts)
-    return {"company": company, "groups": groups, "rules": facts["rules"],
-            "ready": all(r["done"] for g in groups for r in g["rows"] if r["key"] in ("payable", "components", "structure", "assignments"))}
+    pending = setup_review.hr_pending(groups)
+    return {"company": company, "groups": groups, "rules": facts["rules"], "hr_pending": pending, "hr_ready": not pending,
+            "ready": not pending and all(r["done"] for g in groups for r in g["rows"] if r["key"] in ("payable", "components", "structure", "assignments"))}
 
 
 @frappe.whitelist(methods=["POST"])

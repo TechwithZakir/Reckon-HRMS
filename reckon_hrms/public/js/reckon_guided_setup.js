@@ -200,7 +200,12 @@
 		const slug = (dt) => frappe.router.slug(dt);
 
 		function draw() {
-			$groups.html(data.groups.map((g) => `<div class="rgs-card"><h2>${esc(g.title)}</h2>
+			const blocked = !data.hr_ready;
+			const banner = blocked ? `<div class="rgs-card" style="border-color:var(--orange-500,#d98200)"><h2>Finish HR setup first</h2>
+				<div class="rgs-muted">Payroll builds on your people, holiday calendar, working hours and leave. Still to do in HR Studio:</div>
+				<ul style="margin:8px 0 0 18px;padding:0">${data.hr_pending.map((x) => `<li><b>${esc(x.label)}</b> <span class="rgs-muted">${esc(x.detail)}</span></li>`).join("")}</ul>
+				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-hr-first>Complete HR setup</button></div></div>` : "";
+			$groups.html(banner + `<div ${blocked ? 'style="opacity:.55"' : ""}>` + data.groups.map((g) => `<div class="rgs-card"><h2>${esc(g.title)}</h2>
 				${g.rows.map((r) => `<div class="rgs-rev"><div><span class="rgs-tick ${r.done ? "on" : ""}">${r.done ? "✓" : "–"}</span><b>${esc(r.label)}</b>
 					<div class="rgs-d" style="margin-left:30px">${esc(r.detail)}</div>
 					${r.key === "rules" ? `<div data-rules hidden style="margin:8px 0 0 30px" class="rgs-grid">
@@ -208,7 +213,8 @@
 						<label class="rgs-f"><span>Day's pay = base / this</span><input class="form-control input-sm" data-r="divisor" value="${esc(data.rules.divisor)}" inputmode="numeric"></label>
 						<label class="rgs-f"><span>Monthly cap (0 = none)</span><input class="form-control input-sm" data-r="cap" value="${esc(data.rules.cap)}" inputmode="decimal"></label>
 						<div style="align-self:end"><button type="button" class="btn btn-primary btn-xs" data-save-rules>Save</button> <span class="rgs-muted" data-rmsg></span></div></div>` : ""}
-					</div><span>${r.actions.map((a, i) => `<button type="button" class="btn ${a.kind === "agent" || a.kind === "fix" ? "btn-primary" : "btn-default"} btn-xs" data-act="${esc(r.key)}:${i}">${esc(a.label)}</button>`).join(" ")}</span></div>`).join("")}</div>`).join(""));
+					</div><span>${r.actions.map((a, i) => `<button type="button" class="btn ${a.kind === "agent" || a.kind === "fix" ? "btn-primary" : "btn-default"} btn-xs" data-act="${esc(r.key)}:${i}">${esc(a.label)}</button>`).join(" ")}</span></div>`).join("")}</div>`).join("") + "</div>");
+			if (blocked) root.find("[data-groups] [data-act]").each(function () { if (!/^(employees|holidays|attendance|leave):/.test(this.dataset.act)) $(this).prop("disabled", true); });
 		}
 
 		function load() {
@@ -217,7 +223,8 @@
 		}
 		load();
 		root.on("click", "[data-refresh]", load);
-		root.on("click", "[data-ask]", () => window.ReckonStudioAsk("payroll"));
+		root.on("click", "[data-hr-first]", () => { frappe.route_options = { stage: "guided" }; frappe.set_route("reckon-hrms-hr-studio"); });
+		root.on("click", "[data-ask]", () => (data && !data.hr_ready ? $groups.find("[data-hr-first]").trigger("click") : window.ReckonStudioAsk("payroll")));
 		root.on("click", "[data-act]", function () {
 			const [key, i] = this.dataset.act.split(":");
 			const action = data.groups.flatMap((g) => g.rows).find((r) => r.key === key).actions[Number(i)];

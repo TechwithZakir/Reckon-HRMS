@@ -92,6 +92,12 @@ def payroll_groups(f: dict) -> list[dict]:
     return [{"title": "Already handled in HR Studio", "rows": hr}, {"title": "Payroll, in the order HRMS needs it", "rows": pay}]
 
 
+def hr_pending(groups: list[dict]) -> list[dict]:
+    """The HR Studio steps that are not done yet. Payroll comes after them: people, holidays, hours and leave feed every salary slip."""
+    return [{"key": r["key"], "label": r["label"], "detail": r["detail"], "actions": r["actions"]}
+            for g in groups[:1] for r in g["rows"] if not r["done"]]
+
+
 LEAVE_FIELDS = {"Casual Leave": "leave_casual", "Sick Leave": "leave_sick", "Earned Leave": "leave_earned", "Maternity Leave": "leave_maternity"}
 _FORMULA = re.compile(r"^\s*base\s*\*\s*([0-9]+(?:\.[0-9]+)?)\s*$")
 

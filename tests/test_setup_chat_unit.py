@@ -424,3 +424,40 @@ class StructureNameTests(unittest.TestCase):
         r = sc.turn("start payroll", None, env)
         r = sc.turn("basic 50, house rent 10", r["state"], env)
         self.assertEqual(r["state"]["answers"]["structure_name"], "Standard")
+
+
+class HrFirstChatTests(unittest.TestCase):
+    def env(self, pending):
+        env = make_env()
+        env["current"] = {}
+        env["hr_pending"] = pending
+        return env
+
+    def test_payroll_asks_nothing_while_hr_is_unfinished_and_offers_the_hr_setup(self):
+        r = say("start payroll", None, self.env(["Employees", "Attendance and working hours"]))
+        self.assertIn("Payroll needs HR set up first", r["reply"])
+        self.assertIn("Employees; Attendance and working hours", r["reply"])
+        self.assertNotIn("1 of 2", r["reply"])
+        self.assertEqual([o["value"] for o in r["choices"]["options"]], ["start"])
+        self.assertEqual(r["state"]["flow"], "")
+
+    def test_choosing_the_hr_setup_starts_the_hr_questions(self):
+        env = self.env(["Employees"])
+        r = say("start payroll", None, env)
+        r = say("start", r["state"], env)
+        self.assertIn("Which country", r["reply"])
+        self.assertEqual(r["state"]["flow"], "")
+
+    def test_payroll_questions_start_once_hr_is_done(self):
+        r = say("start payroll", None, self.env([]))
+        self.assertIn("1 of 2", r["reply"])
+        self.assertEqual(r["state"]["flow"], "payroll")
+
+
+class PayrollPageBlockTests(unittest.TestCase):
+    def test_the_payroll_tab_shows_a_finish_hr_first_prompt_and_disables_payroll_actions(self):
+        from pathlib import Path
+
+        js = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "public" / "js" / "reckon_guided_setup.js").read_text(encoding="utf-8")
+        for needle in ("Finish HR setup first", "data-hr-first", "data.hr_pending", "!data.hr_ready"):
+            self.assertIn(needle, js)

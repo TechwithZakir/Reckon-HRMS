@@ -149,3 +149,22 @@ class PayrollGroupsTests(unittest.TestCase):
         self.assertFalse(rows["run"]["done"])
         _g, rows = self.rows(last_run={"name": "HR-PRUN-2", "status": "Draft"})
         self.assertEqual(rows["run"]["detail"], "Latest run HR-PRUN-2: Draft")
+
+
+class HrFirstTests(unittest.TestCase):
+    def groups(self, **over):
+        base = {"company": "Acme", "employees": 12, "holiday_list": "H", "shifts": 1, "leave_policies": 1, "payable_account": "P", "components": 9,
+                "structures": 1, "active": 12, "assigned": 12, "rules": {"marks_per_day": 3, "divisor": 30, "cap": 0.0}, "last_run": None}
+        base.update(over)
+        return sr.payroll_groups(base)
+
+    def test_nothing_blocks_payroll_when_hr_is_done(self):
+        self.assertEqual(sr.hr_pending(self.groups()), [])
+
+    def test_each_unfinished_hr_step_is_listed_with_where_to_fix_it(self):
+        pending = sr.hr_pending(self.groups(employees=0, shifts=0))
+        self.assertEqual([p["label"] for p in pending], ["Employees", "Attendance and working hours"])
+        self.assertTrue(all(p["actions"][0]["kind"] == "hr" for p in pending))
+
+    def test_payroll_steps_alone_never_count_as_hr_pending(self):
+        self.assertEqual(sr.hr_pending(self.groups(payable_account="", components=0, structures=0)), [])

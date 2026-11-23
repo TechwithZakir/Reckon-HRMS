@@ -28,7 +28,11 @@ def _env(company: str) -> dict:
         return setup_plan.parse_ai_holidays(rows, setup_plan.normalize_answers({})["year"])
 
     cur = ai_setup.read_current(company)
+    from reckon_hrms.setup_review import hr_pending
+
+    readiness = ai_setup.payroll_readiness()
     return {
+        "hr_pending": [r["label"] for r in hr_pending(readiness["groups"])],
         "company": company,
         "countries": frappe.get_all("Country", pluck="name", order_by="name asc", limit_page_length=0),
         "industries": salary_suggest.segments(),

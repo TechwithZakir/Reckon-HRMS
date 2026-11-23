@@ -397,6 +397,13 @@ def turn(message: str, state, env: dict) -> dict:
     if not st["started"] or begin:
         wanted = (begin.group(1) or "").strip().replace(" ", "_") if begin else ""
         payroll = wanted.startswith("payroll") or wanted == "rules" or st.get("flow") == "payroll" and wanted in PAYROLL_STEPS
+        if payroll and env.get("hr_pending"):
+            # Salary slips need people, holidays, working hours and leave: HR Studio comes first.
+            st = {"idx": 0, "answers": {}, "phase": "ask", "started": True, "fixing": False, "flow": ""}
+            missing = "; ".join(env["hr_pending"])
+            return out(f"Payroll needs HR set up first, because every salary slip uses your people, holiday calendar, working hours and leave. "
+                       f"Still to do in HR Studio: **{missing}**.\n\nFinish those, then come back to payroll.",
+                       choices={"type": "single", "options": [{"label": "Start HR setup now", "value": "start"}]})
         env = {**env, "steps": PAYROLL_STEPS if payroll else None}
         steps_now = _steps(env)
         first = steps_now.index(wanted) if wanted in steps_now else 0
