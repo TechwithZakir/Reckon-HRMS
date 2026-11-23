@@ -30,18 +30,30 @@ def _gate(doctype: str):
                      frappe.PermissionError)
 
 
+def _company_components(mine: str) -> list:
+    """The pay items of this company: ones it created, plus any (standard or not) that one of its salary structures uses."""
+    used = frappe.db.sql_list(
+        "SELECT DISTINCT sd.salary_component FROM `tabSalary Detail` sd JOIN `tabSalary Structure` ss ON ss.name = sd.parent "
+        "WHERE sd.parenttype = 'Salary Structure' AND ss.company = %s", (mine,))
+    return used
+
+
 @frappe.whitelist(methods=["GET"])
 def list_components(start=0, page_length=DEFAULT_PAGE) -> dict:
     _gate("Salary Component")
     start_i, length_i = page_bounds(start, page_length)
+    mine = _mine()
+    used = _company_components(mine)
+    or_filters = [["company", "=", mine]] + ([["name", "in", used]] if used else [])
     rows = frappe.get_list(
         "Salary Component",
+        or_filters=or_filters,
         fields=["name", "type", "salary_component_abbr", "depends_on_payment_days", "is_tax_applicable"],
         order_by="name asc", start=start_i, page_length=length_i,
     )
     return {
         "rows": rows,
-        "total": len(frappe.get_list("Salary Component", pluck="name", limit_page_length=0)),  # what this person may see, not every company's
+        "total": len(frappe.get_list("Salary Component", or_filters=or_filters, pluck="name", limit_page_length=0)),
         "add_new": route("Salary Component", "new"),
         "list": route("Salary Component", "list"),
     }
@@ -111,6 +123,7 @@ def assignment_summary(company: str | None = None) -> dict:
     )[0][0]
     missing = max(0, active - int(assigned))
     return {
+        "currency": frappe.db.get_value("Company", company, "default_currency") or "",
         "active": active,
         "with_structure": int(assigned),
         "without_structure": missing,

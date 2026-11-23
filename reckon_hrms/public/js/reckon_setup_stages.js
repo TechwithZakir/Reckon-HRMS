@@ -244,11 +244,13 @@ window.ReckonSetupStages.salary = function (parent) {
 	root.html(`
 		<style>${STYLE}</style>
 		<div class="rhs-muted">Step 2 of 3</div>
+		<div id="setupBanner"></div>
 		<div class="rhs-card" id="summary"><h2>Who has a salary structure</h2><div class="rhs-muted">Loading…</div></div>
 		<div class="rhs-card"><h2>Tax years <span class="rhs-map">Income Tax Slab</span></h2>
 			<table class="rhs-table"><tbody id="slabs"></tbody></table>
 			<div class="rhs-row"><a class="rhc-ico" href="/app/income-tax-slab/new" title="Add new" aria-label="Add new tax year">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("add", "sm") : "+")}</a><a class="rhc-ico" href="/app/income-tax-slab" title="Open the list" aria-label="Open the tax years list">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("list", "sm") : "≡")}</a></div></div>
 		<div class="rhs-card"><h2>What you pay and deduct <span class="rhs-map">Salary Component</span></h2>
+			<div class="rhs-muted" style="margin-bottom:6px">Your company's pay items and the ones its salary structures use.</div>
 			<table class="rhs-table"><thead><tr><th>Item</th><th>Kind</th><th>Cut for unpaid leave</th><th>Taxable</th></tr></thead><tbody id="comps"></tbody></table>
 			<div class="rhs-row"><a class="rhc-ico" href="/app/salary-component/new" title="Add new" aria-label="Add new pay item">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("add", "sm") : "+")}</a><a class="rhc-ico" href="/app/salary-component" title="Open the list" aria-label="Open the pay items list">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("list", "sm") : "≡")}</a></div></div>
 		<div class="rhs-card"><h2>Salary structures <span class="rhs-map">Salary Structure</span></h2>
@@ -257,7 +259,7 @@ window.ReckonSetupStages.salary = function (parent) {
 		<div class="rhs-card"><h2>Give a salary structure to everyone without one <span class="rhs-map">Salary Structure Assignment</span></h2>
 			<div class="rhs-muted">Each person without a structure gets the one you pick, from the date you choose (the 1st of this month, so this month's salary can be run). People who already have it are skipped.</div>
 			<div class="rhs-row"><label>Salary structure <select id="bkStruct"></select></label>
-			<label>Base salary (৳) <input id="bkBase" type="number" min="1" step="500" value="60000"></label>
+			<label>Base salary (<span data-cur>৳</span>) <input id="bkBase" type="number" min="1" step="500" value="60000"></label>
 			<label>From <input id="bkDate" type="date"></label></div>
 			<div class="rhs-row"><button class="rhs-btn rhs-pri" id="bkGo" type="button">Assign to everyone without a structure</button></div>
 			<div id="bkOut" class="rhs-muted" style="margin-top:10px"></div></div>
@@ -296,7 +298,7 @@ window.ReckonSetupStages.salary = function (parent) {
 	// Payslip preview: same formula engine as Salary Slip, nothing saved. Debounced 300 ms.
 	const preview = $(`<div class="rhs-card"><h2>Payslip preview</h2>
 		<div class="rhs-row"><label>Salary structure <select id="pvStruct"></select></label>
-		<label>Base salary per month (৳) <input id="pvBase" type="number" min="0" step="500" value="60000"></label></div>
+		<label>Base salary per month (<span data-cur>৳</span>) <input id="pvBase" type="number" min="0" step="500" value="60000"></label></div>
 		<div id="pvOut" class="rhs-muted" style="margin-top:10px"></div></div>`);
 	root.find(".rhs-card").first().after(preview);
 	let timer = null;
@@ -320,13 +322,26 @@ window.ReckonSetupStages.salary = function (parent) {
 		runPreview();
 	});
 
+	// What is still missing before salary can run, from the same checks as the guided setup (HR first, then payroll).
+	call("ai_setup.payroll_readiness", {}).then((r) => {
+		const d = r.message;
+		const todo = [...d.hr_pending.map((x) => `${x.label} (HR Studio)`),
+			...d.groups[1].rows.filter((x) => !x.done && ["payable", "components", "structure"].includes(x.key)).map((x) => x.label)];
+		if (!todo.length) return;
+		root.find("#setupBanner").html(`<div class="rhs-card" style="border-color:var(--orange-500,#d98200)"><h2>Finish the setup first</h2>
+			<div class="rhs-muted">Salary can only run properly once these are done for ${esc(d.company)}: <b>${todo.map(esc).join("; ")}</b>.</div>
+			<div class="rhs-row"><button class="rhs-btn rhs-pri" type="button" data-guided>Open Guided setup</button></div></div>`);
+		root.find("[data-guided]").on("click", () => $('.rhs-stages [data-stage="guided"]').trigger("click"));
+	}).catch(() => {});
+
 	call("salary.assignment_summary", { company }).then((r) => {
 		const s = r.message;
+		if (s.currency) { root.find("[data-cur]").text(s.currency); preview.find("[data-cur]").text(s.currency); }
 		root.find("#summary").html(`<h2>Who has a salary structure</h2>
 			<div class="rhs-sum"><div><span class="rhs-muted">Active people</span><b>${s.active}</b></div>
 			<div><span class="rhs-muted">With a structure</span><b>${s.with_structure}</b></div>
 			<div><span class="rhs-muted">Without a structure</span><b class="${s.without_structure ? "rhs-warn" : ""}">${s.without_structure}</b></div></div>
-			${s.without_structure ? `<div class="rhs-alert">${s.without_structure} people have no salary structure and will be skipped in the salary run.
+			${s.without_structure ? `<div class="rhs-alert">${s.without_structure} ${s.without_structure === 1 ? "person has" : "people have"} no salary structure and will be skipped in the salary run.
 			<a href="${esc(s.filter_route)}">Open assignments</a></div>` : ""}`);
 	}).catch(() => root.find("#summary").append(`<div class="rhs-err">Could not load the summary.</div>`));
 

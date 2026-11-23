@@ -94,3 +94,21 @@ class NoUnscopedListsOnTheScreensTests(unittest.TestCase):
         people = (ROOT / "api" / "people.py").read_text(encoding="utf-8")
         body = people[people.index("def list_employees"): people.index("def filter_options")]
         self.assertIn('filters={"company": _company()}', body)
+
+
+class SalaryRulesTabTests(unittest.TestCase):
+    """The Salary rules tab shows this company's pay items, its own currency and what is still missing."""
+
+    def test_pay_items_are_the_companys_own_and_the_ones_its_structures_use(self):
+        body = SALARY[SALARY.index("def _company_components"): SALARY.index("def list_structures")]
+        self.assertIn("ss.company = %s", body)
+        self.assertIn('or_filters = [["company", "=", mine]]', body)
+        self.assertNotIn('frappe.get_list("Salary Component", pluck="name", limit_page_length=0)', body)
+
+    def test_the_tab_shows_a_status_box_the_companys_currency_and_correct_grammar(self):
+        for needle in ("Finish the setup first", "ai_setup.payroll_readiness", "s.currency", 'person has" : "people have"', "data-cur"):
+            self.assertIn(needle, JS)
+
+    def test_the_assignment_summary_names_the_companys_currency(self):
+        body = SALARY[SALARY.index("def assignment_summary"): SALARY.index("def bulk_assign")]
+        self.assertIn('"currency"', body)
