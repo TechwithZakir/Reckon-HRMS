@@ -4,15 +4,18 @@ Run: python -m unittest discover -s tests
 """
 
 import pathlib
-import re
 import sys
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from reckon_hrms.constants import tenant_role  # noqa: E402
-from reckon_hrms.constants import MODULE_FEATURES, ROLES, TENANT_OWNED_DOCTYPES  # noqa: E402
+from reckon_hrms.constants import (  # noqa: E402
+    MODULE_FEATURES,
+    ROLES,
+    TENANT_OWNED_DOCTYPES,
+    tenant_role,  # noqa: E402
+)
 from reckon_hrms.saas_module import get_module_definition  # noqa: E402
 
 REQUIRED_KEYS = {

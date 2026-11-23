@@ -40,7 +40,12 @@ class TenantScopingTests(unittest.TestCase):
 
     def test_every_reachable_doctype_has_a_scoping_rule(self):
         from reckon_hrms import hooks
-        from reckon_hrms.constants import EMPLOYEE_CHECKIN, HOLIDAY_ASSIGNMENT, READ_ONLY_SETTINGS, SHARED_CATALOG_DOCTYPES
+        from reckon_hrms.constants import (
+            EMPLOYEE_CHECKIN,
+            HOLIDAY_ASSIGNMENT,
+            READ_ONLY_SETTINGS,
+            SHARED_CATALOG_DOCTYPES,
+        )
 
         scoped = set(TENANT_OWNED_DOCTYPES) | set(SHARED_CATALOG_DOCTYPES) | set(READ_ONLY_SETTINGS) | {EMPLOYEE_CHECKIN, HOLIDAY_ASSIGNMENT}
         self.assertEqual(sorted(set(DESK_DOCTYPES) - scoped), [])

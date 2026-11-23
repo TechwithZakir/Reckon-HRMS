@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import frappe
-from reckon_saas_platform.team import add_team_member, list_team_members, remove_team_member
+from reckon_saas_platform.team import (
+    add_team_member,
+    list_team_members,
+    remove_team_member,
+)
 
 
 @frappe.whitelist(methods=["GET"])

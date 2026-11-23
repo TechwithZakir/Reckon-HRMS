@@ -7,7 +7,11 @@ import unittest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from reckon_hrms.defaults import (  # noqa: E402
-    DEPARTMENTS, DESIGNATIONS, LEAVE_TYPES, SALARY_COMPONENTS, SHIFT_TYPES,
+    DEPARTMENTS,
+    DESIGNATIONS,
+    LEAVE_TYPES,
+    SALARY_COMPONENTS,
+    SHIFT_TYPES,
 )
 
 

@@ -6,7 +6,6 @@ name as a user. These wrappers pass the session user explicitly.
 """
 
 import frappe
-
 from reckon_saas_platform.tenant_security import (
     bind_doc_to_tenant,
     validate_tenant_company_immutable,
@@ -87,7 +86,11 @@ def validate_owned(doc, method=None, *args, **kwargs):
 # ---------- rows reached through another record ----------
 
 def _tenant_company():
-    from reckon_saas_platform.tenant_security import TenantResolutionError, require_tenant, user_can_bypass_tenant
+    from reckon_saas_platform.tenant_security import (
+        TenantResolutionError,
+        require_tenant,
+        user_can_bypass_tenant,
+    )
 
     if user_can_bypass_tenant(frappe.session.user):
         return None, True

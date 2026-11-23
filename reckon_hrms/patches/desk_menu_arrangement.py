@@ -43,7 +43,6 @@ PAGE_FOR_URL = {"/hrms-home": "reckon-hrms-home", "/hrms-checkin": "reckon-hrms-
 
 def _link_rows() -> list[dict]:
     rows = []
-    seen = set()
     for group, items in MENU:
         rows.append({"type": "Card Break", "label": group})
         for item in items:
