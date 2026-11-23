@@ -168,3 +168,21 @@ class HrFirstTests(unittest.TestCase):
 
     def test_payroll_steps_alone_never_count_as_hr_pending(self):
         self.assertEqual(sr.hr_pending(self.groups(payable_account="", components=0, structures=0)), [])
+
+
+class IndustryRowTests(unittest.TestCase):
+    def test_the_industry_is_a_template_with_no_page_to_open(self):
+        facts = {"company": "Acme", "user": "u", "country": "BD", "language": "English", "industry_label": "IT / Software", "branches": 1, "departments": 1,
+                 "designations": 1, "holiday_list": "H", "weekly_off": [], "named_holidays": 0, "shifts": 1, "leave_policies": 1}
+        row = next(r for r in sr.rows(facts) if r["key"] == "industry")
+        self.assertEqual(row["label"], "Industry template")
+        self.assertIsNone(row["doctype"])
+        self.assertIsNone(row["name"])
+        self.assertEqual(row["detail"], "IT / Software")
+
+    def test_the_page_offers_a_picker_for_it_not_an_open_link(self):
+        from pathlib import Path
+
+        js = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "public" / "js" / "reckon_guided_setup.js").read_text(encoding="utf-8")
+        self.assertIn("data-pick-industry", js)
+        self.assertIn('x.key === "industry"', js)

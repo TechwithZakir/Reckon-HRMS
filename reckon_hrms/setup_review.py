@@ -24,8 +24,9 @@ def rows(facts: dict, studio: str = "hr") -> list[dict]:
          "doctype": "Company", "name": company, "chat": "country"},
         {"key": "language", "label": "Language", "done": bool(facts.get("language")), "detail": facts.get("language") or "Not set",
          "doctype": "User", "name": facts.get("user"), "chat": "language"},
-        {"key": "industry", "label": "Industry", "done": bool(facts.get("industry_label")), "detail": facts.get("industry_label") or "Not chosen",
-         "doctype": "Company", "name": company, "chat": "industry"},
+        # The industry is a starter template chosen once, not a record: there is no page to open, only the picker.
+        {"key": "industry", "label": "Industry template", "done": bool(facts.get("industry_label")), "detail": facts.get("industry_label") or "Not chosen",
+         "doctype": None, "name": None, "chat": "industry"},
         {"key": "locations", "label": "Locations", "done": facts.get("branches", 0) > 0, "detail": _count(facts.get("branches", 0), "branch", "branches"),
          "doctype": "Branch", "name": None, "chat": "locations"},
         {"key": "departments", "label": "Departments", "done": facts.get("departments", 0) > 0,

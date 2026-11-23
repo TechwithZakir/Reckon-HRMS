@@ -318,12 +318,20 @@
 					<div class="rgs-muted">${d.finished ? "Setup is done. " : ""}Open any step to review or edit it. A step that is still empty can be set up with Ask AI.</div>
 					${d.rows.map((x, i) => `<div class="rgs-rev"><div><span class="rgs-tick ${x.done ? "on" : ""}">${x.done ? "✓" : "–"}</span><b>${esc(x.label)}</b>
 						<div class="rgs-d" style="margin-left:30px">${esc(x.detail)}</div></div>
-						<span>${x.done || !x.chat ? `<button type="button" class="btn btn-default btn-xs" data-open="${i}">Review / edit</button>` : `<button type="button" class="btn btn-primary btn-xs" data-fill="${i}">✦ Set up now</button> <button type="button" class="btn btn-default btn-xs" data-open="${i}">Open</button>`}</span></div>`).join("")}
+						<span>${x.key === "industry"
+							? `${x.done ? "" : `<button type="button" class="btn btn-primary btn-xs" data-fill="${i}">✦ Set up now</button> `}<button type="button" class="btn btn-default btn-xs" data-pick-industry>${x.done ? "Change" : "Choose"}</button>`
+							: x.done || !x.chat ? `<button type="button" class="btn btn-default btn-xs" data-open="${i}">Review / edit</button>` : `<button type="button" class="btn btn-primary btn-xs" data-fill="${i}">✦ Set up now</button> <button type="button" class="btn btn-default btn-xs" data-open="${i}">Open</button>`}</span></div>`).join("")}
 					</div>`);
 				$review.off("click").on("click", "[data-open]", function () {
 					const x = d.rows[Number(this.dataset.open)];
 					const slug = frappe.router.slug(x.doctype);
 					if (x.name) frappe.set_route(slug, x.name); else frappe.set_route(slug);
+				});
+				// The industry is a template, not a page: its picker is in the section below.
+				$review.on("click", "[data-pick-industry]", () => {
+					root.find("[data-more]").prop("open", true);
+					const sel = root.find("[data-sel]")[0];
+					if (sel) { sel.scrollIntoView({ behavior: "smooth", block: "center" }); sel.focus(); }
 				});
 				$review.on("click", "[data-fill]", function () {
 					const x = d.rows[Number(this.dataset.fill)];
