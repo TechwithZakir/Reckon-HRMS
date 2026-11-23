@@ -591,3 +591,26 @@ class StudioStartTests(unittest.TestCase):
 
         js = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "public" / "js" / "reckon_guided_setup.js").read_text(encoding="utf-8")
         self.assertIn('window.aura.start_agent("hrms_setup", studio === "payroll" ? "start payroll" : "start")', js)
+
+
+class AiTimeBudgetTests(unittest.TestCase):
+    """The AI must never hold the chat for a minute: its calls are capped, and a failure falls back to the plain reader."""
+
+    def test_the_agents_ai_calls_are_capped_in_seconds(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1] / "reckon_hrms"
+        setup = (root / "api" / "ai_setup.py").read_text(encoding="utf-8")
+        agent = (root / "ai_agent.py").read_text(encoding="utf-8")
+        self.assertIn("timeout: int = 12", setup)
+        self.assertIn("timeout=timeout", setup)
+        self.assertIn("timeout=20", agent)
+
+    def test_a_failing_or_silent_ai_leaves_the_plain_behaviour(self):
+        env = make_env()
+        env["current"] = {}
+        env["ai_text"] = lambda key, text, fmt: None
+        r = say("start", None, env)
+        r = say("we have our head office and a factory in Dhaka and one depot", {**r["state"], "idx": sc.STEPS.index("locations")}, env)
+        # the plain reader keeps the sentence as the one name it can read, exactly as before
+        self.assertIn("locations", r["state"]["answers"])

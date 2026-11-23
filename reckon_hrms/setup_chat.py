@@ -51,7 +51,7 @@ NUM = r"(\d+(?:\.\d+)?)"
 CANON_FORMAT = {
     "country": "the country's full name only, for example: Bangladesh",
     "language": "either English or Bangla",
-    "locations": "the place names only, separated by commas, for example: Head Office, Dhaka Factory",
+    "locations": "one short name per office, factory or site, separated by commas, keeping what each place is, for example: Head Office, Dhaka Factory, Khulna Depot",
     "industry": "one short phrase for what the company does, for example: garment factory",
     "extra_departments": "the department names only, separated by commas, for example: Sales, Accounts, Production",
     "extra_titles": "the job titles only, separated by commas, for example: Manager, Supervisor, Operator",
