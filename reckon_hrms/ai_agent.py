@@ -45,7 +45,7 @@ def _env(company: str) -> dict:
             system = (aura._ask_system_prompt(settings) + "\n\nThe person is in the middle of the ReckonERP HR setup interview, on the step "
                       f"'{step_title}'. Answer their question in at most four short sentences, in plain words. Do not ask a question and do not say "
                       "you changed anything: the interview carries on by itself afterwards.")
-            return (aura._complete(settings, system, f"Question: {question[:600]}{guides}", max_tokens=400, quiet=True, timeout=20) or "").strip() or None
+            return (aura._complete(settings, system, f"Question: {question[:600]}{guides}", max_tokens=400, quiet=True, timeout=40) or "").strip() or None
         except Exception:  # noqa: BLE001 - a failing AI must not stop the interview
             return None
 

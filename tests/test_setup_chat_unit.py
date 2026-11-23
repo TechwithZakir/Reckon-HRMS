@@ -602,9 +602,9 @@ class AiTimeBudgetTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1] / "reckon_hrms"
         setup = (root / "api" / "ai_setup.py").read_text(encoding="utf-8")
         agent = (root / "ai_agent.py").read_text(encoding="utf-8")
-        self.assertIn("timeout: int = 12", setup)
+        self.assertIn("timeout: int = 30", setup)
         self.assertIn("timeout=timeout", setup)
-        self.assertIn("timeout=20", agent)
+        self.assertIn("timeout=40", agent)
 
     def test_a_failing_or_silent_ai_leaves_the_plain_behaviour(self):
         env = make_env()

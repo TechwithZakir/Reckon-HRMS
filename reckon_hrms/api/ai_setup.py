@@ -260,7 +260,7 @@ def _ai_json(prompt: str, user: str, max_tokens: int = 700):
         return None
 
 
-def _ai_text(system: str, user: str, max_tokens: int = 400, timeout: int = 12):
+def _ai_text(system: str, user: str, max_tokens: int = 400, timeout: int = 30):
     """One plain-text answer from the company's AI, or None when AI is off, over its daily limit, or fails."""
     ready = _ai_ready()
     if not ready:
