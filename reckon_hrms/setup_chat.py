@@ -33,6 +33,11 @@ PLAN_STEP_TO_QUESTION = {"departments": "extra_departments", "titles": "extra_ti
 PAGE_LINKS = (("holiday", "Holiday List"), ("employee", "Employee"), ("department", "Department"), ("branch", "Branch"), ("location", "Branch"),
               ("leave", "Leave Type"), ("shift", "Shift Type"), ("salary structure", "Salary Structure"), ("payroll", "Payroll Studio"),
               ("hr studio", "HR Studio"))
+GROSS_HELP = re.compile(r"\b(different|differ|each|individual|own|varies|vary)\W+(?:\w+\W+){0,3}(gross|salary|salaries)\b|\b(gross|salary|salaries)\W+(?:\w+\W+){0,3}(different|differ|each person|individual|varies|vary)", re.IGNORECASE)
+GROSS_ADVICE = ("When people are paid different amounts, keep **one salary structure** (the shape of pay: percentages and fixed items) and give each person their own "
+                "gross. The gross is the base on that person's structure assignment. You can use several structures if the shape differs. "
+                "Set it in **Payroll Studio > Salary rules > Each person's gross salary** (type amounts or load a CSV), or add `gross_salary` "
+                "(and `salary_structure`) columns when you import employees. A raise is a new assignment from its date, so old slips stay as they were.")
 CHANGE_WORDS = re.compile(r"\b(change|edit|redo|fix|update|correct|go to|back to)\b", re.IGNORECASE)
 # The payroll flow asks only what belongs to payroll: HR Studio already owns people, places, holidays, hours and leave.
 PAYROLL_STEPS = ["structure", "rules"]
@@ -507,7 +512,8 @@ def turn(message: str, state, env: dict) -> dict:
             lines = [f"{'✓' if r['result'] == 'done' else '!' if r['result'] == 'failed' else '–'} **{r['label']}**: {r['message'] or r['result']}" for r in result["results"]]
             head = f"Done: {result['done']} steps set up" + (f", {result['failed']} failed" if result["failed"] else "") + "."
             return out(head + "\n\n" + "\n".join(lines) + "\n\nReview or edit any step here: Holiday List, Branch, Department, Designation, Shift Type, Salary Structure. "
-                       "The Guided setup tab in HR Studio and Payroll Studio now shows each step with its own link. Next you can add your employees and give them the salary structure.", done=True)
+                       "The Guided setup tab in HR Studio and Payroll Studio now shows each step with its own link. Next you can add your employees and give them the salary structure."
+                       + ("\n\n**Pay amounts:** if everyone has the same gross, use the \"same gross\" card on Payroll Studio > Salary rules. " + GROSS_ADVICE if flow_name() == "payroll" else ""), done=True)
         # Only a clear change request, or a step name on its own, reopens a step. A question or a request for a page does not.
         for i, key in enumerate(_steps(env)):
             named = TITLES[key].casefold() == low or key.replace("_", " ") == low or (CHANGE_WORDS.search(text) and (TITLES[key].casefold() in low or key.replace("_", " ") in low))
@@ -536,6 +542,9 @@ def turn(message: str, state, env: dict) -> dict:
     if link:
         question, replies = _question(st["idx"], env, answers)
         return out(f"You can open {link} any time. Back to the setup:\n\n{question}", replies)
+    if GROSS_HELP.search(text):
+        question, replies = _question(st["idx"], env, answers)
+        return out(f"{GROSS_ADVICE}\n\nBack to the setup:\n\n{question}", replies)
     if env.get("ai_answer") and _looks_like_question(text):
         said = env["ai_answer"](text, TITLES.get(key, key))
         if said:

@@ -614,3 +614,21 @@ class AiTimeBudgetTests(unittest.TestCase):
         r = say("we have our head office and a factory in Dhaka and one depot", {**r["state"], "idx": sc.STEPS.index("locations")}, env)
         # the plain reader keeps the sentence as the one name it can read, exactly as before
         self.assertIn("locations", r["state"]["answers"])
+
+
+class GrossAdviceTests(unittest.TestCase):
+    def test_a_different_gross_for_each_person_gets_the_one_structure_advice_and_the_interview_carries_on(self):
+        from reckon_hrms import setup_chat
+
+        env = {"company": "Acme", "countries": [], "industries": [], "year": 2026, "current": {}, "steps": None,
+               "build_plan": lambda a: {"steps": []}, "apply": lambda a: {"results": [], "done": 0, "failed": 0}}
+        first = setup_chat.turn("start payroll", None, env)
+        out = setup_chat.turn("Every employee has a different gross salary", first["state"], env)
+        self.assertIn("Each person's gross salary", out["reply"])
+        self.assertIn("Back to the setup", out["reply"])
+        self.assertEqual(out["state"]["idx"], first["state"]["idx"])
+
+    def test_the_deduction_rule_wording_is_not_mistaken_for_it(self):
+        from reckon_hrms import setup_chat
+
+        self.assertIsNone(setup_chat.GROSS_HELP.search("every 3 late marks = 1 day, pay / 30"))
