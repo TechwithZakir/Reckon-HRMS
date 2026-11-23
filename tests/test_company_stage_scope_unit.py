@@ -77,3 +77,20 @@ class SuggestionTests(unittest.TestCase):
 
     def test_the_screen_uses_the_servers_suggestions_when_it_sends_them(self):
         self.assertIn("Array.isArray(r.message.suggest)", JS)
+
+
+class NoUnscopedListsOnTheScreensTests(unittest.TestCase):
+    """The screens never ask Frappe for a whole doctype: a vendor administrator would see every company's rows."""
+
+    def test_no_hr_or_payroll_screen_calls_the_generic_list_for_people_or_masters(self):
+        studio = (ROOT / "reckon_hrms" / "page" / "reckon_hrms_hr_studio" / "reckon_hrms_hr_studio.js").read_text(encoding="utf-8")
+        self.assertNotIn('"frappe.client.get_list"', studio)
+        for doctype in ('"Branch"', '"Designation"', '"Employee Grade"', 'doctype: "Employee"'):
+            self.assertNotIn("frappe.client.get_list", JS[max(0, JS.find(doctype) - 80): JS.find(doctype) + 80] if doctype in JS and "get_list" in JS[max(0, JS.find(doctype) - 80): JS.find(doctype) + 80] else "")
+        self.assertIn("reckon_hrms.api.people.list_employees", studio)
+        self.assertIn("reckon_hrms.api.people.filter_options", JS)
+
+    def test_the_employee_list_endpoint_filters_by_the_servers_company(self):
+        people = (ROOT / "api" / "people.py").read_text(encoding="utf-8")
+        body = people[people.index("def list_employees"): people.index("def filter_options")]
+        self.assertIn('filters={"company": _company()}', body)

@@ -163,9 +163,8 @@ window.ReckonHrStages = window.ReckonHrStages || {};
 		}
 
 		function load() {
-			frappe.call({ method: "frappe.client.get_list", args: {
-				doctype: "Employee", fields: ["name", "employee_name", "branch", "department", "designation", "date_of_joining", "status", "image"],
-				order_by: "employee_name asc", limit_page_length: 2000 } }).then((r) => {
+			// Only this company's people, chosen by the server, not by what the caller's roles could see.
+			frappe.call({ method: "reckon_hrms.api.people.list_employees", type: "GET" }).then((r) => {
 				state.rows = r.message || [];
 				const uniq = (k) => [...new Set(state.rows.map((x) => x[k]).filter(Boolean))].sort();
 				fill("branch", uniq("branch"));

@@ -476,9 +476,10 @@ window.ReckonSetupStages.run = function (parent) {
 
 	const call = (method, args) => frappe.call({ method: "reckon_hrms.api.payroll_run." + method, args: args || {}, type: "GET" });
 	const post = (method, args) => frappe.call({ method: "reckon_hrms.api.payroll_run." + method, args: args || {} });
-	const fill = (sel, doctype) => frappe.call({ method: "frappe.client.get_list",
-		args: { doctype, fields: ["name"], limit_page_length: 100, order_by: "name asc" } }).then((r) => {
-		root.find(sel).append(r.message.map((x) => `<option value="${esc(x.name)}">${esc(x.name)}</option>`).join(""));
+	// This company's own and the standard choices only, from the server.
+	const options = frappe.call({ method: "reckon_hrms.api.people.filter_options", type: "GET" });
+	const fill = (sel, doctype) => options.then((r) => {
+		root.find(sel).append((r.message[doctype] || []).map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join(""));
 	});
 	fill("#fBranch", "Branch");
 	fill("#fDept", "Department");

@@ -25,6 +25,30 @@ MASTERS = {  # field -> (DocType, name field) for the lookups the file refers to
 }
 
 
+LIST_ROLES = ["HR Manager", "HR User", "Payroll Manager", "System Manager"]
+
+
+@frappe.whitelist(methods=["GET"])
+def list_employees() -> list[dict]:
+    """The signed-in company's employees for the Employee details tab. Never another company's, whatever the caller's roles."""
+    frappe.only_for(LIST_ROLES)
+    return frappe.get_all(
+        "Employee", filters={"company": _company()},
+        fields=["name", "employee_name", "branch", "department", "designation", "date_of_joining", "status", "image"],
+        order_by="employee_name asc", limit_page_length=2000)
+
+
+@frappe.whitelist(methods=["GET"])
+def filter_options() -> dict:
+    """Branches, departments, job titles and levels a payroll run may filter by: this company's own and the standard ones."""
+    frappe.only_for(LIST_ROLES)
+    out = {}
+    for doctype in ("Branch", "Department", "Designation", "Employee Grade"):
+        filters = {"company": _company()} if doctype == "Department" else shared_or_own(doctype)
+        out[doctype] = frappe.get_all(doctype, filters=filters, pluck="name", order_by="name asc", limit_page_length=100)
+    return out
+
+
 def _csv_text(file_url: str) -> str:
     if not file_url:
         frappe.throw(_("Choose a CSV file first."))
