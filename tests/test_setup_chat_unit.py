@@ -461,3 +461,31 @@ class PayrollPageBlockTests(unittest.TestCase):
         js = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "public" / "js" / "reckon_guided_setup.js").read_text(encoding="utf-8")
         for needle in ("Finish HR setup first", "data-hr-first", "data.hr_pending", "!data.hr_ready"):
             self.assertIn(needle, js)
+
+
+class PayrollInterviewPageTests(unittest.TestCase):
+    """The payroll tab has the same helpful pieces as HR Studio's guided setup: an Ask AI card and a pre-filled interview."""
+
+    def setUp(self):
+        from pathlib import Path
+
+        self.js = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "public" / "js" / "reckon_guided_setup.js").read_text(encoding="utf-8")
+
+    def test_the_payroll_tab_has_the_ask_ai_card_and_an_interview_that_opens_when_hr_is_done(self):
+        for needle in ("Guided payroll setup with Ask AI", 'interview(root, "payroll", $())', "Payroll setup interview", "data.hr_ready"):
+            self.assertIn(needle, self.js)
+
+    def test_each_studio_asks_only_its_own_questions(self):
+        self.assertIn('(studio === "payroll" ? x.studio === "payroll" : x.studio !== "payroll")', self.js)
+        self.assertIn("PAYROLL_KEYS", self.js)
+
+    def test_payroll_sends_only_payroll_answers_so_no_hr_setting_changes(self):
+        start = self.js.index("const PAYROLL_KEYS")
+        block = self.js[start: start + 600]
+        self.assertIn("rule_marks", block)
+        self.assertIn("structure_name", block)
+        self.assertNotIn("weekly_off", block.split(":")[0])
+
+    def test_the_rule_question_has_a_one_tap_standard_and_an_edit_link(self):
+        self.assertIn("data-standard-rule", self.js)
+        self.assertIn('rules: ["Company", LINKS.company]', self.js)

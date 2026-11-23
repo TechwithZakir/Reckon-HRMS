@@ -49,6 +49,9 @@ QUESTIONS = [
      "help": "Give the shift a name and its start and end time. Leave the name empty to skip."},
     {"key": "leave_casual", "studio": "both", "kind": "leave", "label": "Leave days per year",
      "help": "Days per year for each type, from your own policy. Leave a type empty to skip it. Nothing is given to employees yet."},
+    {"key": "rule_marks", "studio": "payroll", "kind": "rules", "label": "How should late entry and early exit be deducted?",
+     "help": "Every this many marks equal one day, a day's pay is base salary divided by a number, and an optional monthly cap. "
+             "Nothing is deducted by saving this rule."},
     {"key": "structure_name", "studio": "payroll", "kind": "structure", "label": "Salary structure",
      "help": "Basic and house rent as a percent of the gross salary, medical and conveyance as fixed monthly amounts. "
              "Leave the name empty to skip. Amounts per person are set when you give the structure to people."},

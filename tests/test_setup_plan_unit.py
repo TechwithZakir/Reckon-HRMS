@@ -74,7 +74,7 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(keys[:4], ["country", "language", "locations", "extra_departments"])
         self.assertEqual(keys[-1], "structure_name")
         # Payroll has its own studio: the salary structure is not an HR question.
-        self.assertEqual([q["key"] for q in sp.QUESTIONS if q["studio"] == "payroll"], ["structure_name"])
+        self.assertEqual([q["key"] for q in sp.QUESTIONS if q["studio"] == "payroll"], ["rule_marks", "structure_name"])
 
     def test_weekly_off_is_suggested_by_country_and_never_applied_silently(self):
         self.assertEqual(sp.suggest_weekly_off("Bangladesh"), ["Friday"])

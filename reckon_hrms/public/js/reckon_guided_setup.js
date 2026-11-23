@@ -65,7 +65,7 @@
 		const EDIT = (key) => ({
 			country: ["Company", LINKS.company], language: ["User", LINKS.user], locations: ["Branch"], extra_departments: ["Department"],
 			extra_titles: ["Designation"], weekly_off: ["Holiday List", LINKS.holiday_list], holidays: ["Holiday List", LINKS.holiday_list],
-			shift: ["Shift Type"], leave: ["Leave Policy"], structure_name: ["Salary Structure", LINKS.structure],
+			shift: ["Shift Type"], leave: ["Leave Policy"], structure_name: ["Salary Structure", LINKS.structure], rules: ["Company", LINKS.company],
 		})[key];
 
 		const STYLE2 = `<style>.rgs-bar{height:6px;background:var(--control-bg);border-radius:99px;overflow:hidden;margin:8px 0 14px}.rgs-bar b{display:block;height:100%;background:var(--primary)}.rgs-q{padding:4px 0 8px}.rgs-qh{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:2px}.rgs-q h3{font-size:16px;margin:0}.rgs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}.rgs-f span{display:block;font-size:12px;color:var(--text-muted);margin-bottom:2px}.rgs-days{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}.rgs-days label{display:inline-flex;gap:5px;align-items:center;margin:0;font-weight:400}.rgs-st{display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:1px 8px;margin-left:8px}.rgs-st.ready,.rgs-st.done{background:var(--green-100,#e4f5e9);color:var(--green-700,#1e6b3a)}.rgs-st.skipped{background:var(--control-bg);color:var(--text-muted)}.rgs-st.attention,.rgs-st.failed{background:var(--orange-100,#fff1db);color:var(--orange-700,#8a5300)}.rgs-nav{display:flex;justify-content:space-between;gap:8px;margin-top:14px;flex-wrap:wrap}.rgs-dots{display:flex;gap:5px;flex-wrap:wrap;margin-top:12px}.rgs-dots button{width:10px;height:10px;border-radius:50%;border:0;padding:0;background:var(--border-color);cursor:pointer}.rgs-dots button.on{background:var(--primary)}.rgs-dots button.done{background:var(--green-500,#3a9a5b)}</style>`;
@@ -73,7 +73,7 @@
 		const days = () => (Array.isArray(answers.weekly_off) ? answers.weekly_off : (Q.weekly_off_by_country[val("country")] || Q.default_weekly_off));
 		const total = () => Q.questions.length;
 		const answered = (x) => {
-			const keys = { country: ["country"], language: ["language"], list: [x.key], text: [x.key], days: ["weekly_off"], shift: ["shift_name"], leave: ["leave_casual", "leave_sick", "leave_earned", "leave_maternity"], structure: ["structure_name"] }[x.kind] || [x.key];
+			const keys = { country: ["country"], language: ["language"], list: [x.key], text: [x.key], days: ["weekly_off"], shift: ["shift_name"], leave: ["leave_casual", "leave_sick", "leave_earned", "leave_maternity"], structure: ["structure_name"], rules: ["rule_marks"] }[x.kind] || [x.key];
 			return keys.some((k) => (Array.isArray(answers[k]) ? answers[k].length : String(val(k)).trim()));
 		};
 
@@ -94,8 +94,10 @@
 			else if (x.kind === "days") { const picked = days(); body = `<div class="rgs-days">${Q.weekdays.map((d) => `<label><input type="checkbox" data-day="${d}" ${picked.includes(d) ? "checked" : ""}> ${d}</label>`).join("")}</div>`; }
 			else if (x.kind === "shift") body = `<div class="rgs-grid">${field("shift_name", "Shift name", 'placeholder="General Shift"')}${field("shift_start", "Starts", 'placeholder="09:00"')}${field("shift_end", "Ends", 'placeholder="17:00"')}${field("late_grace", "Late entry grace (minutes)", 'inputmode="numeric"')}</div>`;
 			else if (x.kind === "leave") body = `<div class="rgs-grid">${field("leave_casual", "Casual Leave", 'inputmode="decimal"')}${field("leave_sick", "Sick Leave", 'inputmode="decimal"')}${field("leave_earned", "Earned Leave", 'inputmode="decimal"')}${field("leave_maternity", "Maternity Leave", 'inputmode="decimal"')}</div>`;
+			else if (x.kind === "rules") body = `<div class="rgs-grid">${field("rule_marks", "Marks that equal one day", 'inputmode="numeric" placeholder="3"')}${field("rule_divisor", "Day's pay = base salary / this", 'inputmode="numeric" placeholder="30"')}${field("rule_cap", "Monthly cap (0 = none)", 'inputmode="decimal" placeholder="0"')}</div>
+				<div style="margin-top:8px"><button type="button" class="btn btn-default btn-xs" data-standard-rule>Use the standard rule: 3 marks, pay / 30, no cap</button></div>`;
 			else if (x.kind === "structure") body = `<div class="rgs-grid">${field("structure_name", "Structure name", 'placeholder="Standard Structure"')}${field("basic_pct", "Basic, % of gross", 'inputmode="decimal"')}${field("hra_pct", "House rent, % of gross", 'inputmode="decimal"')}${field("medical_amount", "Medical, fixed per month", 'inputmode="decimal"')}${field("conveyance_amount", "Conveyance, fixed per month", 'inputmode="decimal"')}</div>`;
-			const ek = ({ structure: "structure_name", text: "holidays", days: "weekly_off", shift: "shift", leave: "leave" })[x.kind] || x.key;
+			const ek = ({ structure: "structure_name", text: "holidays", days: "weekly_off", shift: "shift", leave: "leave", rules: "rules" })[x.kind] || x.key;
 			const last = idx === n - 1;
 			$step.html(`${STYLE2}<div class="rgs-muted">Step ${idx + 1} of ${n}</div>
 				<div class="rgs-bar"><b style="width:${Math.round((idx / n) * 100)}%"></b></div>
@@ -113,13 +115,21 @@
 			prepare();
 		}
 
-		const gather = () => Object.assign({}, answers, { industry: $sel.val() || "", weekly_off: days() });
+		const PAYROLL_KEYS = ["structure_name", "basic_pct", "hra_pct", "medical_amount", "conveyance_amount", "rule_marks", "rule_divisor", "rule_cap"];
+		const gather = () => (studio === "payroll"
+			? Object.fromEntries(PAYROLL_KEYS.filter((k) => answers[k] != null && answers[k] !== "").map((k) => [k, answers[k]]))
+			: Object.assign({}, answers, { industry: $sel.val() || "", weekly_off: days() }));
 		const badge = (st) => `<span class="rgs-st ${esc(st)}">${esc(({ ready: "will be added", skipped: "skipped", attention: "needs your attention", done: "done", failed: "failed" })[st] || st)}</span>`;
 
 		function prepare() {
 			$plan.html(`<div class="rgs-muted" style="margin-top:10px">✦ Ask AI is reading your answers…</div>`);
 			frappe.call({ method: "reckon_hrms.api.ai_setup.prepare", args: { answers: JSON.stringify(gather()) } }).then((r) => {
 				const p = r.message;
+				if (studio === "payroll") {
+					p.steps = p.steps.filter((st) => st.key === "structure" || st.key === "rules");
+					p.ready = p.steps.filter((st) => st.status === "ready").length;
+					p.attention = p.steps.filter((st) => st.status === "attention").length;
+				}
 				$plan.html(`<div style="margin-top:14px"><b>Your setup plan for ${esc(p.company)}</b>
 					<div class="rgs-muted">${p.ready} steps will run${p.attention ? `, ${p.attention} need your attention (go back, fix them and review again)` : ""}.${p.ai_used ? " Ask AI read your holiday text." : ""} Nothing has been created yet.</div>
 					${p.steps.map((st) => `<div class="rgs-group" style="margin-top:10px"><b>${esc(st.title)}</b>${badge(st.status)}
@@ -158,6 +168,7 @@
 			answers.weekly_off = $step.find("[data-day]:checked").map((_i, el) => el.dataset.day).get();
 			answers.__daysChosen = true; save();
 		});
+		$step.on("click", "[data-standard-rule]", () => { Object.assign(answers, { rule_marks: "3", rule_divisor: "30", rule_cap: "0" }); save(); draw(); });
 		$step.on("click", "[data-next]", () => go(idx + 1));
 		$step.on("click", "[data-skip]", () => go(idx + 1));
 		$step.on("click", "[data-back]", () => go(idx - 1));
@@ -176,7 +187,9 @@
 			frappe.call({ method: "reckon_hrms.api.ai_setup.current_answers", type: "GET" }),
 		]).then(([r, c]) => {
 			Q = r.message;
-			Q.questions = Q.questions.filter((x) => x.studio !== "payroll");  // the salary structure is asked in Payroll Studio
+			// Payroll Studio asks the payroll questions, HR Studio the HR ones: nothing is asked twice.
+			Q.questions = Q.questions.filter((x) => (studio === "payroll" ? x.studio === "payroll" : x.studio !== "payroll"));
+			if (studio === "payroll") Q.questions.sort((a, b) => (a.kind === "structure" ? -1 : 1) - (b.kind === "structure" ? -1 : 1));
 			const have = (c.message && c.message.answers) || {};
 			LINKS = (c.message && c.message.links) || {};
 			// What the company already has fills the answers; only what was typed this session overrides it.
@@ -190,11 +203,14 @@
 	// ---- Payroll Studio: the salary process in the order HRMS needs it. What HR Studio owns is shown as a status with a link.
 	function payrollPanel(parent) {
 		const root = $(`<div class="rgs">${STYLE}
-			<div class="rgs-card"><h2><span class="rgs-spark">✦</span> Guided payroll setup</h2>
-				<div class="rgs-muted">The salary process in the order ReckonERP HRMS needs it. People, places, holidays, working hours and leave are set in HR Studio, so they are only shown here and never asked again. Ask AI sets up the salary structure and the late and early deduction rule for you; nothing is created until you confirm.</div>
+			<div class="rgs-card"><h2><span class="rgs-spark">✦</span> Guided payroll setup with Ask AI</h2>
+				<div class="rgs-muted">Ask AI asks you the questions in the chat, one at a time (the salary structure, then the late and early deduction rule), and then sets them up for you. Nothing is created until you confirm. You can also answer the same questions below. People, places, holidays, working hours and leave belong to HR Studio, so they are only shown, never asked again.</div>
 				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-ask>✦ Ask AI to set up payroll</button>
 					<button type="button" class="btn btn-default btn-sm" data-refresh>Refresh</button></div></div>
-			<div data-groups></div></div>`).appendTo(parent);
+			<div data-groups></div>
+			<div class="rgs-card" data-interview hidden><h2>Payroll setup interview</h2>
+				<div class="rgs-muted">Answer what you know, then review one plan before anything is created. Your existing structure and rule are filled in, and each question links to the page that edits them.</div>
+				<div data-stepper></div><div data-plan></div></div></div>`).appendTo(parent);
 		const $groups = root.find("[data-groups]");
 		let data = null;
 		const slug = (dt) => frappe.router.slug(dt);
@@ -217,12 +233,20 @@
 			if (blocked) root.find("[data-groups] [data-act]").each(function () { if (!/^(employees|holidays|attendance|leave):/.test(this.dataset.act)) $(this).prop("disabled", true); });
 		}
 
+		let started = false;
 		function load() {
-			frappe.call({ method: "reckon_hrms.api.ai_setup.payroll_readiness", type: "GET" }).then((r) => { data = r.message; draw(); })
+			frappe.call({ method: "reckon_hrms.api.ai_setup.payroll_readiness", type: "GET" }).then((r) => {
+				data = r.message;
+				draw();
+				// The interview opens once HR setup is done; until then the box above says what to finish first.
+				root.find("[data-interview]").prop("hidden", !data.hr_ready);
+				if (data.hr_ready && !started) { started = true; interview(root, "payroll", $()); }
+			})
 				.catch(() => $groups.html(`<div class="rgs-card rgs-muted">Payroll setup needs the HR Manager or Payroll Manager role.</div>`));
 		}
 		load();
 		root.on("click", "[data-refresh]", load);
+		root.on("rgs:refresh", load);
 		root.on("click", "[data-hr-first]", () => { frappe.route_options = { stage: "guided" }; frappe.set_route("reckon-hrms-hr-studio"); });
 		root.on("click", "[data-ask]", () => (data && !data.hr_ready ? $groups.find("[data-hr-first]").trigger("click") : window.ReckonStudioAsk("payroll")));
 		root.on("click", "[data-act]", function () {
