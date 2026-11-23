@@ -54,7 +54,7 @@ class TenantScopingTests(unittest.TestCase):
         from reckon_hrms.constants import SHARED_CATALOG_DOCTYPES
 
         for doctype in SHARED_CATALOG_DOCTYPES:
-            self.assertEqual(hooks.permission_query_conditions[doctype], "reckon_saas_platform.tenant_security.get_tenant_shared_query")
+            self.assertEqual(hooks.permission_query_conditions[doctype], "reckon_hrms.tenancy_hooks.shared_query")
             self.assertIn("bind_catalog_company", hooks.doc_events[doctype]["before_validate"])
         patch = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "patches.txt").read_text(encoding="utf-8")
         self.assertIn("reckon_hrms.patches.company_on_shared_masters", patch)

@@ -50,6 +50,51 @@ TENANT_OWNED_DOCTYPES = (
 )
 
 
+# Other HR and payroll doctypes with a Company field. Their lists are limited to the company (tenants) or to the selected
+# Default Company (vendor staff), but they are not added to the tenant's compact desk reach (DESK_DOCTYPES).
+EXTRA_SCOPED_DOCTYPES = (
+    "Appointment Letter",
+    "Appraisal",
+    "Appraisal Cycle",
+    "Arrear",
+    "Attendance Request",
+    "Employee Advance",
+    "Employee Benefit Application",
+    "Employee Benefit Claim",
+    "Employee Incentive",
+    "Employee Onboarding",
+    "Employee Onboarding Template",
+    "Employee Other Income",
+    "Employee Performance Feedback",
+    "Employee Promotion",
+    "Employee Separation",
+    "Employee Separation Template",
+    "Employee Tax Exemption Declaration",
+    "Employee Tax Exemption Proof Submission",
+    "Employee Transfer",
+    "Full and Final Statement",
+    "Goal",
+    "Gratuity",
+    "Job Offer",
+    "Job Opening",
+    "Job Requisition",
+    "Leave Block List",
+    "Leave Encashment",
+    "Leave Period",
+    "Overtime Slip",
+    "Payroll Correction",
+    "Payroll Period",
+    "Retention Bonus",
+    "Salary Withholding",
+    "Shift Request",
+    "Shift Schedule Assignment",
+    "Staffing Plan",
+    "Training Event",
+    "Training Program",
+    "Travel Request",
+)
+
+
 def tenant_role(kind: str, company: str) -> str:
     """Per-tenant role name, for example "Reckon HRMS Admin - Acme Ltd". kind is "Admin" or "User"."""
     if kind not in {"Admin", "User"}:

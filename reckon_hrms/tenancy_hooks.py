@@ -14,6 +14,53 @@ from reckon_saas_platform.tenant_security import (
 )
 
 
+def _selected_company(user=None):
+    """The Default Company a vendor user picked (Session Defaults), or None: tenants never get this, they have their own company."""
+    from reckon_saas_platform.tenant_security import user_can_bypass_tenant
+
+    user = user or frappe.session.user
+    if not user_can_bypass_tenant(user):
+        return None
+    return frappe.defaults.get_user_default("Company", user) or None
+
+
+def owned_query(user=None, doctype=None):
+    """A tenant sees its own company's rows (platform rule). Vendor staff see the selected Default Company's rows, or all when none is picked."""
+    from reckon_saas_platform.tenant_security import get_tenant_owned_query
+
+    base = get_tenant_owned_query(user or frappe.session.user, doctype)
+    if base:
+        return base
+    company = _selected_company(user)
+    return f"`tab{doctype}`.`company` = {frappe.db.escape(company)}" if company and doctype else ""
+
+
+def shared_query(user=None, doctype=None):
+    """Same for the shared masters: own rows and the vendor's standard ones (no company); vendor staff see the selected company's and the standard ones."""
+    from reckon_saas_platform.tenant_security import get_tenant_shared_query
+
+    base = get_tenant_shared_query(user or frappe.session.user, doctype)
+    if base:
+        return base
+    company = _selected_company(user)
+    if not (company and doctype):
+        return ""
+    table = f"`tab{doctype}`"
+    return f"({table}.`company` = {frappe.db.escape(company)} or ifnull({table}.`company`, '') = '')"
+
+
+def job_applicant_query(user=None, doctype=None):
+    """An applicant belongs to the company of its job opening."""
+    company, bypass = _tenant_company()
+    if bypass:
+        company = _selected_company(user)
+        if not company:
+            return ""
+    elif not company:
+        return "1=0"
+    return f"`tabJob Applicant`.`job_title` in (select `name` from `tabJob Opening` where `company` = {frappe.db.escape(company)})"
+
+
 def bind_company(doc, method=None, *args, **kwargs):
     bind_doc_to_tenant(doc, user=frappe.session.user)
 
@@ -54,7 +101,9 @@ def holiday_assignment_query(user=None, doctype=None):
     """Holiday List Assignment has no Company: it belongs to the company of the Holiday List it assigns."""
     company, bypass = _tenant_company()
     if bypass:
-        return ""
+        company = _selected_company(user)
+        if not company:
+            return ""
     if not company:
         return "1=0"
     return (
@@ -77,7 +126,9 @@ def employee_linked_query(user=None, doctype=None):
     """Employee Checkin (and other rows that only name an employee) belong to that employee's company."""
     company, bypass = _tenant_company()
     if bypass:
-        return ""
+        company = _selected_company(user)
+        if not company:
+            return ""
     if not company:
         return "1=0"
     table = f"`tab{doctype or 'Employee Checkin'}`"

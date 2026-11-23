@@ -1,4 +1,4 @@
-from reckon_hrms.constants import READ_ONLY_SETTINGS, SHARED_CATALOG_DOCTYPES, TENANT_OWNED_DOCTYPES
+from reckon_hrms.constants import EXTRA_SCOPED_DOCTYPES, READ_ONLY_SETTINGS, SHARED_CATALOG_DOCTYPES, TENANT_OWNED_DOCTYPES
 
 app_name = "reckon_hrms"
 app_title = "Reckon HRMS"
@@ -30,18 +30,22 @@ reckon_saas_modules = [
 ]
 
 # Tenant users see only their Company's rows. Same platform rules as Distribution.
+# Vendor staff (who see every company) see only the selected Default Company's rows: Session Defaults > Company.
+_SCOPED = TENANT_OWNED_DOCTYPES + EXTRA_SCOPED_DOCTYPES
 permission_query_conditions = {
-    doctype: "reckon_saas_platform.tenant_security.get_tenant_owned_query"
-    for doctype in TENANT_OWNED_DOCTYPES
+    doctype: "reckon_hrms.tenancy_hooks.owned_query"
+    for doctype in _SCOPED
 }
 has_permission = {
     doctype: "reckon_saas_platform.tenant_security.has_tenant_owned_permission"
-    for doctype in TENANT_OWNED_DOCTYPES
+    for doctype in _SCOPED
 }
 # Reference masters: the vendor's seeded rows are a read-only catalog; a tenant's own rows are its alone.
 permission_query_conditions.update({
-    doctype: "reckon_saas_platform.tenant_security.get_tenant_shared_query" for doctype in SHARED_CATALOG_DOCTYPES
+    doctype: "reckon_hrms.tenancy_hooks.shared_query" for doctype in SHARED_CATALOG_DOCTYPES
 })
+# An applicant has no Company of its own: it belongs to the company of the job opening it applies to.
+permission_query_conditions["Job Applicant"] = "reckon_hrms.tenancy_hooks.job_applicant_query"
 has_permission.update({
     doctype: "reckon_saas_platform.tenant_security.has_tenant_shared_permission" for doctype in SHARED_CATALOG_DOCTYPES
 })
@@ -61,7 +65,7 @@ doc_events = {
             "reckon_hrms.tenancy_hooks.validate_owned",
         ],
     }
-    for doctype in TENANT_OWNED_DOCTYPES
+    for doctype in _SCOPED
 }
 # A tenant's own addition to a shared master is stamped with its company (vendor and seed writes stay unstamped).
 for _doctype in SHARED_CATALOG_DOCTYPES:
