@@ -86,7 +86,8 @@ def payroll_groups(f: dict) -> list[dict]:
         row("rules", "Late and early deduction rule", True, rule_text, [{"kind": "rules", "label": "Edit"}]),
         row("assignments", "Structure given to people", f["active"] > 0 and f["assigned"] >= f["active"],
             f"{f['assigned']} of {f['active']} active people have a structure",
-            [{"kind": "stage", "stage": "salary", "label": "Give structure to people"}] if f["active"] and f["assigned"] < f["active"] else [{"kind": "open", "doctype": "Salary Structure Assignment", "label": "Review / edit"}]),
+            ([{"kind": "stage", "stage": "salary", "label": "Give structure to people"}] if f["active"] and f["assigned"] < f["active"] else [{"kind": "open", "doctype": "Salary Structure Assignment", "label": "Review / edit"}])
+            + ([{"kind": "stage", "stage": "salary", "label": "Paid different amounts? Set each person's gross"}] if f["active"] else [])),
         row("run", "Run salary", bool(last and last.get("status") == "Paid"), (f"Latest run {last['name']}: {last['status']}" if last else "No run yet"),
             [{"kind": "stage", "stage": "run", "label": "Open Run salary"}]),
     ]
