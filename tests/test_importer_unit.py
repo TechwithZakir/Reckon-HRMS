@@ -56,5 +56,39 @@ class ImporterTests(unittest.TestCase):
         self.assertEqual(len(result["errors"]), 50)
 
 
+class GrossSalaryTests(unittest.TestCase):
+    TODAY = date(2026, 11, 8)
+
+    def check(self, known_extra, **kw):
+        return importer.check_rows([row(**kw)], {**KNOWN, **known_extra}, today=self.TODAY)
+
+    def test_amounts_read_with_commas_and_reject_nonsense(self):
+        self.assertEqual(importer.parse_amount("45,000"), 45000.0)
+        self.assertEqual(importer.parse_amount("45000.505"), 45000.5)
+        for bad in ("", "abc", "0", "-5", "99999999999"):
+            self.assertIsNone(importer.parse_amount(bad))
+
+    def test_the_template_has_the_pay_columns(self):
+        self.assertIn("gross_salary,salary_structure", importer.template_csv())
+
+    def test_no_gross_is_fine(self):
+        self.assertEqual(self.check({})["ready"], 1)
+
+    def test_a_gross_uses_the_only_structure_when_there_is_one(self):
+        self.assertEqual(self.check({"salary_structure": {"Std"}, "structure_default": {"Std"}}, gross_salary="45,000")["ready"], 1)
+
+    def test_a_gross_needs_a_named_structure_when_there_are_several_or_none(self):
+        out = self.check({"salary_structure": {"A", "B"}, "structure_default": set()}, gross_salary="45000")
+        self.assertEqual(out["errors"][0]["field"], "salary_structure")
+        ok = self.check({"salary_structure": {"A", "B"}, "structure_default": set()}, gross_salary="45000", salary_structure="B")
+        self.assertEqual(ok["ready"], 1)
+
+    def test_an_unknown_structure_or_bad_gross_or_orphan_structure_is_reported(self):
+        known = {"salary_structure": {"Staff"}, "structure_default": set()}
+        self.assertIn("Did you mean 'Staff'?", self.check(known, gross_salary="1000", salary_structure="Staf")["errors"][0]["message"])
+        self.assertEqual(self.check(known, gross_salary="lots")["errors"][0]["field"], "gross_salary")
+        self.assertEqual(self.check(known, salary_structure="Staff")["errors"][0]["field"], "gross_salary")
+
+
 if __name__ == "__main__":
     unittest.main()

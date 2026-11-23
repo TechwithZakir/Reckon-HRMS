@@ -78,6 +78,9 @@ def _known(company: str) -> dict[str, set[str]]:
         known[field] = set(frappe.get_all(doctype, filters=shared_or_own(doctype), pluck=name_field, limit_page_length=0))
     known["department"] = set(frappe.get_all(
         "Department", filters={"company": company}, pluck="department_name", limit_page_length=0))
+    structures = frappe.get_all("Salary Structure", filters={"company": company, "docstatus": 1, "is_active": "Yes"}, pluck="name", limit_page_length=0)
+    known["salary_structure"] = set(structures)
+    known["structure_default"] = set(structures) if len(structures) == 1 else set()  # one structure: a file may leave the column out
     return known
 
 
@@ -116,7 +119,8 @@ def apply_import(file_url: str) -> dict:
 def run_import(file_url, company, job):
     key = f"reckon_import:{job}"
     rows = _rows(_csv_text(file_url))
-    result = importer.check_rows(rows, _known(company))
+    known = _known(company)
+    result = importer.check_rows(rows, known)
     valid = result["valid"]
     state = {"state": "running", "created": 0, "failed": [], "done": 0, "total": len(valid)}
     for i in range(0, len(valid), IMPORT_BATCH):
@@ -139,6 +143,15 @@ def run_import(file_url, company, job):
                 })
                 doc.insert(ignore_permissions=True)
                 state["created"] += 1
+                gross = importer.parse_amount(data.get("gross_salary"))
+                if gross:
+                    from reckon_hrms.api.salary import assign_one
+
+                    structure = data.get("salary_structure") or next(iter(known["structure_default"]))
+                    try:
+                        assign_one(doc.name, structure, gross, getdate(importer.parse_date(data["date_of_joining"])), company)
+                    except Exception as exc:  # noqa: BLE001 - the person is added; say the pay could not be set
+                        state["failed"].append({"row": item["row"], "reason": "Added, but the salary could not be set: " + str(exc)[:120]})
             except Exception as exc:
                 state["failed"].append({"row": item["row"], "reason": str(exc)[:160]})
             state["done"] += 1

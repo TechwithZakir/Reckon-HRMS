@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import flt, get_first_day, getdate
 
+from reckon_hrms.api.scope import own_employee
 from reckon_hrms.api.shortcuts import route
 from reckon_hrms.paging import DEFAULT_PAGE, page_bounds
 from reckon_hrms.salary_formula import describe
@@ -218,6 +219,85 @@ def structure_amounts(structure: str, base) -> dict:
 
 
 BULK_BATCH = 200
+
+
+def assign_one(employee: str, structure: str, base: float, from_date, company: str):
+    """Give one person a structure and their own gross from a date. A new assignment, so earlier slips and history stay as they were."""
+    ssa = frappe.get_doc({"doctype": "Salary Structure Assignment", "employee": employee, "salary_structure": structure,
+                          "from_date": from_date, "base": base, "company": company})
+    ssa.insert(ignore_permissions=True)
+    ssa.submit()
+    return ssa.name
+
+
+def _latest_assignment(employee: str, on):
+    return frappe.db.get_value(
+        "Salary Structure Assignment", {"employee": employee, "docstatus": 1, "from_date": ["<=", on]},
+        ["name", "salary_structure", "base", "from_date"], as_dict=True, order_by="from_date desc, creation desc")
+
+
+@frappe.whitelist(methods=["GET"])
+def employee_pay(start=0, page_length=25, search: str | None = None) -> dict:
+    """Active people of this company with their current structure and gross, for the gross salary table."""
+    _gate("Salary Structure Assignment")
+    mine = _mine()
+    start_i, length_i = page_bounds(start, page_length)
+    filters = {"company": mine, "status": "Active"}
+    or_filters = None
+    if search:
+        like = f"%{str(search).strip()[:60]}%"
+        or_filters = [["employee_name", "like", like], ["name", "like", like], ["designation", "like", like]]
+    total = len(frappe.get_all("Employee", filters=filters, or_filters=or_filters, pluck="name", limit_page_length=0))
+    people = frappe.get_all("Employee", filters=filters, or_filters=or_filters, fields=["name", "employee_name", "designation"],
+                            order_by="employee_name asc", start=start_i, page_length=length_i)
+    today = frappe.utils.nowdate()
+    rows = []
+    for person in people:
+        current = _latest_assignment(person.name, today) or {}
+        rows.append({**person, "structure": current.get("salary_structure") or "", "base": float(current.get("base") or 0),
+                     "from_date": str(current.get("from_date") or "")})
+    structures = frappe.get_all("Salary Structure", filters={"company": mine, "docstatus": 1, "is_active": "Yes"}, pluck="name", order_by="name asc")
+    return {"rows": rows, "total": total, "structures": structures, "currency": frappe.db.get_value("Company", mine, "default_currency") or ""}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_gross(rows, from_date: str | None = None) -> dict:
+    """Set each person's own gross salary (and structure): a new Salary Structure Assignment per changed person. Up to 100 a call."""
+    frappe.only_for(["HR Manager", "Payroll Manager", "System Manager"])
+    if not frappe.has_permission("Salary Structure Assignment", "create"):
+        frappe.throw(_("You do not have permission to assign salary structures."), frappe.PermissionError)
+    from reckon_hrms.importer import parse_amount
+
+    mine = _mine()
+    rows = frappe.parse_json(rows) if isinstance(rows, str) else rows
+    if not isinstance(rows, list) or not rows:
+        frappe.throw(_("Nothing to save."))
+    on = getdate(from_date) if from_date else get_first_day(getdate(frappe.utils.nowdate()))
+    out = {"created": 0, "unchanged": 0, "failed": []}
+    for row in rows[:100]:
+        employee = str((row or {}).get("employee") or "")
+        try:
+            own_employee(employee)
+            amount = parse_amount(row.get("gross"))
+            if amount is None:
+                raise ValueError(_("Gross must be a monthly amount above 0."))
+            structure = str(row.get("structure") or "")
+            if not frappe.db.exists("Salary Structure", {"name": structure, "company": mine, "docstatus": 1}):
+                raise ValueError(_("Choose one of your submitted salary structures."))
+            joined = frappe.db.get_value("Employee", employee, "date_of_joining")
+            start = max(on, getdate(joined)) if joined else on
+            current = _latest_assignment(employee, start)
+            if current and current.salary_structure == structure and abs(float(current.base or 0) - amount) < 0.005:
+                out["unchanged"] += 1
+                continue
+            if frappe.db.exists("Salary Structure Assignment", {"employee": employee, "docstatus": 1, "from_date": start}):
+                raise ValueError(_("This person already has an assignment from {0}. Choose a later date.").format(start))
+            assign_one(employee, structure, amount, start, mine)
+            out["created"] += 1
+        except Exception as exc:  # noqa: BLE001 - one person's problem must not stop the others
+            out["failed"].append({"employee": employee, "reason": str(exc)[:160]})
+    frappe.db.commit()
+    return out
 
 
 @frappe.whitelist(methods=["POST"])

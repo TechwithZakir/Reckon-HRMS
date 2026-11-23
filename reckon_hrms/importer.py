@@ -15,11 +15,23 @@ from datetime import date, datetime
 TEMPLATE_COLUMNS = [
     "first_name", "last_name", "gender", "date_of_birth", "date_of_joining", "cell_number",
     "department", "designation", "branch", "grade", "employment_type", "company",
+    "gross_salary", "salary_structure",
 ]
+MAX_GROSS = 10_000_000
 REQUIRED = ["first_name", "gender", "date_of_birth", "date_of_joining", "department", "designation"]
 GENDERS = {"male", "female", "other"}
 DATE_FORMATS = ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d %b %Y", "%d %B %Y")
 PHONE_RE = re.compile(r"^01[3-9]\d{8}$")  # Bangladesh mobile numbers: 11 digits starting 013-019
+
+
+def parse_amount(text) -> float | None:
+    """A monthly amount such as ``45,000`` or ``45000.50``; None when it is not a positive number in range."""
+    cleaned = re.sub(r"[,\s]", "", str(text or ""))
+    try:
+        value = float(cleaned)
+    except ValueError:
+        return None
+    return round(value, 2) if 0 < value <= MAX_GROSS else None
 
 
 def template_csv() -> str:
@@ -83,6 +95,20 @@ def check_rows(rows: list[dict], known: dict[str, set[str]], today: date | None 
                 fix = suggest(value, sorted(known.get(field, set())))
                 text = f"{field.replace('_', ' ').capitalize()} '{value}' not found."
                 problems.append((field, text + (f" Did you mean '{fix}'?" if fix else " Add it in section 2 first.")))
+
+        gross_text = (row.get("gross_salary") or "").strip()
+        structure = (row.get("salary_structure") or "").strip()
+        if gross_text:
+            if parse_amount(gross_text) is None:
+                problems.append(("gross_salary", "Gross salary must be a monthly amount above 0, for example 45000."))
+            elif structure:
+                if structure not in known.get("salary_structure", set()):
+                    fix = suggest(structure, sorted(known.get("salary_structure", set())))
+                    problems.append(("salary_structure", f"Salary structure '{structure}' not found." + (f" Did you mean '{fix}'?" if fix else "")))
+            elif not known.get("structure_default"):
+                problems.append(("salary_structure", "Add a salary_structure column: your company has more than one salary structure, or none yet."))
+        elif structure:
+            problems.append(("gross_salary", "A salary structure needs the gross salary of the person."))
 
         if problems:
             field, message = problems[0]

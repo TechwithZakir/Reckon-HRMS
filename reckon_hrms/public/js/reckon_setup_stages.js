@@ -256,8 +256,16 @@ window.ReckonSetupStages.salary = function (parent) {
 		<div class="rhs-card"><h2>Salary structures <span class="rhs-map">Salary Structure</span></h2>
 			<table class="rhs-table"><thead><tr><th>Name</th><th>Pay</th><th>Active</th><th>People</th></tr></thead><tbody id="structs"></tbody></table>
 			<div class="rhs-row"><a class="rhc-ico" href="/app/salary-structure/new" title="Add new" aria-label="Add new salary structure">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("add", "sm") : "+")}</a><a class="rhc-ico" href="/app/salary-structure" title="Open the list" aria-label="Open the salary structures list">${(frappe.utils && frappe.utils.icon ? frappe.utils.icon("list", "sm") : "≡")}</a></div></div>
-		<div class="rhs-card"><h2>Give a salary structure to everyone without one <span class="rhs-map">Salary Structure Assignment</span></h2>
-			<div class="rhs-muted">Each person without a structure gets the one you pick, from the date you choose (the 1st of this month, so this month's salary can be run). People who already have it are skipped.</div>
+		<div class="rhs-card"><h2>Each person's gross salary <span class="rhs-map">Salary Structure Assignment</span></h2>
+			<div class="rhs-muted">Use this when people are paid different amounts. They share your salary structure; each person's gross is the base the structure's percentages work from. A change starts from the date you pick and earlier salary slips stay as they were. You can also load a CSV with the columns <b>employee</b> (ID), <b>gross</b> and optionally <b>structure</b>.</div>
+			<div class="rhs-row"><input id="gsSearch" type="search" placeholder="Search name or job title"><label>From <input id="gsDate" type="date"></label>
+			<label class="rhs-btn">Load CSV <input id="gsFile" type="file" accept=".csv" style="display:none"></label></div>
+			<table class="rhs-table"><thead><tr><th>Person</th><th>Salary structure</th><th>Gross per month (<span data-cur>৳</span>)</th></tr></thead><tbody id="gsRows"><tr><td colspan="3" class="rhs-muted">Loading…</td></tr></tbody></table>
+			<div class="rhs-row"><button class="rhs-btn" id="gsPrev" type="button">Previous</button><span class="rhs-muted" id="gsPage"></span><button class="rhs-btn" id="gsNext" type="button">Next</button>
+			<button class="rhs-btn rhs-pri" id="gsSave" type="button">Save changed salaries</button></div>
+			<div id="gsOut" class="rhs-muted" style="margin-top:10px"></div></div>
+		<div class="rhs-card"><h2>Give everyone without a structure the same gross <span class="rhs-map">Salary Structure Assignment</span></h2>
+			<div class="rhs-muted">Only for people paid the same. Each person without a structure gets the one you pick, from the date you choose (the 1st of this month, so this month's salary can be run). People who already have it are skipped.</div>
 			<div class="rhs-row"><label>Salary structure <select id="bkStruct"></select></label>
 			<label>Base salary (<span data-cur>৳</span>) <input id="bkBase" type="number" min="1" step="500" value="60000"></label>
 			<label>From <input id="bkDate" type="date"></label></div>
@@ -271,6 +279,68 @@ window.ReckonSetupStages.salary = function (parent) {
 		frappe.call({ method: "reckon_hrms.api.salary.list_structures", args: { company }, type: "GET" }).then((r) => {
 			root.find("#bkStruct").html(r.message.rows.map((x) => `<option value="${esc(x.name)}">${esc(x.name)}</option>`).join(""));
 		});
+		// Each person's own gross: one table, only changed rows are sent.
+		const gs = { start: 0, size: 25, total: 0, structures: [], edits: {} };
+		const gsBox = root.find("#gsRows");
+		root.find("#gsDate").val(moment().startOf("month").format("YYYY-MM-DD"));
+		const gsLoad = () => frappe.call({ method: "reckon_hrms.api.salary.employee_pay", type: "GET",
+			args: { start: gs.start, page_length: gs.size, search: root.find("#gsSearch").val() || "" } }).then((r) => {
+			const d = r.message;
+			gs.total = d.total; gs.structures = d.structures;
+			if (d.currency) root.find("[data-cur]").text(d.currency);
+			gsBox.html(d.rows.length ? d.rows.map((x) => {
+				const e = gs.edits[x.name] || {};
+				const structure = e.structure != null ? e.structure : (x.structure || (d.structures.length === 1 ? d.structures[0] : ""));
+				const gross = e.gross != null ? e.gross : (x.base || "");
+				return `<tr data-emp="${esc(x.name)}" data-was-s="${esc(x.structure)}" data-was-g="${esc(x.base)}"><td>${esc(x.employee_name)}<div class="rhs-muted" style="font-size:12px">${esc(x.designation || "")}</div></td>
+					<td><select class="gs-s"><option value="">Choose…</option>${d.structures.map((n) => `<option ${n === structure ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></td>
+					<td><input class="gs-g" type="number" min="0" step="500" value="${esc(gross)}"></td></tr>`;
+			}).join("") : `<tr><td colspan="3" class="rhs-muted">No active people found.</td></tr>`);
+			const last = Math.min(gs.start + gs.size, gs.total);
+			root.find("#gsPage").text(gs.total ? `${gs.start + 1}–${last} of ${gs.total}` : "");
+			root.find("#gsPrev").prop("disabled", gs.start === 0);
+			root.find("#gsNext").prop("disabled", last >= gs.total);
+		});
+		gsBox.on("input change", "tr[data-emp]", function () {
+			const tr = $(this);
+			gs.edits[tr.data("emp")] = { structure: tr.find(".gs-s").val(), gross: tr.find(".gs-g").val() };
+		});
+		root.find("#gsPrev").on("click", () => { gs.start = Math.max(0, gs.start - gs.size); gsLoad(); });
+		root.find("#gsNext").on("click", () => { gs.start += gs.size; gsLoad(); });
+		let gsTimer = null;
+		root.find("#gsSearch").on("input", () => { clearTimeout(gsTimer); gsTimer = setTimeout(() => { gs.start = 0; gsLoad(); }, 300); });
+		root.find("#gsFile").on("change", function () {
+			const file = this.files && this.files[0];
+			if (!file) return;
+			const reader = new FileReader();
+			reader.onload = () => {
+				const lines = String(reader.result).split(/\r?\n/).filter((l) => l.trim());
+				const head = lines.shift().split(",").map((h) => h.trim().toLowerCase());
+				const at = (n) => head.indexOf(n);
+				if (at("employee") < 0 || at("gross") < 0) { root.find("#gsOut").html(`<span class="rhs-err">The file needs the columns employee and gross.</span>`); return; }
+				lines.forEach((l) => {
+					const c = l.split(",").map((x) => x.trim());
+					gs.edits[c[at("employee")]] = { structure: at("structure") >= 0 ? c[at("structure")] : (gs.structures.length === 1 ? gs.structures[0] : ""), gross: c[at("gross")] };
+				});
+				root.find("#gsOut").text(`${lines.length} rows loaded from the file. Press Save changed salaries to apply them.`);
+				gsLoad();
+			};
+			reader.readAsText(file);
+			this.value = "";
+		});
+		root.find("#gsSave").on("click", () => {
+			const rows = Object.entries(gs.edits).filter(([, e]) => e.gross !== "" && e.gross != null)
+				.map(([employee, e]) => ({ employee, structure: e.structure, gross: e.gross })).slice(0, 100);
+			if (!rows.length) { root.find("#gsOut").text("Nothing changed yet."); return; }
+			frappe.call({ method: "reckon_hrms.api.salary.set_gross", args: { rows, from_date: root.find("#gsDate").val() } }).then((r) => {
+				const o = r.message;
+				rows.forEach((x) => { if (!o.failed.some((f) => f.employee === x.employee)) delete gs.edits[x.employee]; });
+				root.find("#gsOut").html(`${o.created} saved, ${o.unchanged} already the same.` + (o.failed.length ? `<div class="rhs-err">${o.failed.map((f) => esc(f.employee + ": " + f.reason)).join("<br>")}</div>` : ""));
+				gsLoad();
+			}).catch((e) => root.find("#gsOut").html(`<span class="rhs-err">${esc((e && e.message) || "Could not save.")}</span>`));
+		});
+		gsLoad();
+
 		let poll = null;
 		const showProgress = (s) => {
 			const line = s.state === "done"
