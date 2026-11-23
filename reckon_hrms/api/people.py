@@ -40,11 +40,12 @@ def list_employees() -> list[dict]:
 
 @frappe.whitelist(methods=["GET"])
 def filter_options() -> dict:
-    """Branches, departments, job titles and levels a payroll run may filter by: this company's own and the standard ones."""
+    """Offices, departments, job titles and levels a payroll run may filter by: offices and departments are this company's own; titles and levels also include the standard ones."""
     frappe.only_for(LIST_ROLES)
     out = {}
     for doctype in ("Branch", "Department", "Designation", "Employee Grade"):
-        filters = {"company": _company()} if doctype == "Department" else shared_or_own(doctype)
+        # Offices and departments belong to one company; only job titles and levels have standard ones shared by all.
+        filters = {"company": _company()} if doctype in ("Branch", "Department") else shared_or_own(doctype)
         out[doctype] = frappe.get_all(doctype, filters=filters, pluck="name", order_by="name asc", limit_page_length=100)
     return out
 
