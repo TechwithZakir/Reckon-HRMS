@@ -472,8 +472,24 @@ class PayrollInterviewPageTests(unittest.TestCase):
         self.js = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "public" / "js" / "reckon_guided_setup.js").read_text(encoding="utf-8")
 
     def test_the_payroll_tab_has_the_ask_ai_card_and_an_interview_that_opens_when_hr_is_done(self):
-        for needle in ("Guided payroll setup with Ask AI", 'interview(root, "payroll", $())', "Payroll setup interview", "data.hr_ready"):
+        for needle in ('interview(root, "payroll", $())', "data.hr_ready"):
             self.assertIn(needle, self.js)
+
+    def test_both_studios_put_the_setup_interview_first_and_use_the_same_ask_ai_card(self):
+        hr = self.js[self.js.index("window.ReckonGuidedSetup = function"):]
+        self.assertLess(hr.index("data-ask-main"), hr.index("data-interview"))
+        self.assertLess(hr.index("data-interview"), hr.index("data-review"))
+        self.assertLess(hr.index("data-review"), hr.index("data-more"))
+        payroll = self.js[self.js.index("function payrollPanel"): self.js.index("window.ReckonGuidedSetup = function")]
+        self.assertLess(payroll.index("data-ask>"), payroll.index("data-interview"))
+        self.assertLess(payroll.index("data-interview"), payroll.index("data-groups"))
+        # the same heading and button wording in both
+        self.assertEqual(payroll.count("Guided setup with Ask AI"), 1)
+        self.assertIn("✦ Ask AI to set it up for me", payroll)
+        self.assertNotIn("Ask AI to set up payroll", self.js)
+
+    def test_the_payroll_button_always_starts_the_chat_so_the_agent_explains_what_comes_first(self):
+        self.assertIn('root.on("click", "[data-ask]", () => window.ReckonStudioAsk("payroll"));', self.js)
 
     def test_each_studio_asks_only_its_own_questions(self):
         self.assertIn('(studio === "payroll" ? x.studio === "payroll" : x.studio !== "payroll")', self.js)

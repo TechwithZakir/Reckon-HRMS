@@ -203,14 +203,13 @@
 	// ---- Payroll Studio: the salary process in the order HRMS needs it. What HR Studio owns is shown as a status with a link.
 	function payrollPanel(parent) {
 		const root = $(`<div class="rgs">${STYLE}
-			<div class="rgs-card"><h2><span class="rgs-spark">✦</span> Guided payroll setup with Ask AI</h2>
-				<div class="rgs-muted">Ask AI asks you the questions in the chat, one at a time (the salary structure, then the late and early deduction rule), and then sets them up for you. Nothing is created until you confirm. You can also answer the same questions below. People, places, holidays, working hours and leave belong to HR Studio, so they are only shown, never asked again.</div>
-				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-ask>✦ Ask AI to set up payroll</button>
-					<button type="button" class="btn btn-default btn-sm" data-refresh>Refresh</button></div></div>
-			<div data-groups></div>
-			<div class="rgs-card" data-interview hidden><h2>Payroll setup interview</h2>
-				<div class="rgs-muted">Answer what you know, then review one plan before anything is created. Your existing structure and rule are filled in, and each question links to the page that edits them.</div>
-				<div data-stepper></div><div data-plan></div></div></div>`).appendTo(parent);
+			<div class="rgs-card"><h2><span class="rgs-spark">✦</span> Guided setup with Ask AI</h2>
+				<div class="rgs-muted">Ask AI asks you the questions in the chat, one at a time (the salary structure, then the late and early deduction rule), and then sets everything up for you. Nothing is created until you confirm. You can also answer the same questions below. People, places, holidays, working hours and leave belong to HR Studio, so they are only shown, never asked again.</div>
+				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-ask>✦ Ask AI to set it up for me</button></div></div>
+			<div class="rgs-card" data-interview hidden><h2>Setup interview</h2>
+				<div class="rgs-muted">Ask AI asks one question at a time, from the salary structure to the late and early deduction rule. Answer what you know, skip the rest, then review one plan before anything is created. Your existing structure and rule are filled in, and each question links to the page that edits them.</div>
+				<div data-stepper></div><div data-plan></div></div>
+			<div data-groups></div></div>`).appendTo(parent);
 		const $groups = root.find("[data-groups]");
 		let data = null;
 		const slug = (dt) => frappe.router.slug(dt);
@@ -248,7 +247,7 @@
 		root.on("click", "[data-refresh]", load);
 		root.on("rgs:refresh", load);
 		root.on("click", "[data-hr-first]", () => { frappe.route_options = { stage: "guided" }; frappe.set_route("reckon-hrms-hr-studio"); });
-		root.on("click", "[data-ask]", () => (data && !data.hr_ready ? $groups.find("[data-hr-first]").trigger("click") : window.ReckonStudioAsk("payroll")));
+		root.on("click", "[data-ask]", () => window.ReckonStudioAsk("payroll"));
 		root.on("click", "[data-act]", function () {
 			const [key, i] = this.dataset.act.split(":");
 			const action = data.groups.flatMap((g) => g.rows).find((r) => r.key === key).actions[Number(i)];
@@ -286,17 +285,17 @@
 					? "Ask AI asks you the questions in the chat, one at a time, and then sets up your pay items and salary structure for you. It never invents amounts."
 					: "Ask AI asks you the questions in the chat, one at a time (country, language, locations, departments and more), and then sets everything up for you. Nothing is created until you confirm."} You can also answer the same questions below.</div>
 				<div class="rgs-row"><button type="button" class="btn btn-primary btn-sm" data-ask-main>✦ Ask AI to set it up for me</button></div></div>
+			<div class="rgs-card" data-interview><h2>Setup interview</h2>
+				<div class="rgs-muted">Ask AI asks one question at a time, from your country to your leave days. Answer what you know, skip the rest, then review one plan before anything is created. Ask AI never makes up amounts, dates or leave days.</div>
+				<div data-stepper></div>
+				<div data-plan></div></div>
 			<div data-review></div>
-			<details data-more open class="rgs-more"><summary class="rgs-sum">Choose or change your industry, or answer the setup questions</summary>
+			<details data-more open class="rgs-more"><summary class="rgs-sum">Choose or change your industry template</summary>
 			<div class="rgs-card"><h2>Your industry</h2>
 				<div class="rgs-muted" data-now>Loading…</div>
 				<div class="rgs-row"><select class="form-control" data-sel aria-label="Industry" style="flex:1 1 260px;max-width:420px"><option value="">Choose an industry</option></select>
 					<button type="button" class="btn btn-default btn-sm" data-ask-industry>✦ Which one fits me?</button></div>
-				<div data-preview></div></div>
-			<div class="rgs-card" data-interview><h2>Setup interview</h2>
-				<div class="rgs-muted">Ask AI asks one question at a time, from your country to your salary structure. Answer what you know, skip the rest, then review one plan before anything is created. Ask AI never makes up amounts, dates or leave days.</div>
-				<div data-stepper></div>
-				<div data-plan></div></div></div></details></div>`).appendTo(parent);
+				<div data-preview></div></div></details></div>`).appendTo(parent);
 
 		const $now = root.find("[data-now]");
 		const $sel = root.find("[data-sel]");
