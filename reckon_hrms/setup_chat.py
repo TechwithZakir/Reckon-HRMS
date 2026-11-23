@@ -47,6 +47,35 @@ LEAVE_WORDS = (("leave_casual", r"casual"), ("leave_sick", r"sick"), ("leave_ear
 NUM = r"(\d+(?:\.\d+)?)"
 
 
+# What each question's reply is rewritten to when the AI helps. The same reader then checks it.
+CANON_FORMAT = {
+    "country": "the country's full name only, for example: Bangladesh",
+    "language": "either English or Bangla",
+    "locations": "the place names only, separated by commas, for example: Head Office, Dhaka Factory",
+    "industry": "one short phrase for what the company does, for example: garment factory",
+    "extra_departments": "the department names only, separated by commas, for example: Sales, Accounts, Production",
+    "extra_titles": "the job titles only, separated by commas, for example: Manager, Supervisor, Operator",
+    "weekly_off": "the weekday names, for example: Friday, Saturday",
+    "holidays": "one holiday per line as YYYY-MM-DD then the name, for example: 2026-03-26 Independence Day. Only dates the reply states",
+    "shift": "a shift name with start and end time and optional grace, for example: General Shift 09:00 to 17:30, grace 10 minutes",
+    "leave": "days per year by type, for example: casual 10, sick 14, earned 18, maternity 112. Only types the reply states",
+    "structure": "a name then percents and amounts, for example: Standard, basic 60, house rent 20, medical 1500, conveyance 1000",
+    "rules": "for example: every 3 marks = 1 day, divided by 30, cap 0",
+}
+LIST_KEYS = ("locations", "extra_departments", "extra_titles")
+
+
+def _sentence_like(text: str) -> bool:
+    """A sentence rather than a list: many words and no commas, or a clear sentence opener."""
+    words = text.split()
+    return (len(words) > 5 and "," not in text and "\n" not in text) or bool(re.match(r"(we|our|i|my|there|it|the)\b", text.strip(), re.IGNORECASE) and len(words) > 3)
+
+
+def _looks_like_question(text: str) -> bool:
+    low = text.casefold().strip()
+    return low.endswith("?") or bool(re.match(r"(what|why|how|which|who|when|where|explain|tell me|can i|should i|do i|does)\b", low))
+
+
 def _steps(env: dict) -> list[str]:
     return env.get("steps") or STEPS
 
@@ -339,6 +368,60 @@ def _confirmed(text: str) -> bool:
     return low in YES or low.startswith("yes")
 
 
+def _read(key: str, text: str, env: dict, answers: dict):
+    """Read one reply for one question: ``(value, error, special)``. Nothing is guessed."""
+    value, error = None, None
+    low = text.casefold().strip()
+    if key == "country":
+        picked, error = _pick_country(text, env["countries"])
+        value = {"country": picked} if picked else None
+    elif key == "language":
+        if re.search(r"bangla|bengali|\bbn\b|বাংলা", low):
+            value = {"language": "bn"}
+        elif re.search(r"english|\ben\b", low):
+            value = {"language": "en"}
+        else:
+            error = "Please choose English or Bangla."
+    elif key == "locations":
+        names = sp.split_names(text)
+        value, error = ({"locations": ", ".join(names)}, None) if names else (None, "Give one or more names, separated by commas, or say skip.")
+    elif key == "industry":
+        picked, error = _pick_industry(text, env["industries"])
+        value = {"industry": picked} if picked else None
+        if error:
+            error = "I could not tell which industry fits. Choose one below, or describe what your company does."
+    elif key in ("extra_departments", "extra_titles"):
+        names = sp.split_names(text)
+        value, error = ({key: ", ".join(names)}, None) if names else (None, "Give one or more names, separated by commas, or say skip.")
+    elif key == "weekly_off":
+        days, error = _parse_days(text, answers.get("country"))
+        value = {"weekly_off": days} if days else None
+    elif key == "holidays" and low in ("yes", "yes, add them", "add them", "yes please", "y", "ok") and answers.get("country"):
+        value = {"holidays_country": "1"}
+    elif key == "holidays" and "list my own" in low:
+        return None, None, "own_list"
+    elif key == "holidays":
+        rows, unread = sp.parse_holidays(text, env["year"])
+        if unread and env.get("ai_holidays"):
+            lines = env["ai_holidays"]("\n".join(unread))
+            more, unread = sp.parse_holidays("\n".join(lines), env["year"]) if lines else ([], unread)
+            rows = rows + more
+        if rows and not unread:
+            value = {"holidays": "\n".join(f"{h['date']} {h['name']}" for h in rows)}
+        else:
+            error = ("I could not read these lines: " + "; ".join(unread[:4]) + f". Please write each as date then name, for example {env['year']}-03-26 Independence Day.") if unread else \
+                f"Please write each holiday as date then name, for example {env['year']}-03-26 Independence Day."
+    elif key == "shift":
+        value, error = _parse_shift(text)
+    elif key == "leave":
+        value, error = _parse_leave(text)
+    elif key == "rules":
+        value, error = _parse_rules(text)
+    elif key == "structure":
+        value, error = _parse_structure(text, env.get("current", {}).get("structure_name", ""))
+    return value, error, None
+
+
 def turn(message: str, state, env: dict) -> dict:
     """One chat turn. ``env`` keys: countries, industries, year, current_country, build_plan(answers), apply(answers), ai_holidays(text)."""
     st = _clean_state(state)
@@ -453,6 +536,11 @@ def turn(message: str, state, env: dict) -> dict:
     if link:
         question, replies = _question(st["idx"], env, answers)
         return out(f"You can open {link} any time. Back to the setup:\n\n{question}", replies)
+    if env.get("ai_answer") and _looks_like_question(text):
+        said = env["ai_answer"](text, TITLES.get(key, key))
+        if said:
+            question, replies = _question(st["idx"], env, answers)
+            return out(f"{said}\n\nBack to the setup:\n\n{question}", replies)
     if low in SKIP:
         for k in STEP_KEYS.get(key, ()):
             answers.pop(k, None)
@@ -461,54 +549,18 @@ def turn(message: str, state, env: dict) -> dict:
         st["idx"] = len(_steps(env)) if st.get("fixing") else st["idx"] + 1
         return ask_next()
 
-    value, error = None, None
-    if key == "country":
-        picked, error = _pick_country(text, env["countries"])
-        value = {"country": picked} if picked else None
-    elif key == "language":
-        if re.search(r"bangla|bengali|\bbn\b|বাংলা", low):
-            value = {"language": "bn"}
-        elif re.search(r"english|\ben\b", low):
-            value = {"language": "en"}
-        else:
-            error = "Please choose English or Bangla."
-    elif key == "locations":
-        names = sp.split_names(text)
-        value, error = ({"locations": ", ".join(names)}, None) if names else (None, "Give one or more names, separated by commas, or say skip.")
-    elif key == "industry":
-        picked, error = _pick_industry(text, env["industries"])
-        value = {"industry": picked} if picked else None
-        if error:
-            error = "I could not tell which industry fits. Choose one below, or describe what your company does."
-    elif key in ("extra_departments", "extra_titles"):
-        names = sp.split_names(text)
-        value, error = ({key: ", ".join(names)}, None) if names else (None, "Give one or more names, separated by commas, or say skip.")
-    elif key == "weekly_off":
-        days, error = _parse_days(text, answers.get("country"))
-        value = {"weekly_off": days} if days else None
-    elif key == "holidays" and low in ("yes", "yes, add them", "add them", "yes please", "y", "ok") and answers.get("country"):
-        value = {"holidays_country": "1"}
-    elif key == "holidays" and "list my own" in low:
+    value, error, special = _read(key, text, env, answers)
+    if special == "own_list":
         return out(f"Type your holidays, one per line, date first. For example: {env['year']}-03-26 Independence Day. I will not guess any dates.", ["skip"], choices=None)
-    elif key == "holidays":
-        rows, unread = sp.parse_holidays(text, env["year"])
-        if unread and env.get("ai_holidays"):
-            lines = env["ai_holidays"]("\n".join(unread))
-            more, unread = sp.parse_holidays("\n".join(lines), env["year"]) if lines else ([], unread)
-            rows = rows + more
-        if rows and not unread:
-            value = {"holidays": "\n".join(f"{h['date']} {h['name']}" for h in rows)}
-        else:
-            error = ("I could not read these lines: " + "; ".join(unread[:4]) + f". Please write each as date then name, for example {env['year']}-03-26 Independence Day.") if unread else \
-                f"Please write each holiday as date then name, for example {env['year']}-03-26 Independence Day."
-    elif key == "shift":
-        value, error = _parse_shift(text)
-    elif key == "leave":
-        value, error = _parse_leave(text)
-    elif key == "rules":
-        value, error = _parse_rules(text)
-    elif key == "structure":
-        value, error = _parse_structure(text, env.get("current", {}).get("structure_name", ""))
+    # The AI rewrites a reply the plain reader cannot use (or a sentence given for a list) into the exact short form, and the
+    # same reader checks it: the AI never writes an answer of its own.
+    ai_text = env.get("ai_text")
+    if ai_text and key in CANON_FORMAT and (error or not value or (key in LIST_KEYS and _sentence_like(text))):
+        rewritten = ai_text(key, text, CANON_FORMAT[key])
+        if rewritten:
+            value2, error2, special2 = _read(key, rewritten, env, answers)
+            if value2 and not special2:
+                value, error = value2, None
     if error or not value:
         question, replies = _question(st["idx"], env, answers)
         return out(f"{error or 'I could not read that.'}\n\n{question}", replies)

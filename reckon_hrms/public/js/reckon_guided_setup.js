@@ -19,7 +19,8 @@
 	};
 	// "Ask AI" starts the setup agent in the chat: it asks the questions there and sets everything up itself.
 	window.ReckonStudioAsk = function (studio) {
-		if (window.aura && window.aura.start_agent) window.aura.start_agent("hrms_setup");
+		// Payroll Studio starts the payroll flow (which first says if HR setup must be finished), HR Studio the HR one.
+		if (window.aura && window.aura.start_agent) window.aura.start_agent("hrms_setup", studio === "payroll" ? "start payroll" : "start");
 		else askAi(STUDIO_ASK[studio] || STUDIO_ASK.hr);
 	};
 

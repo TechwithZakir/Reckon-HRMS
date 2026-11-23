@@ -260,6 +260,18 @@ def _ai_json(prompt: str, user: str, max_tokens: int = 700):
         return None
 
 
+def _ai_text(system: str, user: str, max_tokens: int = 400):
+    """One plain-text answer from the company's AI, or None when AI is off, over its daily limit, or fails."""
+    ready = _ai_ready()
+    if not ready:
+        return None
+    aura, settings = ready
+    try:
+        return (aura._complete(settings, system, user, max_tokens=max_tokens, quiet=True) or "").strip() or None
+    except Exception:  # noqa: BLE001 - AI is optional; the plain reader carries on
+        return None
+
+
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=30, seconds=60 * 60)
 def prepare(answers) -> dict:

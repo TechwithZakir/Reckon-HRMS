@@ -27,6 +27,28 @@ def _env(company: str) -> dict:
             "Return only the array. Never invent a holiday that is not in the text.", text)
         return setup_plan.parse_ai_holidays(rows, setup_plan.normalize_answers({})["year"])
 
+    def ai_text(key, text, fmt):
+        system = ("Rewrite the user's reply to a setup question into this exact short form: " + fmt + ". Return only the rewritten text, "
+                  "with no explanation. If the reply does not state the information, return exactly NONE. Never add a value the reply does not state.")
+        out = ai_setup._ai_text(system, text[:1500], 200)
+        return None if not out or out.strip().upper().startswith("NONE") else out.strip("`").strip()
+
+    def ai_answer(question, step_title):
+        ready = ai_setup._ai_ready()
+        if not ready:
+            return None
+        aura, settings = ready
+        try:
+            aura._consume_daily_ask_quota(settings)
+            guides = "".join(f"\n\n<support_guide module=\"{g['id']}\">\n{c}\n</support_guide>"
+                             for g, c in aura._get_support_skills(question, "reckon-hrms/reckon-hrms-hr-studio"))
+            system = (aura._ask_system_prompt(settings) + "\n\nThe person is in the middle of the ReckonERP HR setup interview, on the step "
+                      f"'{step_title}'. Answer their question in at most four short sentences, in plain words. Do not ask a question and do not say "
+                      "you changed anything: the interview carries on by itself afterwards.")
+            return (aura._complete(settings, system, f"Question: {question[:600]}{guides}", max_tokens=400, quiet=True) or "").strip() or None
+        except Exception:  # noqa: BLE001 - a failing AI must not stop the interview
+            return None
+
     cur = ai_setup.read_current(company)
     from reckon_hrms.setup_review import hr_pending
 
@@ -40,6 +62,8 @@ def _env(company: str) -> dict:
         "current_country": frappe.db.get_value("Company", company, "country") or "",
         "country_holiday_count": lambda country: ai_setup.country_holiday_count(country, setup_plan.normalize_answers({})["year"]),
         **{"current": cur["answers"], "current_industry": cur["industry"]},
+        "ai_text": ai_text,
+        "ai_answer": ai_answer,
         "build_plan": build_plan,
         "apply": ai_setup.run_setup,
         "ai_holidays": ai_holidays,

@@ -505,3 +505,89 @@ class PayrollInterviewPageTests(unittest.TestCase):
     def test_the_rule_question_has_a_one_tap_standard_and_an_edit_link(self):
         self.assertIn("data-standard-rule", self.js)
         self.assertIn('rules: ["Company", LINKS.company]', self.js)
+
+
+class SmartReplyTests(unittest.TestCase):
+    """With the AI on, the agent understands sentences and answers questions; the plain reader still checks every answer."""
+
+    def env(self, ai_text=None, ai_answer=None):
+        env = make_env()
+        env["current"] = {}
+        if ai_text:
+            env["ai_text"] = ai_text
+        if ai_answer:
+            env["ai_answer"] = ai_answer
+        return env
+
+    def at(self, key, env):
+        r = say("start", None, env)
+        r["state"]["idx"] = sc.STEPS.index(key)
+        return r
+
+    def test_a_sentence_for_a_list_is_rewritten_by_the_ai_then_read_by_the_normal_reader(self):
+        seen = []
+
+        def ai_text(key, text, fmt):
+            seen.append((key, fmt))
+            return "Head Office, Dhaka Factory, Khulna Depot"
+
+        env = self.env(ai_text)
+        r = self.at("locations", env)
+        r = say("we have our head office, a factory in Dhaka and a depot in Khulna", {**r["state"], "idx": sc.STEPS.index("locations")}, env)
+        self.assertEqual(r["state"]["answers"]["locations"], "Head Office, Dhaka Factory, Khulna Depot")
+        self.assertEqual(seen[0][0], "locations")
+        self.assertIn("Head Office", seen[0][1])
+
+    def test_a_plain_list_never_goes_to_the_ai(self):
+        called = []
+        env = self.env(lambda *a: called.append(a))
+        r = self.at("locations", env)
+        say("Head Office, Dhaka Factory", {**r["state"], "idx": sc.STEPS.index("locations")}, env)
+        self.assertEqual(called, [])
+
+    def test_a_reply_the_plain_reader_cannot_use_is_rewritten_then_checked_again(self):
+        env = self.env(lambda key, text, fmt: "casual 10, sick 14")
+        r = self.at("leave", env)
+        r = say("ten days of casual and fourteen sick leave a year", {**r["state"], "idx": sc.STEPS.index("leave")}, env)
+        self.assertEqual((r["state"]["answers"]["leave_casual"], r["state"]["answers"]["leave_sick"]), ("10", "14"))
+
+    def test_the_ai_cannot_put_a_value_in_that_the_reader_rejects(self):
+        env = self.env(lambda key, text, fmt: "every 99 marks, divided by 30")
+        r = say("start payroll", None, env)
+        r = say("basic 60", r["state"], env)
+        self.assertEqual(r["state"]["idx"], 1)  # now on the deduction rule
+        r = say("something vague", r["state"], env)
+        self.assertNotIn("rule_marks", r["state"]["answers"])
+        self.assertEqual(r["state"]["idx"], 1)
+        self.assertIn("Give both numbers", r["reply"])
+
+    def test_the_ai_saying_none_leaves_the_normal_error(self):
+        env = self.env(lambda key, text, fmt: None)
+        r = self.at("leave", env)
+        r = say("many days", {**r["state"], "idx": sc.STEPS.index("leave")}, env)
+        self.assertIn("Give the days per year", r["reply"])
+        self.assertEqual(r["state"]["idx"], sc.STEPS.index("leave"))
+
+    def test_a_question_in_the_middle_is_answered_and_the_question_is_asked_again(self):
+        env = self.env(ai_answer=lambda q, step: f"House rent allowance is part of pay. ({step})")
+        r = self.at("weekly_off", env)
+        r = say("what is the usual weekly off in Bangladesh?", {**r["state"], "idx": sc.STEPS.index("weekly_off")}, env)
+        self.assertIn("House rent allowance is part of pay. (Weekly off)", r["reply"])
+        self.assertIn("Back to the setup", r["reply"])
+        self.assertIn("weekly off", r["reply"].lower())
+        self.assertEqual(r["state"]["idx"], sc.STEPS.index("weekly_off"))
+        self.assertNotIn("weekly_off", r["state"]["answers"])
+
+    def test_without_ai_a_question_is_read_as_an_answer_attempt_as_before(self):
+        env = self.env()
+        r = self.at("leave", env)
+        r = say("how many days?", {**r["state"], "idx": sc.STEPS.index("leave")}, env)
+        self.assertIn("Give the days per year", r["reply"])
+
+
+class StudioStartTests(unittest.TestCase):
+    def test_the_payroll_studio_starts_the_payroll_flow_not_the_hr_one(self):
+        from pathlib import Path
+
+        js = (Path(__file__).resolve().parents[1] / "reckon_hrms" / "public" / "js" / "reckon_guided_setup.js").read_text(encoding="utf-8")
+        self.assertIn('window.aura.start_agent("hrms_setup", studio === "payroll" ? "start payroll" : "start")', js)
