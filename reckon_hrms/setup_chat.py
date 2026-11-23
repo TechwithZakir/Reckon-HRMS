@@ -17,7 +17,8 @@ STEPS = ["country", "language", "locations", "industry", "extra_departments", "e
          "shift", "leave"]
 TITLES = {"country": "Country", "language": "Language", "locations": "Locations", "industry": "Industry",
           "extra_departments": "Departments", "extra_titles": "Job titles", "weekly_off": "Weekly off", "holidays": "Public holidays",
-          "shift": "Working hours", "leave": "Leave days", "structure": "Salary structure", "rules": "Late and early deduction rule"}
+          "shift": "Working hours", "leave": "Leave days", "structure": "Salary structure", "rules": "Late and early deduction rule",
+          "pay_amounts": "Pay amounts"}
 # The answer keys each step owns: skipping or redoing a step clears them, so a half-answer never lingers in the plan.
 STEP_KEYS = {
     "country": ("country",), "language": ("language",), "locations": ("locations",), "industry": ("industry",),
@@ -26,6 +27,7 @@ STEP_KEYS = {
     "leave": ("leave_casual", "leave_sick", "leave_earned", "leave_maternity"),
     "structure": ("structure_name", "basic_pct", "hra_pct", "medical_amount", "conveyance_amount"),
     "rules": ("rule_marks", "rule_divisor", "rule_cap"),
+    "pay_amounts": ("pay_mode",),
 }
 # A plan step belongs to the question that fixes it.
 PLAN_STEP_TO_QUESTION = {"departments": "extra_departments", "titles": "extra_titles"}
@@ -40,7 +42,7 @@ GROSS_ADVICE = ("When people are paid different amounts, keep **one salary struc
                 "(and `salary_structure`) columns when you import employees. A raise is a new assignment from its date, so old slips stay as they were.")
 CHANGE_WORDS = re.compile(r"\b(change|edit|redo|fix|update|correct|go to|back to)\b", re.IGNORECASE)
 # The payroll flow asks only what belongs to payroll: HR Studio already owns people, places, holidays, hours and leave.
-PAYROLL_STEPS = ["structure", "rules"]
+PAYROLL_STEPS = ["structure", "rules", "pay_amounts"]
 PLAN_KEYS = {"hr": {"industry", "country", "language", "locations", "departments", "titles", "holidays", "shift", "leave"},
              "payroll": {"structure", "rules"}}
 SKIP = {"skip", "none", "no", "nothing", "n/a", "na", "pass", "না", "skip this"}
@@ -273,6 +275,9 @@ def _choices(key: str, env: dict, answers: dict):
         cur = {**env.get("current", {}), **answers}
         usual = set(cur.get("weekly_off") or sp.suggest_weekly_off(cur.get("country")))
         return {"type": "multi", "options": [{"label": d, "value": d, "checked": d in usual} for d in sp.WEEKDAYS]}
+    if key == "pay_amounts":
+        return {"type": "single", "options": [{"label": "The same gross for everyone", "value": "same"},
+                                              {"label": "A different gross for each person", "value": "different"}]}
     if key == "rules":
         return {"type": "single", "options": [{"label": "Standard: every 3 marks = 1 day, pay / 30, no cap", "value": "every 3 marks, divided by 30, no cap"}]}
     if key == "holidays":
@@ -322,6 +327,8 @@ def _question_text(i: int, env, answers: dict) -> tuple[str, list[str]]:
         return head + "What are your working hours?** Give a shift name, start and end time.\nFor example: General Shift 09:00 to 17:30, grace 10 minutes.", ["skip"]
     if key == "leave":
         return head + "How many leave days per year for each type, by your policy?**\nFor example: casual 10, sick 14, earned 18, maternity 112. Leave out any type you do not want.", ["skip"]
+    if key == "pay_amounts":
+        return head + "Is everyone paid the same gross, or does each person have their own?** Choose one. This only decides what I point you to next: nothing is created for it.", ["skip"]
     if key == "rules":
         return head + "How should late entry and early exit be deducted?**\nEvery this many marks equal one day, a day's pay is base salary divided by a number, and an optional monthly cap.\nFor example: every 3 marks = 1 day, divided by 30, no cap.", ["skip"]
     return head + "How should the salary structure be built?**\nBasic and house rent as a percent of the gross, medical and conveyance as fixed monthly amounts.\nFor example: basic 60, house rent 20, medical 1500, conveyance 1000.", ["skip"]
@@ -340,6 +347,8 @@ def _echo(key: str, value: dict, env: dict) -> str:
     if key == "leave":
         names = {k: label for k, label in sp.LEAVE_QUESTIONS}
         return ", ".join(f"{names[k].replace(' Leave', '')} {v}" for k, v in value.items())
+    if key == "pay_amounts":
+        return "a different gross for each person" if value["pay_mode"] == "different" else "the same gross for everyone"
     if key == "rules":
         cap = value.get("rule_cap")
         return f"every {value['rule_marks']} marks = 1 day, pay / {value['rule_divisor']}" + (f", cap {cap}" if cap not in (None, "", "0") else ", no cap")
@@ -366,6 +375,16 @@ def _summary(plan: dict, flow: str = "hr") -> str:
             items = "; ".join(step["items"][:4])
         rows.append(f"{mark} **{step['title']}**: {items}" + (f"\n   _{step['note']}_" if step["status"] == "attention" and step["note"] else ""))
     return "\n".join(rows)
+
+
+def _pay_next(mode) -> str:
+    """What to do about amounts after the payroll setup, from the person's own answer."""
+    same = "everyone has the same gross, so use the \"same gross\" card on Payroll Studio > Salary rules to give your people the structure with that one amount."
+    if mode == "same":
+        return "\n\n**Pay amounts:** " + same
+    if mode == "different":
+        return "\n\n**Pay amounts:** " + GROSS_ADVICE
+    return "\n\n**Pay amounts:** if " + same + " If amounts differ: " + GROSS_ADVICE
 
 
 def _confirmed(text: str) -> bool:
@@ -420,6 +439,13 @@ def _read(key: str, text: str, env: dict, answers: dict):
         value, error = _parse_shift(text)
     elif key == "leave":
         value, error = _parse_leave(text)
+    elif key == "pay_amounts":
+        if re.search(r"differ|each|own|individual|vary|varies", low):
+            value = {"pay_mode": "different"}
+        elif re.search(r"same|equal|everyone|flat|one", low):
+            value = {"pay_mode": "same"}
+        else:
+            error = "Please choose: the same gross for everyone, or a different gross for each person."
     elif key == "rules":
         value, error = _parse_rules(text)
     elif key == "structure":
@@ -498,7 +524,7 @@ def turn(message: str, state, env: dict) -> dict:
         st = {"idx": first, "answers": {}, "phase": "ask", "started": True, "fixing": False, "flow": "payroll" if payroll else ""}
         answers = st["answers"]
         question, replies = _question(first, env, answers)
-        what = ("payroll for **%s** by asking two questions, the salary structure and the late and early deduction rule. "
+        what = ("payroll for **%s** by asking three questions: the salary structure, the late and early deduction rule, and whether everyone is paid the same gross. "
                 "People, places, holidays, hours and leave are set in HR Studio, so I will not ask about them again" % env["company"]
                 if payroll else "HR and payroll for **%s** by asking a few questions" % env["company"])
         return out(f"I will set up {what}, then do the setup for you. "
@@ -513,7 +539,7 @@ def turn(message: str, state, env: dict) -> dict:
             head = f"Done: {result['done']} steps set up" + (f", {result['failed']} failed" if result["failed"] else "") + "."
             return out(head + "\n\n" + "\n".join(lines) + "\n\nReview or edit any step here: Holiday List, Branch, Department, Designation, Shift Type, Salary Structure. "
                        "The Guided setup tab in HR Studio and Payroll Studio now shows each step with its own link. Next you can add your employees and give them the salary structure."
-                       + ("\n\n**Pay amounts:** if everyone has the same gross, use the \"same gross\" card on Payroll Studio > Salary rules. " + GROSS_ADVICE if flow_name() == "payroll" else ""), done=True)
+                       + (_pay_next(answers.get("pay_mode")) if flow_name() == "payroll" else ""), done=True)
         # Only a clear change request, or a step name on its own, reopens a step. A question or a request for a page does not.
         for i, key in enumerate(_steps(env)):
             named = TITLES[key].casefold() == low or key.replace("_", " ") == low or (CHANGE_WORDS.search(text) and (TITLES[key].casefold() in low or key.replace("_", " ") in low))
@@ -542,7 +568,7 @@ def turn(message: str, state, env: dict) -> dict:
     if link:
         question, replies = _question(st["idx"], env, answers)
         return out(f"You can open {link} any time. Back to the setup:\n\n{question}", replies)
-    if GROSS_HELP.search(text):
+    if key != "pay_amounts" and GROSS_HELP.search(text):
         question, replies = _question(st["idx"], env, answers)
         return out(f"{GROSS_ADVICE}\n\nBack to the setup:\n\n{question}", replies)
     if env.get("ai_answer") and _looks_like_question(text):

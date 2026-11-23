@@ -1,4 +1,21 @@
-from reckon_hrms.constants import EXTRA_SCOPED_DOCTYPES, READ_ONLY_SETTINGS, SHARED_CATALOG_DOCTYPES, TENANT_OWNED_DOCTYPES
+import hashlib
+from pathlib import Path
+
+from reckon_hrms.constants import (
+    EXTRA_SCOPED_DOCTYPES,
+    READ_ONLY_SETTINGS,
+    SHARED_CATALOG_DOCTYPES,
+    TENANT_OWNED_DOCTYPES,
+)
+
+
+def _asset_version(*parts):
+    """A short fingerprint of an asset file. nginx caches /assets for a year, so the URL changes when the file does."""
+    try:
+        return hashlib.md5((Path(__file__).parent / "public" / Path(*parts)).read_bytes()).hexdigest()[:10]
+    except OSError:
+        return "0"
+
 
 app_name = "reckon_hrms"
 app_title = "Reckon HRMS"
@@ -11,7 +28,7 @@ app_license = "GPL-3.0-or-later"
 required_apps = ["frappe", "erpnext", "hrms", "reckon_saas_platform"]
 
 # Shared stage code for the single Setup page (Your company, Salary rules, Run salary).
-app_include_js = ["/assets/reckon_hrms/js/reckon_setup_stages.js", "/assets/reckon_hrms/js/reckon_guided_setup.js", "/assets/reckon_hrms/js/reckon_home_redirect.js"]
+app_include_js = [f"/assets/reckon_hrms/js/{name}?v={_asset_version('js', name)}" for name in ("reckon_setup_stages.js", "reckon_guided_setup.js", "reckon_home_redirect.js")]
 
 # The Reckon HRMS tile on the Desk apps screen, and the landing page for HRMS-only tenants.
 add_to_apps_screen = [

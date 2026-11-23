@@ -295,11 +295,11 @@ class PayrollFlowTests(unittest.TestCase):
 
     def test_it_asks_only_the_salary_structure_and_the_deduction_rule(self):
         r = self.start(self.env())
-        self.assertIn("2 questions", r["reply"].replace("two questions", "2 questions"))
-        self.assertIn("1 of 2", r["reply"])
+        self.assertIn("3 questions", r["reply"].replace("three questions", "3 questions"))
+        self.assertIn("1 of 3", r["reply"])
         self.assertIn("salary structure", r["reply"].lower())
         for hr_question in ("country", "language", "departments", "holidays", "working hours", "leave days", "Where do you work"):
-            self.assertNotIn(hr_question, r["reply"].split("**1 of 2")[1], hr_question)
+            self.assertNotIn(hr_question, r["reply"].split("**1 of 3")[1], hr_question)
         self.assertEqual(r["state"]["flow"], "payroll")
 
     def test_the_plan_lists_only_payroll_steps_and_applying_changes_nothing_else(self):
@@ -308,11 +308,13 @@ class PayrollFlowTests(unittest.TestCase):
         r = self.start(env)
         r = say("Standard, basic 60, house rent 20, medical 1500, conveyance 1000", r["state"], env)
         self.assertIn("1500", r["reply"])
-        self.assertIn("2 of 2", r["reply"])
+        self.assertIn("2 of 3", r["reply"])
         r = say("every 3 marks = 1 day, divided by 30, no cap", r["state"], env)
+        self.assertIn("3 of 3", r["reply"])
+        r = say("a different gross for each person", r["state"], env)
         self.assertEqual(r["state"]["phase"], "review")
         self.assertIn("Salary structure", r["reply"])
-        self.assertIn("Late and early deduction rule", r["reply"])
+        self.assertIn("Attendance deduction rule", r["reply"])
         for hr_step in ("Industry", "Country", "Locations", "Holiday calendar", "Working hours", "Leave policy"):
             self.assertNotIn(hr_step, r["reply"], hr_step)
         done = say("Yes, set everything up", r["state"], env)
@@ -437,7 +439,7 @@ class HrFirstChatTests(unittest.TestCase):
         r = say("start payroll", None, self.env(["Employees", "Attendance and working hours"]))
         self.assertIn("Payroll needs HR set up first", r["reply"])
         self.assertIn("Employees; Attendance and working hours", r["reply"])
-        self.assertNotIn("1 of 2", r["reply"])
+        self.assertNotIn("1 of 3", r["reply"])
         self.assertEqual([o["value"] for o in r["choices"]["options"]], ["start"])
         self.assertEqual(r["state"]["flow"], "")
 
@@ -450,7 +452,7 @@ class HrFirstChatTests(unittest.TestCase):
 
     def test_payroll_questions_start_once_hr_is_done(self):
         r = say("start payroll", None, self.env([]))
-        self.assertIn("1 of 2", r["reply"])
+        self.assertIn("1 of 3", r["reply"])
         self.assertEqual(r["state"]["flow"], "payroll")
 
 
@@ -632,3 +634,21 @@ class GrossAdviceTests(unittest.TestCase):
         from reckon_hrms import setup_chat
 
         self.assertIsNone(setup_chat.GROSS_HELP.search("every 3 late marks = 1 day, pay / 30"))
+
+
+class PayAmountsStepTests(unittest.TestCase):
+    def test_the_last_payroll_question_is_same_or_different_gross_and_changes_the_closing_advice(self):
+        from reckon_hrms import setup_chat
+
+        self.assertEqual(setup_chat.PAYROLL_STEPS[-1], "pay_amounts")
+        env = {"company": "Acme", "steps": setup_chat.PAYROLL_STEPS, "year": 2026}
+        value, error, _ = setup_chat._read("pay_amounts", "a different gross for each person", env, {})
+        self.assertEqual(value, {"pay_mode": "different"})
+        value, error, _ = setup_chat._read("pay_amounts", "The same gross for everyone", env, {})
+        self.assertEqual(value, {"pay_mode": "same"})
+        value, error, _ = setup_chat._read("pay_amounts", "banana", env, {})
+        self.assertIsNone(value)
+        self.assertIn("Please choose", error)
+        self.assertIn("Each person's gross salary", setup_chat._pay_next("different"))
+        self.assertNotIn("Each person's gross salary", setup_chat._pay_next("same"))
+        self.assertIn("same gross", setup_chat._pay_next(None))
