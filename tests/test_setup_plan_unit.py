@@ -228,3 +228,19 @@ class DeductionRuleTests(unittest.TestCase):
     def test_no_weekly_off_is_planned_unless_it_was_asked(self):
         self.assertEqual(self.step(self.plan({"rule_marks": "3", "rule_divisor": "30"}), "holidays")["status"], "skipped")
         self.assertEqual(self.step(self.plan({"weekly_off": ["Friday"]}), "holidays")["status"], "ready")
+
+
+class WeeklyOffDatesTests(unittest.TestCase):
+    def test_every_chosen_weekday_in_the_period_and_nothing_twice(self):
+        from datetime import date
+
+        rows = sp.weekly_off_dates(date(2026, 1, 1), date(2026, 12, 31), ["Friday"])
+        self.assertEqual(len(rows), 52)
+        self.assertTrue(all(name == "Friday" for _d, name in rows))
+        self.assertEqual(rows[0][0], "2026-01-02")
+        again = sp.weekly_off_dates(date(2026, 1, 1), date(2026, 1, 31), ["Friday", "Saturday"], have=["2026-01-02"])
+        self.assertNotIn("2026-01-02", [d for d, _n in again])
+        self.assertEqual(len(again), 9)
+
+    def test_a_country_gets_its_usual_days(self):
+        self.assertEqual(sp.suggest_weekly_off("Bangladesh"), ["Friday"])

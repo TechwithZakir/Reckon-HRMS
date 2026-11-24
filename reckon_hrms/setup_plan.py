@@ -25,6 +25,19 @@ WEEKLY_OFF_BY_COUNTRY = {
 DEFAULT_WEEKLY_OFF = ["Saturday", "Sunday"]
 
 
+def weekly_off_dates(start, end, days, have=()) -> list[tuple[str, str]]:
+    """(date, weekday) for every chosen weekday from ``start`` to ``end`` (dates) that is not in ``have`` already."""
+    from datetime import timedelta
+
+    skip, out, day = {str(d) for d in have}, [], start
+    while day <= end:
+        name = day.strftime("%A")
+        if name in days and day.isoformat() not in skip:
+            out.append((day.isoformat(), name))
+        day += timedelta(days=1)
+    return out
+
+
 def suggest_weekly_off(country) -> list[str]:
     return list(WEEKLY_OFF_BY_COUNTRY.get(clean_text(country, 60), DEFAULT_WEEKLY_OFF))
 

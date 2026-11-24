@@ -44,6 +44,26 @@ def ensure_shared_defaults() -> dict:
     return created
 
 
+def weekly_off_days(company: str, field_value: str | None = None) -> list[str]:
+    """The weekly off days for a company: the list's own choice, else the usual ones for the company's country."""
+    from reckon_hrms import setup_plan
+
+    if field_value in setup_plan.WEEKDAYS:
+        return [field_value]
+    return setup_plan.suggest_weekly_off(frappe.db.get_value("Company", company, "country"))
+
+
+def fill_weekly_off(doc, days: list[str]) -> int:
+    """Add the weekly off days to a Holiday List for its whole period (a new list has none: the field alone creates no rows)."""
+    from reckon_hrms import setup_plan
+
+    have = [r.holiday_date for r in doc.get("holidays") or []]
+    rows = setup_plan.weekly_off_dates(frappe.utils.getdate(doc.from_date), frappe.utils.getdate(doc.to_date), days, have)
+    for date, name in rows:
+        doc.append("holidays", {"holiday_date": date, "description": name, "weekly_off": 1})
+    return len(rows)
+
+
 def ensure_company_defaults(company: str) -> dict:
     """Company-owned starter masters: departments and a holiday calendar for each tenant."""
     created = 0
@@ -57,14 +77,17 @@ def ensure_company_defaults(company: str) -> dict:
     holiday_list_created = 0
     if not frappe.db.exists("Holiday List", {"company": company}):
         year = frappe.utils.getdate().year
-        frappe.get_doc({
+        doc = frappe.get_doc({
             "doctype": "Holiday List",
             "holiday_list_name": holiday_list,
             "company": company,
             "from_date": f"{year}-01-01",
             "to_date": f"{year}-12-31",
-            "weekly_off": "Friday",
-        }).insert(ignore_permissions=True)
+        })
+        days = weekly_off_days(company)
+        doc.weekly_off = days[0]
+        fill_weekly_off(doc, days)
+        doc.insert(ignore_permissions=True)
         holiday_list_created = 1
     return {"departments": created, "holiday_list": holiday_list_created}
 

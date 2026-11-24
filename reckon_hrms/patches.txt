@@ -27,3 +27,4 @@ reckon_hrms.patches.menu_more_doctypes
 reckon_hrms.patches.payroll_payable_account_type
 reckon_hrms.patches.component_accounts_existing_slips
 reckon_hrms.patches.holiday_assignment_for_employees
+reckon_hrms.patches.weekly_off_for_existing_lists
