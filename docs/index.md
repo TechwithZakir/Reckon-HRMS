@@ -8,6 +8,8 @@ lang: en
 
 # Reckon HRMS: compact HR and payroll for small businesses
 
+![Banner](banner.svg)
+
 Reckon HRMS is a company-wise HR and payroll product from Reckon Technologies Ltd. It is designed for small businesses that want employee records, attendance, leave and payroll in one simple workspace, delivered as a subscription through [ReckonERP](https://app.reckon.tech).
 
 ## Detailed features
